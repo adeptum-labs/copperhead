@@ -17,6 +17,8 @@ package org.copperhead.core.sample;
 
 import java.util.List;
 import java.util.stream.IntStream;
+import org.copperhead.core.debug.MemoryRow;
+import org.copperhead.core.debug.Register;
 import org.copperhead.core.graphics.AmigaColor;
 import org.copperhead.core.graphics.CopperList;
 import org.copperhead.core.graphics.Palette;
@@ -59,6 +61,23 @@ public final class SampleMachine {
 	public static CopperList copperList() {
 		return CopperList.of(COPPER_BASE, 0x0100, 0x1200, 0x0180, 0x0000, 0x3001, 0xFFFE, 0x0180, 0x0A3F,
 			0x3101, 0xFFFE, 0x0180, 0x0B4F, 0xFFFF, 0xFFFE);
+	}
+
+	/** The registers where the plasma stops; D0 counts the steps taken, so it is handed in. */
+	public static List<Register> registers(final int d0) {
+		return List.of(new Register("D0", d0), new Register("D1", 0x1F), new Register("D2", 0),
+			new Register("D3", 0x140), new Register("D4", 0x100), new Register("D5", 0), new Register("D6", 1),
+			new Register("D7", 0xFF), new Register("A0", 0xC1200), new Register("A1", 0xC1400),
+			new Register("A2", 0x40000), new Register("A3", 0x40028), new Register("A4", 0),
+			new Register("A5", 0xDFF000), new Register("A6", 0x676), new Register("A7", 0x7FF00));
+	}
+
+	public static List<MemoryRow> memory() {
+		return List.of(
+			new MemoryRow("00040000", "0000 0000 0F0F 0F0F  3C3C 3C3C 7E7E 7E7E", "........<<<<~~~~"),
+			new MemoryRow("00040010", "FFFF FFFF 7E7E 7E7E  3C3C 3C3C 0F0F 0F0F", "....~~~~<<<<...."),
+			new MemoryRow("00040020", "0000 0000 0000 0000  0000 0000 0000 0000", "................"),
+			new MemoryRow("00DFF180", "0A3F 0000 0F00 00F0  000F 0FFF 0888 0444", ".?.............."));
 	}
 
 	private static int ballCell(final int cell) {
