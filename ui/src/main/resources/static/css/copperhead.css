@@ -830,3 +830,92 @@ html[data-theme="light"] [data-theme-toggle] .menu__check {
 	border-radius: 6px;
 	background: var(--bar);
 }
+
+.debugger {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	padding: 14px;
+}
+
+.debugger__bar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px;
+}
+
+.debugger__status {
+	margin-left: 6px;
+	color: var(--mute);
+	font: 11px var(--mono);
+}
+
+.debugger__cards {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+	gap: 12px;
+}
+
+.card {
+	padding: 10px 12px;
+	background: var(--panel);
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	font: 11px/1.6 var(--mono);
+}
+
+.card__title {
+	margin: 0 0 8px;
+	color: var(--mute);
+	font: 500 11px var(--sans);
+	letter-spacing: .04em;
+	text-transform: uppercase;
+}
+
+.card__note {
+	margin: 0 0 6px;
+	color: var(--mute);
+	font-family: var(--sans);
+}
+
+.registers {
+	display: grid;
+	grid-template-columns: repeat(4, minmax(0, 1fr));
+	gap: 2px 12px;
+}
+
+.register {
+	display: flex;
+	gap: 6px;
+}
+
+.register__name {
+	color: var(--mute);
+}
+
+.register--pc .register__value {
+	color: var(--acct);
+}
+
+.copper__row,
+.memory__row,
+.breakpoint {
+	display: flex;
+	gap: 12px;
+	white-space: pre;
+}
+
+.copper__address,
+.memory__address {
+	color: var(--mute);
+}
+
+.copper__decoded {
+	color: var(--kw);
+}
+
+.memory__text,
+.breakpoint__hits {
+	color: var(--cm);
+}

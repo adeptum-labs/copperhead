@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+	<body>
+		<div th:fragment="debugger" class="debugger">
+			<div class="debugger__bar">
+				<button class="button button--accent" type="button" hx-post="/action/step">Step · F8</button>
+				<button class="button" type="button" hx-post="/action/step-over">Over · F10</button>
+				<button class="button" type="button" hx-post="/action/run">Run/Pause · F5</button>
+				<span class="debugger__status" th:text="${view.status()}">stopped · plasma.s:13</span>
+			</div>
+			<div class="debugger__cards">
+				<section class="card">
+					<h3 class="card__title">Registers</h3>
+					<div class="registers">
+						<div class="register" th:each="register : ${view.registers()}">
+							<span class="register__name" th:text="${register.name()}">D0</span>
+							<span class="register__value" th:text="${register.value()}">00000017</span>
+						</div>
+						<div class="register register--pc">
+							<span class="register__name">PC</span><span class="register__value" th:text="${view.pc()}"></span>
+						</div>
+						<div class="register">
+							<span class="register__name">SR</span><span class="register__value" th:text="${view.sr()}"></span>
+						</div>
+					</div>
+				</section>
+				<section class="card">
+					<h3 class="card__title">Copper list @ $3F800</h3>
+					<div class="copper__row" th:each="row : ${view.copper()}">
+						<span class="copper__address" th:text="${row.address()}"></span>
+						<span class="copper__words" th:text="${row.words()}"></span>
+						<span class="copper__decoded" th:text="${row.decoded()}"></span>
+					</div>
+				</section>
+				<section class="card">
+					<h3 class="card__title">Memory · chip</h3>
+					<div class="memory__row" th:each="row : ${view.memory()}">
+						<span class="memory__address" th:text="${row.address()}"></span>
+						<span th:text="${row.words()}"></span>
+						<span class="memory__text" th:text="${row.text()}"></span>
+					</div>
+				</section>
+				<section class="card">
+					<h3 class="card__title">Breakpoints</h3>
+					<p class="card__note" th:text="'Breakpoints in ' + ${view.file()} + ' · click a line number in Code to toggle'"></p>
+					<div class="breakpoint" th:each="mark : ${view.breakpoints()}">
+						<span class="breakpoint__location" th:text="${mark.location()}">plasma.s:13</span>
+						<span class="breakpoint__hits" th:text="${mark.hits()}">1,170 hits</span>
+					</div>
+				</section>
+			</div>
+		</div>
+	</body>
+</html>

@@ -317,4 +317,39 @@ public class StudioFlowTest {
 		assertEquals(500, screen.trigger("#tool .palette__entry:nth-of-type(1)", Map.of("index", "40")).status());
 		assertEquals(before, rig.session().state());
 	}
+
+	@Example
+	public void shouldShowRegistersCopperMemoryAndBreakpoints() throws Exception {
+		final Screen screen = Screen.open(rig).click(railTool(Tool.DEBUGGER));
+
+		assertEquals("00000017", screen.find("#tool .register:nth-of-type(1) .register__value").text());
+		assertEquals("END", screen.find("#tool .copper__row:last-of-type .copper__decoded").text());
+		assertEquals(4, screen.document().select("#tool .memory__row").size());
+		assertEquals("plasma.s:13", screen.find("#tool .breakpoint__location").text());
+	}
+
+	@Example
+	public void shouldStepWithF8AndPauseTheMachine() throws Exception {
+		final Screen screen = Screen.open(rig).click(railTool(Tool.DEBUGGER)).press("f8");
+
+		assertEquals("stopped · plasma.s:14", screen.find("#tool .debugger__status").text());
+		assertEquals("00000018", screen.find("#tool .register:nth-of-type(1) .register__value").text());
+		assertEquals("▶ Run", screen.find("#machine .machine__run").text());
+	}
+
+	@Example
+	public void shouldCountTheHitWhenTheRunComesRound() throws Exception {
+		final Screen screen = Screen.open(rig).click(railTool(Tool.DEBUGGER))
+			.press("f8").press("f8").press("f8").press("f10");
+
+		assertEquals("stopped · plasma.s:13 · 1,171 hits", screen.find("#tool .debugger__status").text());
+		assertEquals("1,171 hits", screen.find("#tool .breakpoint__hits").text());
+	}
+
+	@Example
+	public void shouldMarkTheLineTheRunStoppedOnInTheCode() throws Exception {
+		final Screen screen = Screen.open(rig).press("f8").click(railTool(Tool.CODE));
+
+		assertTrue(screen.find(line(14)).hasClass("code__line--pc"));
+	}
 }

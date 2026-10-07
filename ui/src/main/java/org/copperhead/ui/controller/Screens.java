@@ -47,6 +47,11 @@ public final class Screens {
 		return regions(state, Region.values());
 	}
 
+	/** The regions a change to the running machine reaches: the controls, the tool, the screen, time and status. */
+	public static Regions playback(final StudioState state) {
+		return regions(state, Region.MACHINE, Region.TOOL, Region.EMULATOR, Region.TIMELINE, Region.STATUS);
+	}
+
 	private static View render(final StudioState state, final Region region) {
 		return switch (region) {
 			case MENUS -> Menus.of(state);

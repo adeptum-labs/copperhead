@@ -40,6 +40,7 @@ public record StudioState(Project project, Target target, Tool tool, Modal modal
 	Sprite sprite, int spriteColour, int paletteIndex, BuildOptions options, BuildReport build,
 	Duration position) {
 
+	private static final int BYTE = 0xFF;
 	private static final int FIRST_D0 = 0x17;
 	private static final int FIRST_HITS = 1170;
 	private static final int BASE_COLOUR = 1;
@@ -98,6 +99,15 @@ public record StudioState(Project project, Target target, Tool tool, Modal modal
 		return build.warnings().stream().findFirst()
 			.map(warning -> withTool(Tool.CODE).withFile(warning.file()).withCursor(warning.line()))
 			.orElse(this);
+	}
+
+	/* The run stops for a step, the way a debugger halts the machine before moving it on by one instruction. */
+	public StudioState step() {
+		final String traced = project.trace().file();
+		final int next = project.trace().after(pc);
+
+		return withRunning(false).withPc(next).withD0(d0 + 1 & BYTE).withBreakpoints(breakpoints.stream()
+			.map(mark -> mark.file().equals(traced) && mark.line() == next ? mark.hit() : mark).toList());
 	}
 
 	public StudioState paintSprite(final int cell) {

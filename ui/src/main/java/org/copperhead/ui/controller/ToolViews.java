@@ -31,6 +31,7 @@ final class ToolViews {
 			case CODE -> CodeViews.tool(state);
 			case SPRITES -> SpriteViews.tool(state);
 			case PALETTE -> PaletteViews.tool(state);
+			case DEBUGGER -> DebuggerViews.tool(state);
 			default -> new ToolView(List.of(title(state.tool().label())), "",
 				new PendingView(state.tool().label()));
 		};

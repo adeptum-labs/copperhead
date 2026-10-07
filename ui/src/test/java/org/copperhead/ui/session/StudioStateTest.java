@@ -94,4 +94,21 @@ public class StudioStateTest {
 
 		assertSame(game, game.showWarning());
 	}
+
+	@Example
+	public void shouldStopAndMoveToTheNextLineOnAStep() {
+		final StudioState stepped = opened.step();
+
+		assertFalse(stepped.running());
+		assertEquals(14, stepped.pc());
+		assertEquals(0x18, stepped.d0());
+	}
+
+	@Example
+	public void shouldCountAHitWhenAStepReachesABreakpoint() {
+		final StudioState round = opened.step().step().step().step();
+
+		assertEquals(13, round.pc());
+		assertEquals(1171, round.breakpoints().getFirst().hits());
+	}
 }
