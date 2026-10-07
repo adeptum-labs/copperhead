@@ -17,6 +17,7 @@ package org.copperhead.ui.session;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.stream.Stream;
 import lombok.With;
 import org.copperhead.core.build.BuildOptions;
 import org.copperhead.core.build.BuildReport;
@@ -58,5 +59,48 @@ public record StudioState(Project project, Target target, Tool tool, Modal modal
 			List.of(new Breakpoint(traced, project.breakpoint(), FIRST_HITS)), project.breakpoint(), FIRST_D0,
 			SampleMachine.ball(), BASE_COLOUR, FIRST_PICK, options, Builds.canned(project, target, options),
 			FIRST_POSITION);
+	}
+
+	public boolean breakpointAt(final String in, final int line) {
+		return breakpoints.stream().anyMatch(mark -> mark.file().equals(in) && mark.line() == line);
+	}
+
+	/** Sets a breakpoint on a line of the open file, or takes away the one already there. */
+	public StudioState toggleBreakpoint(final int line) {
+		requireLine(line);
+
+		if (breakpointAt(file, line)) {
+			return withBreakpoints(breakpoints.stream()
+				.filter(mark -> !mark.file().equals(file) || mark.line() != line).toList());
+		}
+
+		return withBreakpoints(Stream.concat(breakpoints.stream(), Stream.of(new Breakpoint(file, line, 0)))
+			.toList());
+	}
+
+	/** Opens a source; the traced one opens where the run stopped, any other at its top. */
+	public StudioState openFile(final String name) {
+		project.source(name);
+		return withFile(name).withCursor(name.equals(project.trace().file()) ? pc : 1);
+	}
+
+	public StudioState moveCursor(final int line) {
+		requireLine(line);
+		return withCursor(line);
+	}
+
+	public StudioState clearBreakpoints() {
+		return withBreakpoints(List.of());
+	}
+
+	/** Shows the line the first warning of the last build points at. */
+	public StudioState showWarning() {
+		return build.warnings().stream().findFirst()
+			.map(warning -> withTool(Tool.CODE).withFile(warning.file()).withCursor(warning.line()))
+			.orElse(this);
+	}
+
+	private void requireLine(final int line) {
+		project.source(file).line(line);
 	}
 }

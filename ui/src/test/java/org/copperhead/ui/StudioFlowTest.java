@@ -180,4 +180,71 @@ public class StudioFlowTest {
 		assertTrue(save.hasAttr("disabled"));
 		assertEquals("Coming in a later release", save.attr("title"));
 	}
+
+	private static String line(final int number) {
+		return "#tool .code__line:nth-of-type(" + number + ")";
+	}
+
+	@Example
+	public void shouldOpenTheTracedFileStoppedAtItsBreakpoint() throws Exception {
+		final Screen screen = Screen.open(rig);
+
+		assertEquals("plasma.s", screen.find("#tool .tool__tab--active").text());
+		screen.find("#tool .tool__tab--active .tool__mark");
+		assertTrue(screen.find(line(13)).hasClass("code__line--pc"));
+		assertTrue(screen.find(line(13) + " .code__dot").hasClass("code__dot--on"));
+		assertEquals("68000 · UTF-8 · ln 13 · 1 breakpoint", screen.find("#tool .tool__meta").text());
+	}
+
+	@Example
+	public void shouldToggleABreakpointOnTheLineNumber() throws Exception {
+		final Screen screen = Screen.open(rig).click(line(20) + " .code__gutter");
+
+		assertTrue(screen.find(line(20) + " .code__dot").hasClass("code__dot--on"));
+		screen.click(line(20) + " .code__gutter");
+		assertFalse(screen.find(line(20) + " .code__dot").hasClass("code__dot--on"));
+	}
+
+	@Example
+	public void shouldSetABreakpointWhereTheCursorIsWithF9() throws Exception {
+		final Screen screen = Screen.open(rig).click(line(5) + " .code__text").press("f9");
+
+		assertTrue(screen.find(line(5)).hasClass("code__line--cursor"));
+		assertTrue(screen.find(line(5) + " .code__dot").hasClass("code__dot--on"));
+		assertEquals("68000 · UTF-8 · ln 5 · 2 breakpoints", screen.find("#tool .tool__meta").text());
+	}
+
+	@Example
+	public void shouldSwitchFilesFromTheTabs() throws Exception {
+		final Screen screen = Screen.open(rig).click("#tool [hx-vals*=intro.s]");
+
+		assertEquals("intro.s", screen.find("#tool .tool__tab--active").text());
+		assertTrue(screen.document().select("#tool .code__line--pc").isEmpty());
+		assertEquals(20, screen.document().select("#tool .code__line").size());
+	}
+
+	@Example
+	public void shouldClearEveryBreakpointFromTheDebugMenu() throws Exception {
+		final Screen screen = Screen.open(rig).click("#menus [hx-post=/action/breakpoints-clear]");
+
+		assertTrue(screen.document().select("#tool .code__dot--on").isEmpty());
+	}
+
+	@Example
+	public void shouldRefuseALineTheFileDoesNotHave() throws Exception {
+		final Screen screen = Screen.open(rig);
+		final StudioState before = rig.session().state();
+
+		assertEquals(500, screen.trigger(line(5) + " .code__text", Map.of("line", "99")).status());
+		assertEquals(before, rig.session().state());
+	}
+
+	@Example
+	public void shouldRefuseALineThatIsNoNumber() throws Exception {
+		final Screen screen = Screen.open(rig);
+		final StudioState before = rig.session().state();
+
+		assertEquals(500, screen.trigger(line(5) + " .code__gutter", Map.of("line", "five")).status());
+		assertEquals(before, rig.session().state());
+	}
 }

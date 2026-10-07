@@ -24,6 +24,9 @@ import org.copperhead.core.sample.SampleProjects;
 import org.copperhead.ui.view.Modal;
 import org.copperhead.ui.view.Tool;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class StudioStateTest {
@@ -49,5 +52,46 @@ public class StudioStateTest {
 		assertEquals(Tool.CODE, opened.tool());
 		assertEquals(Modal.NONE, opened.modal());
 		assertEquals("nightfall.adf", opened.build().adf());
+	}
+
+	@Example
+	public void shouldSetABreakpointThatHasNotBeenHitYet() {
+		assertTrue(opened.toggleBreakpoint(20).breakpoints().contains(new Breakpoint("plasma.s", 20, 0)));
+	}
+
+	@Example
+	public void shouldTakeAwayTheBreakpointOnALineThatHasOne() {
+		assertFalse(opened.toggleBreakpoint(13).breakpointAt("plasma.s", 13));
+	}
+
+	@Example
+	public void shouldRefuseALineTheOpenFileDoesNotHave() {
+		assertThrows(IllegalArgumentException.class, () -> opened.toggleBreakpoint(34));
+		assertThrows(IllegalArgumentException.class, () -> opened.moveCursor(0));
+	}
+
+	@Example
+	public void shouldOpenAnotherFileAtItsFirstLine() {
+		final StudioState intro = opened.openFile("intro.s");
+
+		assertEquals("intro.s", intro.file());
+		assertEquals(1, intro.cursor());
+		assertThrows(IllegalArgumentException.class, () -> opened.openFile("nowhere.s"));
+	}
+
+	@Example
+	public void shouldShowTheFirstWarningOfTheBuildInTheCode() {
+		final StudioState shown = opened.withTool(Tool.SPRITES).openFile("intro.s").showWarning();
+
+		assertEquals(Tool.CODE, shown.tool());
+		assertEquals("plasma.s", shown.file());
+		assertEquals(24, shown.cursor());
+	}
+
+	@Example
+	public void shouldStayWhereItIsWhenTheBuildWarnedOfNothing() {
+		final StudioState game = StudioState.open(SampleProjects.blitzball(), Target.A500_OCS);
+
+		assertSame(game, game.showWarning());
 	}
 }

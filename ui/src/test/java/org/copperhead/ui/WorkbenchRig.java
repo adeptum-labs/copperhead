@@ -16,6 +16,7 @@
 package org.copperhead.ui;
 
 import java.net.URI;
+import org.copperhead.ui.controller.CodeController;
 import org.copperhead.ui.controller.Screens;
 import org.copperhead.ui.controller.WorkbenchController;
 import org.copperhead.ui.session.ProjectSession;
@@ -44,7 +45,7 @@ public class WorkbenchRig implements AutoCloseable {
 
 	/** Every controller of the studio, sharing the one session the way the container shares it. */
 	static Object[] controllers(final ProjectSession session) {
-		return new Object[] {new WorkbenchController(session)};
+		return new Object[] {new WorkbenchController(session), new CodeController(session)};
 	}
 
 	public URI base() {

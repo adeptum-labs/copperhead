@@ -28,6 +28,7 @@ final class ToolViews {
 
 	static ToolView of(final StudioState state) {
 		return switch (state.tool()) {
+			case CODE -> CodeViews.tool(state);
 			default -> new ToolView(List.of(title(state.tool().label())), "",
 				new PendingView(state.tool().label()));
 		};
