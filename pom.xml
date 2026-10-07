@@ -20,6 +20,14 @@
 		<module>shell</module>
 	</modules>
 	<profiles>
+		<profile>
+			<!-- Drives the interface in a real browser, which is fetched on the first run,
+			     so it stays out of the everyday build. -->
+			<id>browser</id>
+			<modules>
+				<module>e2e</module>
+			</modules>
+		</profile>
 	</profiles>
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
