@@ -39,6 +39,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class StudioFlowTest {
 	private static final Pattern FONT = Pattern.compile("url\\(\"\\.\\./fonts/([^\"]+)\"\\)");
+	private static final String CELLS = "#tool .sprite__grid .sprite__cell";
 
 	private WorkbenchRig rig;
 
@@ -90,7 +91,7 @@ public class StudioFlowTest {
 		final Screen screen = Screen.open(rig).click(railTool(Tool.SPRITES));
 
 		assertEquals("Sprites", screen.find("#rail .rail__tool--on").attr("title"));
-		assertEquals("Sprites", screen.find("#tool .tool__tab--active").text());
+		assertEquals("ball.spr", screen.find("#tool .tool__tab--active").text());
 		assertTrue(screen.find("#menus [hx-vals*=SPRITES]").hasClass("menu__item--checked"));
 	}
 
@@ -245,6 +246,41 @@ public class StudioFlowTest {
 		final StudioState before = rig.session().state();
 
 		assertEquals(500, screen.trigger(line(5) + " .code__gutter", Map.of("line", "five")).status());
+		assertEquals(before, rig.session().state());
+	}
+
+	@Example
+	public void shouldPaintTheCellClickedInTheColourChosen() throws Exception {
+		final Screen screen = Screen.open(rig).click(railTool(Tool.SPRITES))
+			.click("#tool .swatch:nth-of-type(3)").click(CELLS + ":nth-of-type(1)");
+
+		assertTrue(screen.find("#tool .swatch:nth-of-type(3)").hasClass("swatch--on"));
+		assertTrue(screen.find(CELLS + ":nth-of-type(1)").hasClass("sprite__cell--2"));
+	}
+
+	@Example
+	public void shouldClearEveryCell() throws Exception {
+		final Screen screen = Screen.open(rig).click(railTool(Tool.SPRITES))
+			.click("#tool [hx-post=/action/sprite-clear]");
+
+		assertEquals(256, screen.document().select(CELLS + ".sprite__cell--0").size());
+	}
+
+	@Example
+	public void shouldRefuseAColourAHardwareSpriteCannotShow() throws Exception {
+		final Screen screen = Screen.open(rig).click(railTool(Tool.SPRITES));
+		final StudioState before = rig.session().state();
+
+		assertEquals(500, screen.trigger("#tool .swatch:nth-of-type(3)", Map.of("colour", "4")).status());
+		assertEquals(before, rig.session().state());
+	}
+
+	@Example
+	public void shouldRefuseACellOutsideTheSprite() throws Exception {
+		final Screen screen = Screen.open(rig).click(railTool(Tool.SPRITES));
+		final StudioState before = rig.session().state();
+
+		assertEquals(500, screen.trigger(CELLS + ":nth-of-type(1)", Map.of("cell", "256")).status());
 		assertEquals(before, rig.session().state());
 	}
 }

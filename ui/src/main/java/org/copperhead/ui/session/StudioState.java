@@ -100,6 +100,18 @@ public record StudioState(Project project, Target target, Tool tool, Modal modal
 			.orElse(this);
 	}
 
+	public StudioState paintSprite(final int cell) {
+		return withSprite(sprite.paint(cell, spriteColour));
+	}
+
+	public StudioState pickSpriteColour(final int colour) {
+		return withSpriteColour(Sprite.requireColour(colour));
+	}
+
+	public StudioState clearSprite() {
+		return withSprite(Sprite.blank());
+	}
+
 	private void requireLine(final int line) {
 		project.source(file).line(line);
 	}
