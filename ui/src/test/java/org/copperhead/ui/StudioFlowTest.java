@@ -352,4 +352,64 @@ public class StudioFlowTest {
 
 		assertTrue(screen.find(line(14)).hasClass("code__line--pc"));
 	}
+
+	@Example
+	public void shouldWarnOfTheScaledIndexWhenBuildingForOcs() throws Exception {
+		final Screen screen = Screen.open(rig).press("ctrl+b");
+
+		assertEquals("1 warning · plasma.s:24", screen.find("#status .status__warning").text());
+		assertEquals("Built nightfall.adf · 2,911 bytes", screen.find("#status .status__note").text());
+		assertEquals("last build 2,911 bytes · 0.9s", screen.find("#status .status__build").text());
+	}
+
+	@Example
+	public void shouldBuildCleanForAga() throws Exception {
+		final Screen screen = Screen.open(rig).click("#machine [hx-vals*=AGA]").press("ctrl+b");
+
+		assertTrue(screen.document().select("#status .status__warning").isEmpty());
+		assertEquals("0 warnings", screen.find("#status .status__warnings").text());
+	}
+
+	@Example
+	public void shouldShipUncrunchedOnceShrinklerIsOff() throws Exception {
+		final Screen screen = Screen.open(rig).click(railTool(Tool.BUILD))
+			.click("#tool [hx-vals*=SHRINKLER]").click("#tool [hx-post=/action/build]");
+
+		assertEquals("nightfall.adf · 7,016 bytes · 0.9s · A500", screen.find("#tool .build__summary").text());
+		assertFalse(screen.find("#menus [hx-vals*=SHRINKLER]").hasClass("menu__item--checked"));
+	}
+
+	@Example
+	public void shouldJumpToTheLineAWarningNames() throws Exception {
+		final Screen screen = Screen.open(rig).click(railTool(Tool.SPRITES)).press("ctrl+b")
+			.click("#status .status__warning");
+
+		assertEquals("plasma.s", screen.find("#tool .tool__tab--active").text());
+		assertTrue(screen.find(line(24)).hasClass("code__line--cursor"));
+	}
+
+	@Example
+	public void shouldForgetTheNoteOnTheNextAction() throws Exception {
+		final Screen screen = Screen.open(rig).press("ctrl+b").click(railTool(Tool.SPRITES));
+
+		assertTrue(screen.document().select("#status .status__note").isEmpty());
+	}
+
+	@Example
+	public void shouldShowThePartAndFrameTheRunIsAt() throws Exception {
+		final Screen screen = Screen.open(rig);
+
+		assertEquals("Part 03 · Plasma", screen.find("#status .status__part").text());
+		assertEquals("frame 1170", screen.find("#status .status__frame").text());
+		assertEquals("A500 · OCS", screen.find("#status .status__machine").text());
+	}
+
+	@Example
+	public void shouldRefuseAnOptionItDoesNotHave() throws Exception {
+		final Screen screen = Screen.open(rig).click(railTool(Tool.BUILD));
+		final StudioState before = rig.session().state();
+
+		assertEquals(500, screen.trigger("#tool [hx-vals*=SHRINKLER]", Map.of("option", "TURBO")).status());
+		assertEquals(before, rig.session().state());
+	}
 }

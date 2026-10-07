@@ -15,9 +15,7 @@
 
 package org.copperhead.ui.controller;
 
-import java.util.List;
 import org.copperhead.ui.session.StudioState;
-import org.copperhead.ui.view.PendingView;
 import org.copperhead.ui.view.TabView;
 import org.copperhead.ui.view.ToolView;
 
@@ -32,8 +30,7 @@ final class ToolViews {
 			case SPRITES -> SpriteViews.tool(state);
 			case PALETTE -> PaletteViews.tool(state);
 			case DEBUGGER -> DebuggerViews.tool(state);
-			default -> new ToolView(List.of(title(state.tool().label())), "",
-				new PendingView(state.tool().label()));
+			case BUILD -> BuildViews.tool(state);
 		};
 	}
 

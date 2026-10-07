@@ -17,8 +17,10 @@ package org.copperhead.ui.session;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.Locale;
 import java.util.stream.Stream;
 import lombok.With;
+import org.copperhead.core.build.BuildOption;
 import org.copperhead.core.build.BuildOptions;
 import org.copperhead.core.build.BuildReport;
 import org.copperhead.core.build.Builds;
@@ -108,6 +110,17 @@ public record StudioState(Project project, Target target, Tool tool, Modal modal
 
 		return withRunning(false).withPc(next).withD0(d0 + 1 & BYTE).withBreakpoints(breakpoints.stream()
 			.map(mark -> mark.file().equals(traced) && mark.line() == next ? mark.hit() : mark).toList());
+	}
+
+	public StudioState build(final boolean andRun) {
+		final BuildReport report = Builds.canned(project, target, options);
+
+		return withBuild(report).withRunning(running || andRun)
+			.withNote(String.format(Locale.ROOT, "Built %s · %,d bytes", report.adf(), report.bytes()));
+	}
+
+	public StudioState toggleOption(final BuildOption option) {
+		return withOptions(options.toggle(option));
 	}
 
 	public StudioState paintSprite(final int cell) {

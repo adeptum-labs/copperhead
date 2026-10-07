@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+	<body>
+		<footer th:fragment="status" id="status" class="status" hx-swap-oob="true">
+			<span>vasm 1.9h</span>
+			<span class="status__ok">0 errors</span>
+			<button class="status__warning" type="button" th:if="${view.warns()}" hx-post="/action/goto-warning"
+				th:text="${view.warnings()}">1 warning · plasma.s:24</button>
+			<span class="status__warnings" th:unless="${view.warns()}" th:text="${view.warnings()}">0 warnings</span>
+			<span class="status__build" th:text="${view.lastBuild()}">last build 2,911 bytes · 0.9s</span>
+			<span class="status__note" th:unless="${view.note().isEmpty()}" th:text="${view.note()}"></span>
+			<span class="status__spacer"></span>
+			<span class="status__part" th:text="${view.part()}">Part 03 · Plasma</span>
+			<span class="status__frame" th:text="${view.frame()}">frame 1170</span>
+			<span class="status__machine" th:text="${view.machine()}">A500 · OCS</span>
+		</footer>
+	</body>
+</html>

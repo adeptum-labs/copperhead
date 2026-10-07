@@ -58,6 +58,7 @@ public final class Screens {
 			case MACHINE -> ChromeViews.machine(state);
 			case RAIL -> ChromeViews.rail(state);
 			case TOOL -> ToolViews.of(state);
+			case STATUS -> StatusViews.of(state);
 			default -> new Placeholder(region);
 		};
 	}

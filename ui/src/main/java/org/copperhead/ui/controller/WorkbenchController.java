@@ -44,7 +44,7 @@ public class WorkbenchController {
 		final Tool tool = Tool.valueOf(form.get("tool"));
 
 		return Screens.regions(session.change(state -> state.withTool(tool)), Region.MENUS, Region.RAIL,
-			Region.TOOL);
+			Region.TOOL, Region.STATUS);
 	}
 
 	/* A project opens as it was saved, so nothing of the one before it carries over but the machine. */

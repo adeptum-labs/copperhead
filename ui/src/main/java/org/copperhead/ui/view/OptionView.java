@@ -15,12 +15,5 @@
 
 package org.copperhead.ui.view;
 
-import org.copperhead.web.action.View;
-
-/** The body of a tool whose view is not drawn yet. */
-public record PendingView(String tool) implements View {
-	@Override
-	public String template() {
-		return "fragments/pending :: pending";
-	}
+public record OptionView(String label, boolean on, String vals) {
 }
