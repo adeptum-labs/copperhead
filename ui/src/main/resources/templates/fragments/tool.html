@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+	<body>
+		<section th:fragment="tool" id="tool" class="tool" hx-swap-oob="true">
+			<div class="tool__tabs">
+				<button class="tool__tab" type="button" th:each="tab : ${view.tabs()}"
+					th:classappend="${tab.active()} ? 'tool__tab--active'"
+					th:attr="hx-post=${tab.post()}, hx-vals=${tab.vals()}">
+					<span class="tool__mark" th:if="${tab.marked()}" aria-hidden="true"></span>
+					<span th:text="${tab.label()}">plasma.s</span>
+				</button>
+				<span class="tool__meta" th:text="${view.meta()}">68000 · UTF-8</span>
+			</div>
+			<div class="tool__body">
+				<th:block th:with="view=${view.content()}"><div th:replace="~{__${view.template()}__}"></div></th:block>
+			</div>
+		</section>
+	</body>
+</html>

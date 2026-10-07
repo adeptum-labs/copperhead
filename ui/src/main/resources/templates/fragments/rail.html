@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+	<body>
+		<nav th:fragment="rail" id="rail" class="rail" hx-swap-oob="true">
+			<button class="rail__tool" type="button" title="Code" hx-post="/action/tool" hx-vals='{"tool":"CODE"}'
+				th:classappend="${view.on('CODE')} ? 'rail__tool--on'"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="7 5 2.5 10 7 15"></polyline><polyline points="13 5 17.5 10 13 15"></polyline><line x1="11.5" y1="3.5" x2="8.5" y2="16.5"></line></svg></button>
+			<button class="rail__tool" type="button" title="Sprites" hx-post="/action/tool" hx-vals='{"tool":"SPRITES"}'
+				th:classappend="${view.on('SPRITES')} ? 'rail__tool--on'"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="6" height="6"></rect><rect x="11" y="3" width="6" height="6" fill="currentColor"></rect><rect x="3" y="11" width="6" height="6" fill="currentColor"></rect><rect x="11" y="11" width="6" height="6"></rect></svg></button>
+			<button class="rail__tool" type="button" title="Palette &amp; copper" hx-post="/action/tool"
+				hx-vals='{"tool":"PALETTE"}' th:classappend="${view.on('PALETTE')} ? 'rail__tool--on'"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7.5"></circle><circle cx="7" cy="8" r="1.3" fill="currentColor" stroke="none"></circle><circle cx="11.5" cy="6.5" r="1.3" fill="currentColor" stroke="none"></circle><circle cx="13" cy="11" r="1.3" fill="currentColor" stroke="none"></circle><circle cx="8.5" cy="13" r="1.3" fill="currentColor" stroke="none"></circle></svg></button>
+			<button class="rail__tool" type="button" title="Debugger" hx-post="/action/tool" hx-vals='{"tool":"DEBUGGER"}'
+				th:classappend="${view.on('DEBUGGER')} ? 'rail__tool--on'"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7"></circle><circle cx="10" cy="10" r="2.6" fill="currentColor" stroke="none"></circle><line x1="10" y1="1.5" x2="10" y2="4.5"></line><line x1="10" y1="15.5" x2="10" y2="18.5"></line><line x1="1.5" y1="10" x2="4.5" y2="10"></line><line x1="15.5" y1="10" x2="18.5" y2="10"></line></svg></button>
+			<button class="rail__tool" type="button" title="Build &amp; export" hx-post="/action/tool"
+				hx-vals='{"tool":"BUILD"}' th:classappend="${view.on('BUILD')} ? 'rail__tool--on'"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="14" height="14" rx="1.5"></rect><rect x="6.5" y="3" width="7" height="4.5"></rect><rect x="6.5" y="11.5" width="7" height="5.5" fill="currentColor" stroke="none"></rect></svg></button>
+			<span class="rail__chip">chip <span th:text="${view.chipFree()}">212K</span></span>
+		</nav>
+	</body>
+</html>

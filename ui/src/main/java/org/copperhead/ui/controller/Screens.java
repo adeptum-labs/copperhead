@@ -49,6 +49,10 @@ public final class Screens {
 
 	private static View render(final StudioState state, final Region region) {
 		return switch (region) {
+			case MENUS -> Menus.of(state);
+			case MACHINE -> ChromeViews.machine(state);
+			case RAIL -> ChromeViews.rail(state);
+			case TOOL -> ToolViews.of(state);
 			default -> new Placeholder(region);
 		};
 	}

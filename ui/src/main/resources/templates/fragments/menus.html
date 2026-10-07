@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+	<body>
+		<nav th:fragment="menus" id="menus" class="menus" hx-swap-oob="true">
+			<span class="menus__project" th:text="${view.projectFile()}">nightfall.chp</span>
+			<div class="menu" th:each="menu : ${view.menus()}" data-menu>
+				<button class="menu__button" type="button" data-menu-button th:text="${menu.label()}">File</button>
+				<div class="menu__list" role="menu" hidden>
+					<th:block th:each="item : ${menu.items()}">
+						<hr class="menu__separator" th:if="${item.separated()}">
+						<button class="menu__item" type="button" role="menuitem"
+							th:classappend="${item.checked()} ? 'menu__item--checked'"
+							th:attr="hx-post=${item.post()}, hx-vals=${item.values()}, data-key=${item.key()},
+								data-theme-toggle=${item.theme()} ? '' : null"
+							th:disabled="${item.later()}" th:title="${item.later()} ? 'Coming in a later release'">
+							<span class="menu__check" aria-hidden="true">✓</span>
+							<span class="menu__label" th:text="${item.label()}">Save</span>
+							<span class="menu__keys" th:text="${item.keys()}">Ctrl+S</span>
+						</button>
+					</th:block>
+				</div>
+			</div>
+		</nav>
+	</body>
+</html>
