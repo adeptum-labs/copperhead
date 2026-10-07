@@ -21,6 +21,7 @@ import java.net.URLEncoder;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -40,24 +41,34 @@ public final class Screen {
 	private static final String NONE = "none";
 	private static final String OUT_OF_BAND = "true";
 	private static final String SCRIPTED = "js:";
-	private static final int OK = 200;
+	private static final String DATA = "data-";
+	private static final String HTMX = "hx-";
+	private static final Set<String> FIELDS = Set.of("input", "select", "textarea");
+	private static final int FIRST_SUCCESS = 200;
+	private static final int FIRST_REDIRECT = 300;
 	private static final Jsonb JSON = JsonbBuilder.create();
 
 	private final Client client;
 	private final Document document;
 	private int status;
 
-	private Screen(final Client client, final HttpResponse<String> response) {
+	private Screen(final Client client, final String html, final int status) {
 		this.client = client;
-		this.document = Jsoup.parse(response.body());
-		this.status = response.statusCode();
+		this.document = Jsoup.parse(html);
+		this.status = status;
 	}
 
 	/** The page the shell opens, entered with the token as the window enters it. */
 	public static Screen open(final WorkbenchRig rig) throws Exception {
 		final Client client = new Client(rig.base());
+		final HttpResponse<String> response = client.get(rig.entrance().toString());
 
-		return new Screen(client, client.get(rig.entrance().toString()));
+		return new Screen(client, response.body(), response.statusCode());
+	}
+
+	/** A page made by hand, so a test can show what is refused without a server to answer. */
+	static Screen over(final Client client, final String html) {
+		return new Screen(client, html, 200);
 	}
 
 	public Client client() {
@@ -68,7 +79,7 @@ public final class Screen {
 		return document;
 	}
 
-	/** The status of the last answer; anything but a 200 leaves the page as it was. */
+	/** The status of the last answer; anything but a 2xx leaves the page as it was. */
 	public int status() {
 		return status;
 	}
@@ -90,7 +101,7 @@ public final class Screen {
 			throw new AssertionError(css + " is disabled and cannot be clicked");
 		}
 
-		if (element.attr("hx-vals").startsWith(SCRIPTED)) {
+		if (value(element, "hx-vals").startsWith(SCRIPTED)) {
 			throw new UnsupportedOperationException(css + " works out values of its own; trigger it with them");
 		}
 
@@ -102,7 +113,7 @@ public final class Screen {
 		return send(find(css), values);
 	}
 
-	/** Presses a shortcut the way the page does, by clicking the control that carries it as data-key. */
+	/** Clicks the control that carries the key as data-key, which is how keys.js presses it. */
 	public Screen press(final String key) throws Exception {
 		return click("[data-key=\"" + key + "\"]");
 	}
@@ -110,11 +121,13 @@ public final class Screen {
 	private Screen send(final Element element, final Map<String, String> values) throws Exception {
 		refuseWhatIsNotPlayedOut(element);
 
-		final HttpResponse<String> response = client.submit(element.attr("hx-post"), encode(sent(element, values)));
+		final String form = encode(sent(element, values));
+		final HttpResponse<String> response = client.submit(value(element, "hx-post"), form);
 
+		refuseHeadersThatDirectHtmx(response);
 		status = response.statusCode();
 
-		if (status == OK) {
+		if (status >= FIRST_SUCCESS && status < FIRST_REDIRECT) {
 			for (final Element arrived : Jsoup.parseBodyFragment(response.body()).body().children()) {
 				swap(arrived);
 			}
@@ -123,10 +136,22 @@ public final class Screen {
 		return this;
 	}
 
+	private static void refuseHeadersThatDirectHtmx(final HttpResponse<String> response) {
+		response.headers().map().keySet().stream().filter(name -> name.toLowerCase(Locale.ROOT).startsWith(HTMX))
+			.findFirst().ifPresent(name -> {
+				throw new UnsupportedOperationException(name + " is not played out");
+			});
+	}
+
 	private void swap(final Element arrived) {
-		if (!OUT_OF_BAND.equals(arrived.attr("hx-swap-oob"))) {
+		if (!OUT_OF_BAND.equals(value(arrived, "hx-swap-oob"))) {
 			throw new UnsupportedOperationException("Only regions swapped out of band are played out, not "
 				+ arrived.cssSelector());
+		}
+
+		if (!arrived.children().select("[hx-swap-oob], [data-hx-swap-oob], script").isEmpty()) {
+			throw new UnsupportedOperationException("Neither a nested swap nor a script is played out in #"
+				+ arrived.id());
 		}
 
 		final Element shown = document.getElementById(arrived.id());
@@ -141,8 +166,8 @@ public final class Screen {
 	private static Map<String, String> sent(final Element element, final Map<String, String> values) {
 		final Map<String, String> sent = new LinkedHashMap<>();
 
-		if (element.hasAttr("hx-vals") && !element.attr("hx-vals").startsWith(SCRIPTED)) {
-			JSON.fromJson(element.attr("hx-vals"), Map.class)
+		if (has(element, "hx-vals") && !value(element, "hx-vals").startsWith(SCRIPTED)) {
+			JSON.fromJson(value(element, "hx-vals"), Map.class)
 				.forEach((key, value) -> sent.put(String.valueOf(key), String.valueOf(value)));
 		}
 
@@ -151,23 +176,53 @@ public final class Screen {
 	}
 
 	private static void refuseWhatIsNotPlayedOut(final Element element) {
-		if (!element.hasAttr("hx-post")) {
+		if (!has(element, "hx-post")) {
 			throw new AssertionError("Nothing is sent by " + element.cssSelector());
 		}
 
-		final Element carrier = element.closest("[hx-swap]");
+		final Element carrier = element.closest("[hx-swap], [data-hx-swap]");
 
-		if (carrier == null || !NONE.equals(carrier.attr("hx-swap"))) {
+		if (carrier == null || !NONE.equals(value(carrier, "hx-swap"))) {
 			throw new UnsupportedOperationException("Only hx-swap=\"none\" is played out");
 		}
 
+		refuseFieldsHtmxWouldAdd(element);
+
 		for (Element holder = element; holder != null; holder = holder.parent()) {
 			for (final Attribute attribute : holder.attributes()) {
-				if (attribute.getKey().startsWith("hx-") && !UNDERSTOOD.contains(attribute.getKey())) {
-					throw new UnsupportedOperationException(attribute.getKey() + " is not played out");
-				}
+				refuseWhatIsNotUnderstood(element, holder, withoutData(attribute.getKey()));
 			}
 		}
+	}
+
+	/* htmx sends the enclosing form's fields and the control's own value along with the action, and this screen
+	   sends neither. */
+	private static void refuseFieldsHtmxWouldAdd(final Element element) {
+		if (element.closest("form") != null || element.hasAttr("name") || FIELDS.contains(element.normalName())) {
+			throw new UnsupportedOperationException("Fields sent along with " + element.cssSelector()
+				+ " are not played out");
+		}
+	}
+
+	private static void refuseWhatIsNotUnderstood(final Element element, final Element holder, final String name) {
+		final boolean inherited = holder != element;
+
+		if (name.startsWith(HTMX) && (!UNDERSTOOD.contains(name) || inherited && "hx-vals".equals(name))) {
+			throw new UnsupportedOperationException(name + (inherited ? " from an ancestor" : "")
+				+ " is not played out");
+		}
+	}
+
+	private static String withoutData(final String name) {
+		return name.startsWith(DATA + HTMX) ? name.substring(DATA.length()) : name;
+	}
+
+	private static boolean has(final Element element, final String name) {
+		return element.hasAttr(name) || element.hasAttr(DATA + name);
+	}
+
+	private static String value(final Element element, final String name) {
+		return element.hasAttr(name) ? element.attr(name) : element.attr(DATA + name);
 	}
 
 	private static String encode(final Map<String, String> values) {
