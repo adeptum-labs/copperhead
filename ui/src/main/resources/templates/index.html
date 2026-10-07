@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<title th:text="${view.title()}">Copperhead</title>
+		<link rel="stylesheet" href="/static/css/copperhead.css">
+		<!-- Runs before the first paint, so a stored light theme never flashes dark. -->
+		<script>document.documentElement.dataset.theme = localStorage.getItem("theme") || "dark";</script>
+		<script src="/static/js/htmx.min.js" defer></script>
+		<script src="/static/js/window.js" defer></script>
+	</head>
+	<body class="studio" hx-swap="none">
+		<header class="titlebar" data-drag>
+			<span class="titlebar__brand">Copperhead</span>
+			<th:block th:with="view=${view.region('MENUS')}"><div th:replace="~{__${view.template()}__}"></div></th:block>
+			<span class="titlebar__spacer"></span>
+			<th:block th:with="view=${view.region('MACHINE')}"><div th:replace="~{__${view.template()}__}"></div></th:block>
+			<span class="titlebar__spacer"></span>
+			<div class="titlebar__controls">
+				<button class="titlebar__button titlebar__button--theme" type="button" data-theme-toggle
+					aria-label="Switch theme">
+					<svg class="titlebar__sun" viewBox="0 0 10 10" aria-hidden="true">
+						<circle cx="5" cy="5" r="2"/>
+						<path d="M5 0.5v1.5M5 8v1.5M0.5 5h1.5M8 5h1.5M1.8 1.8l1.1 1.1M7.1 7.1l1.1 1.1M1.8 8.2l1.1-1.1M7.1 2.9l1.1-1.1"/>
+					</svg>
+					<svg class="titlebar__moon" viewBox="0 0 10 10" aria-hidden="true">
+						<path d="M6.8 7.6A3.6 3.6 0 1 1 6.8 2.4A2.8 2.8 0 0 0 6.8 7.6Z"/>
+					</svg>
+				</button>
+				<button class="titlebar__button" type="button" data-window="minimise" aria-label="Minimise">
+					<svg viewBox="0 0 10 10" aria-hidden="true"><path d="M0 5h10"/></svg>
+				</button>
+				<button class="titlebar__button" type="button" data-window="maximise" aria-label="Maximise">
+					<svg viewBox="0 0 10 10" aria-hidden="true"><path d="M0.5 0.5h9v9h-9z"/></svg>
+				</button>
+				<button class="titlebar__button titlebar__button--close" type="button" data-window="close"
+					aria-label="Close">
+					<svg viewBox="0 0 10 10" aria-hidden="true"><path d="M0 0l10 10M10 0L0 10"/></svg>
+				</button>
+			</div>
+		</header>
+
+		<div class="studio__body">
+			<th:block th:with="view=${view.region('RAIL')}"><div th:replace="~{__${view.template()}__}"></div></th:block>
+			<main class="workspace" data-workspace>
+				<div class="workspace__top">
+					<th:block th:with="view=${view.region('TOOL')}"><div th:replace="~{__${view.template()}__}"></div></th:block>
+					<div class="splitter splitter--vertical" data-splitter="vertical" role="separator"
+						aria-orientation="vertical"></div>
+					<th:block th:with="view=${view.region('EMULATOR')}"><div th:replace="~{__${view.template()}__}"></div></th:block>
+				</div>
+				<div class="splitter splitter--horizontal" data-splitter="horizontal" role="separator"
+					aria-orientation="horizontal"></div>
+				<th:block th:with="view=${view.region('TIMELINE')}"><div th:replace="~{__${view.template()}__}"></div></th:block>
+			</main>
+		</div>
+
+		<th:block th:with="view=${view.region('STATUS')}"><div th:replace="~{__${view.template()}__}"></div></th:block>
+		<th:block th:with="view=${view.region('MODAL')}"><div th:replace="~{__${view.template()}__}"></div></th:block>
+
+		<div class="resize resize--left" data-resize="left"></div>
+		<div class="resize resize--right" data-resize="right"></div>
+		<div class="resize resize--bottom" data-resize="bottom"></div>
+		<div class="resize resize--corner" data-resize="bottom-right"></div>
+	</body>
+</html>

@@ -1,0 +1,34 @@
+IBM Plex Sans and Red Hat Mono, latin subsets as served by Google Fonts
+
+Vendored rather than fetched at runtime, so that what ships is what was reviewed and the studio never
+reaches out for a typeface. Both families are licensed under the SIL Open Font License 1.1; each family's
+notice sits next to its files.
+
+  ibm-plex-sans-400-latin.woff2    IBM Plex Sans, weight 400, 45712 bytes
+    source   https://fonts.gstatic.com/s/ibmplexsans/v23/zYXzKVElMYYaJe8bpLHnCwDKr932-G7dytD-Dmu1syxeKYY.woff2
+    sha256   e2291e842cf5af167122a22881a740c7f2dda7716f1e8cd76680264f4a859470
+    licence  ibm-plex-sans.OFL.txt
+
+  ibm-plex-sans-500-latin.woff2    IBM Plex Sans, weight 500, 45712 bytes
+    source   https://fonts.gstatic.com/s/ibmplexsans/v23/zYXzKVElMYYaJe8bpLHnCwDKr932-G7dytD-Dmu1syxeKYY.woff2
+    sha256   e2291e842cf5af167122a22881a740c7f2dda7716f1e8cd76680264f4a859470
+    licence  ibm-plex-sans.OFL.txt
+
+  ibm-plex-sans-600-latin.woff2    IBM Plex Sans, weight 600, 45712 bytes
+    source   https://fonts.gstatic.com/s/ibmplexsans/v23/zYXzKVElMYYaJe8bpLHnCwDKr932-G7dytD-Dmu1syxeKYY.woff2
+    sha256   e2291e842cf5af167122a22881a740c7f2dda7716f1e8cd76680264f4a859470
+    licence  ibm-plex-sans.OFL.txt
+
+  red-hat-mono-latin.woff2         Red Hat Mono, weights 400 and 500, 22412 bytes
+    source   https://fonts.gstatic.com/s/redhatmono/v16/jVyN7nDnA2uf2zVvFAhhzEsUWOxS.woff2
+    sha256   f4bef0a36dbd4f8a34ce60ba67af24babb1334de1637c0f2680e2e18c112c2b3
+    licence  red-hat-mono.OFL.txt
+
+The files were resolved through
+  https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Red+Hat+Mono:wght@400;500&display=swap
+requested with a Chrome user agent, taking the latin block of each face. Google Fonts serves one file per
+family for all of its weights, so the three IBM Plex Sans files are the same bytes. The notices come from
+https://github.com/google/fonts/tree/main/ofl.
+
+Verify a replacement before committing it:
+  sha256sum *.woff2

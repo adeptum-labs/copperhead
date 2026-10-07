@@ -1,0 +1,55 @@
+/*
+    Copperhead
+    Copyright © 2026 Adam Waldenberg
+
+    This program is free software: you can redistribute it and/or modify it under the terms of the
+    GNU General Public License as published by the Free Software Foundation, version 3 of the License.
+
+    This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without
+    even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License along with this program.
+    If not, see <http://www.gnu.org/licenses/>.
+ */
+
+package org.copperhead.ui.controller;
+
+import java.util.Arrays;
+import java.util.EnumMap;
+import java.util.Map;
+import org.copperhead.ui.session.StudioState;
+import org.copperhead.ui.view.IndexView;
+import org.copperhead.ui.view.Placeholder;
+import org.copperhead.ui.view.Region;
+import org.copperhead.ui.view.Regions;
+import org.copperhead.web.action.View;
+
+/** Draws the regions of the window from the state of the studio. */
+public final class Screens {
+	public static final String TITLE = "Copperhead";
+
+	private Screens() {
+	}
+
+	public static IndexView index(final StudioState state) {
+		final Map<Region, View> regions = new EnumMap<>(Region.class);
+
+		Arrays.stream(Region.values()).forEach(region -> regions.put(region, render(state, region)));
+		return new IndexView(TITLE, regions);
+	}
+
+	public static Regions regions(final StudioState state, final Region... regions) {
+		return new Regions(Arrays.stream(regions).map(region -> render(state, region)).toList());
+	}
+
+	public static Regions all(final StudioState state) {
+		return regions(state, Region.values());
+	}
+
+	private static View render(final StudioState state, final Region region) {
+		return switch (region) {
+			default -> new Placeholder(region);
+		};
+	}
+}
