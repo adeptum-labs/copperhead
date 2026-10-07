@@ -11,7 +11,7 @@
 						<button class="menu__item" type="button" role="menuitem"
 							th:classappend="${item.checked()} ? 'menu__item--checked'"
 							th:attr="hx-post=${item.post()}, hx-vals=${item.values()}, data-key=${item.key()},
-								data-theme-toggle=${item.theme()} ? '' : null"
+								data-theme-toggle=${item.theme()} ? 'true' : null"
 							th:disabled="${item.later()}" th:title="${item.later()} ? 'Coming in a later release'">
 							<span class="menu__check" aria-hidden="true">✓</span>
 							<span class="menu__label" th:text="${item.label()}">Save</span>

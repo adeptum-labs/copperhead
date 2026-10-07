@@ -132,6 +132,11 @@ public class StudioFlowTest {
 		assertFalse(rig.session().state().timelineShown());
 	}
 
+	@Example
+	public void shouldMarkTheLightModeItemSoThePageCanSwitchTheTheme() throws Exception {
+		assertEquals(1, Screen.open(rig).document().select("#menus [data-theme-toggle]").size());
+	}
+
 	/* The page is never swapped on a failure, so only the state of the session shows whether a refused request
 	   left everything as it was. */
 	@Example
