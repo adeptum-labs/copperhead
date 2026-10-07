@@ -17,6 +17,7 @@
 		<module>core</module>
 		<module>web</module>
 		<module>ui</module>
+		<module>shell</module>
 	</modules>
 	<profiles>
 	</profiles>
