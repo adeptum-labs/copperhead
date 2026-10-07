@@ -64,6 +64,7 @@ public final class Screens {
 			case TOOL -> ToolViews.of(state);
 			case STATUS -> StatusViews.of(state);
 			case EMULATOR -> EmulatorViews.of(state);
+			case TIMELINE -> TimelineViews.of(state);
 			default -> new Placeholder(region);
 		};
 	}

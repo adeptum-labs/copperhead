@@ -25,6 +25,7 @@ import org.copperhead.ui.controller.EmulatorController;
 import org.copperhead.ui.controller.PaletteController;
 import org.copperhead.ui.controller.Screens;
 import org.copperhead.ui.controller.SpriteController;
+import org.copperhead.ui.controller.TimelineController;
 import org.copperhead.ui.controller.WorkbenchController;
 import org.copperhead.ui.session.ProjectSession;
 import org.copperhead.web.RecordingWindow;
@@ -54,7 +55,8 @@ public class WorkbenchRig implements AutoCloseable {
 	static Object[] controllers(final ProjectSession session) {
 		return new Object[] {new WorkbenchController(session), new CodeController(session),
 			new SpriteController(session), new PaletteController(session), new DebuggerController(session),
-			new BuildController(session), new EmulatorController(session)};
+			new BuildController(session), new EmulatorController(session),
+			new TimelineController(session)};
 	}
 
 	public URI base() {

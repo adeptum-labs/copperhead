@@ -48,7 +48,7 @@ final class Clock {
 		return minutes(from) + "–" + minutes(to);
 	}
 
-	private static String minutes(final Duration at) {
+	static String minutes(final Duration at) {
 		return "%d:%02d".formatted(at.toMinutes(), at.toSecondsPart());
 	}
 }

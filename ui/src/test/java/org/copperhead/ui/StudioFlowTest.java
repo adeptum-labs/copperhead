@@ -471,4 +471,83 @@ public class StudioFlowTest {
 		assertEquals("320×256 · 1 bpl + copper · 24-bit AGA", screen.find("#emulator .emulator__info").text());
 		assertEquals("812K / 2M", screen.find("#emulator .meter__chip").text());
 	}
+
+	@Example
+	public void shouldLayThePartsOutAlongTheRun() throws Exception {
+		final Screen screen = Screen.open(rig);
+
+		assertEquals(6, screen.document().select("#timeline .track__lane .block").size());
+		assertEquals("Plasma", screen.find("#timeline .block--selected").text());
+		assertEquals("0:23.40", screen.find("#timeline [data-clock]").text());
+		assertEquals("125 BPM · pos 03 row 03", screen.find("#timeline .timeline__tempo").text());
+		assertEquals("0:18–0:42", screen.find("#timeline .timeline__range").text());
+		assertEquals(List.of("0:00", "0:21", "0:43", "1:04", "1:26", "1:48"),
+			screen.document().select("#timeline .timeline__tick").eachText());
+	}
+
+	@Example
+	public void shouldPlayFromThePartClicked() throws Exception {
+		final Screen screen = Screen.open(rig).click("#timeline .track__lane .block:nth-of-type(5)");
+
+		assertEquals("Part 05 · Greetings", screen.find("#status .status__part").text());
+		assertEquals("1:08.00", screen.find("#timeline [data-clock]").text());
+		assertEquals("NIGHTFALL · GREETINGS", screen.find("#emulator .emulator__title").text());
+	}
+
+	@Example
+	public void shouldSeekWhereTheRulerIsClicked() throws Exception {
+		final Screen screen = Screen.open(rig).trigger("#timeline .timeline__ruler", Map.of("at", "1000"));
+
+		assertEquals("Part 01 · Loader", screen.find("#status .status__part").text());
+		assertEquals("frame 50", screen.find("#status .status__frame").text());
+	}
+
+	@Example
+	public void shouldHoldASeekInsideTheRun() throws Exception {
+		final Screen screen = Screen.open(rig).trigger("#timeline .timeline__ruler", Map.of("at", "-5000"));
+
+		assertEquals("frame 0", screen.find("#status .status__frame").text());
+		screen.trigger("#timeline .timeline__ruler", Map.of("at", "999999"));
+		assertEquals("Part 06 · End", screen.find("#status .status__part").text());
+		assertEquals("1:48.00", screen.find("#timeline [data-clock]").text());
+	}
+
+	@Example
+	public void shouldOfferTheExitsOfALoopingLevel() throws Exception {
+		final Screen screen = Screen.open(rig).click("#menus [hx-vals*=blitzball]");
+
+		assertEquals("↻ Level 1 · 0:30 per pass · exits:", screen.find("#timeline .timeline__loop > span").text());
+		screen.click("#timeline .timeline__exit:nth-of-type(1)");
+		assertEquals("Title", screen.find("#timeline .block--selected").text());
+		assertEquals("0:00.00", screen.find("#timeline [data-clock]").text());
+	}
+
+	@Example
+	public void shouldHideTheTimelineWithCtrlJ() throws Exception {
+		assertTrue(Screen.open(rig).press("ctrl+j").find("#timeline").hasAttr("hidden"));
+	}
+
+	@Example
+	public void shouldRefuseAPartOrExitThatIsNotThere() throws Exception {
+		final Screen screen = Screen.open(rig);
+		final StudioState before = rig.session().state();
+
+		assertEquals(500, screen.trigger("#timeline .track__lane .block", Map.of("index", "9")).status());
+		assertEquals(before, rig.session().state());
+		screen.click("#menus [hx-vals*=blitzball]");
+
+		final StudioState looping = rig.session().state();
+
+		assertEquals(500, screen.trigger("#timeline .timeline__exit", Map.of("to", "Nowhere")).status());
+		assertEquals(looping, rig.session().state());
+	}
+
+	@Example
+	public void shouldRefuseAMomentThatIsNoNumber() throws Exception {
+		final Screen screen = Screen.open(rig);
+		final StudioState before = rig.session().state();
+
+		assertEquals(500, screen.trigger("#timeline .timeline__ruler", Map.of("at", "soon")).status());
+		assertEquals(before, rig.session().state());
+	}
 }

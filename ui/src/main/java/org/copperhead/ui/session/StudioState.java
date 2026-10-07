@@ -122,6 +122,23 @@ public record StudioState(Project project, Target target, Tool tool, Modal modal
 			project.length().toMillis())));
 	}
 
+	/** Moves the run to a moment, held inside it: before the start is the start, past the end is the end. */
+	public StudioState seek(final Duration at) {
+		if (at.isNegative()) {
+			return withPosition(Duration.ZERO);
+		}
+
+		return withPosition(at.compareTo(project.length()) > 0 ? project.length() : at);
+	}
+
+	public StudioState playPart(final int index) {
+		return seek(project.parts().get(index).start());
+	}
+
+	public StudioState takeExit(final String part) {
+		return playPart(project.part(part));
+	}
+
 	public StudioState reset() {
 		return withRunning(false).withPosition(Duration.ZERO).withPc(project.trace().first()).withD0(0);
 	}

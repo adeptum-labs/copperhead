@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+	<body>
+		<section th:fragment="timeline" id="timeline" class="timeline" hx-swap-oob="true" th:hidden="${!view.shown()}"
+			th:style="${view.at()}"
+			th:attr="data-length=${view.length()}, data-position=${view.position()}, data-running=${view.running()}">
+			<div class="timeline__transport">
+				<button class="timeline__button" type="button" hx-post="/action/seek" hx-vals='{"at":"0"}'
+					title="To the start">|◀</button>
+				<button class="timeline__button" type="button" hx-post="/action/run" title="Play or pause"
+					th:text="${view.running()} ? '❚❚' : '▶'">❚❚</button>
+				<button class="timeline__button" type="button" hx-post="/action/reset" title="Stop">■</button>
+				<span class="timeline__clock"><span data-clock th:text="${view.time()}">0:23.40</span> / <span
+					th:text="${view.total()}">1:48.00</span></span>
+				<span class="timeline__tempo" th:text="${view.tempo()}">125 BPM · pos 03 row 03</span>
+			</div>
+			<div class="timeline__part" th:with="part=${view.selected()}">
+				<span class="timeline__name" th:text="${part.name()}">Plasma</span>
+				<span class="timeline__range" th:text="${part.range()}">0:18–0:42</span>
+				<span class="timeline__meta" th:text="${part.file()} + ' · ' + ${part.meta()}">plasma.s</span>
+				<span class="timeline__spacer"></span>
+				<button class="button" type="button" disabled title="Coming in a later release">Split</button>
+				<button class="button" type="button" disabled title="Coming in a later release">+ Part</button>
+				<button class="button" type="button" disabled title="Coming in a later release">↻ Loop</button>
+				<button class="button button--danger" type="button" disabled title="Coming in a later release">Delete</button>
+			</div>
+			<div class="timeline__loop" th:if="${view.loop().shown()}">
+				<span th:text="${view.loop().text()}">↻ Level 1 · 0:30 per pass · exits:</span>
+				<button class="timeline__exit" type="button" th:each="exit : ${view.loop().exits()}" hx-post="/action/exit"
+					th:hx-vals="${exit.vals()}" th:text="${exit.label()}">Game over → Title</button>
+			</div>
+			<div class="timeline__tracks">
+				<div class="timeline__ruler" hx-post="/action/seek" hx-vals="js:{at: copperhead.seekAt(event)}">
+					<span class="timeline__tick" th:each="tick : ${view.ticks()}" th:style="${tick.place()}"
+						th:text="${tick.label()}">0:00</span>
+				</div>
+				<div class="track">
+					<span class="track__name">Parts</span>
+					<div class="track__lane">
+						<button class="block" type="button" th:each="part : ${view.parts()}"
+							th:classappend="${part.modifier()}" th:style="${part.place()}" hx-post="/action/part"
+							th:hx-vals="${part.vals()}" th:text="${part.label()}">Plasma</button>
+					</div>
+				</div>
+				<div class="track">
+					<span class="track__name">Music</span>
+					<div class="track__lane"><span class="track__bar" th:text="${view.music()}"></span></div>
+				</div>
+				<div class="track">
+					<span class="track__name">Copper</span>
+					<div class="track__lane"><span class="track__bar" th:text="${view.copper()}"></span></div>
+				</div>
+				<div class="track">
+					<span class="track__name">Events</span>
+					<div class="track__lane">
+						<span class="event" th:each="event : ${view.events()}" th:style="${event.place()}"
+							th:title="${event.label()}"></span>
+					</div>
+				</div>
+				<div class="timeline__playhead" aria-hidden="true"></div>
+			</div>
+		</section>
+	</body>
+</html>
