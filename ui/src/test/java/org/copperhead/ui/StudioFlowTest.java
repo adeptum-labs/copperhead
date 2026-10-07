@@ -18,12 +18,17 @@ package org.copperhead.ui;
 import java.net.http.HttpResponse;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 import net.jqwik.api.Example;
 import net.jqwik.api.lifecycle.AfterTry;
 import net.jqwik.api.lifecycle.BeforeTry;
+import org.copperhead.ui.session.StudioState;
 import org.copperhead.ui.view.Region;
 import org.copperhead.ui.view.Tool;
 import org.jsoup.nodes.Element;
@@ -126,21 +131,45 @@ public class StudioFlowTest {
 		assertFalse(rig.session().state().timelineShown());
 	}
 
+	/* The page is never swapped on a failure, so only the state of the session shows whether a refused request
+	   left everything as it was. */
 	@Example
-	public void shouldRefuseAToolItDoesNotKnowAndKeepTheOneShown() throws Exception {
-		final Screen screen = Screen.open(rig).trigger(railTool(Tool.SPRITES), Map.of("tool", "NOPE"));
+	public void shouldRefuseWhatItDoesNotKnowAndLeaveTheStateAlone() throws Exception {
+		final Screen screen = Screen.open(rig);
+		final Map<String, Map<String, String>> unknown = Map.of(
+			"#rail [hx-vals*=SPRITES]", Map.of("tool", "NOPE"),
+			"#machine [hx-vals*=AGA]", Map.of("target", "ECS"),
+			"#menus [hx-post=/action/modal]", Map.of("kind", "NOPE"),
+			"#menus [hx-vals*=blitzball]", Map.of("name", "nowhere"));
 
-		assertEquals(500, screen.status());
-		assertEquals("Code", screen.find("#rail .rail__tool--on").attr("title"));
-		assertEquals(Tool.CODE, rig.session().state().tool());
+		assertAll(unknown.entrySet().stream().map(bad -> () -> {
+			final StudioState before = rig.session().state();
+
+			assertEquals(500, screen.trigger(bad.getKey(), bad.getValue()).status(), bad.getKey());
+			assertEquals(before, rig.session().state(), bad.getKey());
+		}));
+		assertAll(Stream.of("tool", "target", "modal", "project").map(action -> () -> {
+			final StudioState before = rig.session().state();
+
+			assertEquals(500, screen.client().submit("/action/" + action, "").statusCode(), action);
+			assertEquals(before, rig.session().state(), action);
+		}));
 	}
 
 	@Example
-	public void shouldRefuseAChipsetItDoesNotKnow() throws Exception {
-		final Screen screen = Screen.open(rig).trigger("#machine [hx-vals*=AGA]", Map.of("target", "ECS"));
+	public void shouldWriteEveryShortcutOnceInTheOrderTheScriptNamesIt() throws Exception {
+		final List<String> keys = Screen.open(rig).document().select("[data-key]").eachAttr("data-key");
+		final List<String> modifiers = List.of("ctrl", "alt", "shift");
 
-		assertEquals(500, screen.status());
-		assertEquals("OCS", screen.find("#machine .machine__chipset--on").text());
+		assertEquals(keys.size(), new HashSet<>(keys).size());
+		assertAll(keys.stream().map(key -> () -> {
+			final List<String> parts = List.of(key.split("\\+"));
+			final List<String> held = parts.subList(0, parts.size() - 1);
+
+			assertEquals(key.toLowerCase(Locale.ROOT), key);
+			assertTrue(modifiers.containsAll(held), key);
+			assertEquals(held.stream().sorted(Comparator.comparing(modifiers::indexOf)).toList(), held, key);
+		}));
 	}
 
 	@Example

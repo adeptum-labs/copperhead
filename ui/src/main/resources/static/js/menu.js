@@ -15,14 +15,14 @@
 
 /* Menus open on a click and follow the pointer while one is open, as a desktop menu bar does. The bar is drawn
    anew whenever a check mark in it changes, so the handlers live on the document. */
-let open = null;
+let openMenu = null;
 
 const show = (menu) => {
-	if (open && open !== menu) {
-		open.querySelector(".menu__list").hidden = true;
+	if (openMenu && openMenu !== menu) {
+		openMenu.querySelector(".menu__list").hidden = true;
 	}
 
-	open = menu;
+	openMenu = menu;
 
 	if (menu) {
 		menu.querySelector(".menu__list").hidden = false;
@@ -35,7 +35,7 @@ document.addEventListener("click", (event) => {
 	if (button) {
 		const menu = button.closest("[data-menu]");
 
-		show(open === menu ? null : menu);
+		show(openMenu === menu ? null : menu);
 		return;
 	}
 
@@ -45,7 +45,7 @@ document.addEventListener("click", (event) => {
 document.addEventListener("mouseover", (event) => {
 	const button = event.target.closest("[data-menu-button]");
 
-	if (open && button) {
+	if (openMenu && button) {
 		show(button.closest("[data-menu]"));
 	}
 });

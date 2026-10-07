@@ -398,7 +398,8 @@ html:not([data-theme="light"]) .titlebar__moon {
 	visibility: hidden;
 }
 
-.menu__item--checked .menu__check {
+.menu__item--checked .menu__check,
+html[data-theme="light"] [data-theme-toggle] .menu__check {
 	visibility: visible;
 }
 

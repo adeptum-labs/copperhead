@@ -59,7 +59,7 @@ const hold = (element, cursor, start, end) => {
 	let held = false;
 
 	element.addEventListener("pointerdown", (event) => {
-		if (event.button !== 0 || event.target.closest("button")) {
+		if (event.button !== 0 || event.target.closest("button, .menu__list")) {
 			return;
 		}
 

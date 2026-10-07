@@ -18,9 +18,10 @@
 
 /* A symbol that needs Shift on one layout and not on another, such as "/" (Shift+7 on a Swedish keyboard),
    is named by the symbol alone, so the same shortcut works on both. Letters and digits keep their Shift. */
-const shifted = (key) => key.length === 1 && !/[a-z0-9]/i.test(key);
+const shifted = (key) => key.length === 1 && !/[\p{L}\p{N}]/u.test(key);
 
-const combo = (event) => [
+/* Some events carry no key, such as an autofill that fires a bare keydown; they name no shortcut. */
+const combo = (event) => typeof event.key !== "string" ? "" : [
 	event.ctrlKey && "ctrl",
 	event.altKey && "alt",
 	event.shiftKey && !shifted(event.key) && "shift",
@@ -28,11 +29,13 @@ const combo = (event) => [
 ].filter(Boolean).join("+");
 
 document.addEventListener("keydown", (event) => {
-	if (event.target.closest("input, textarea")) {
+	const name = combo(event);
+
+	if (!name || event.target.closest("input, textarea")) {
 		return;
 	}
 
-	const control = document.querySelector(`[data-key="${CSS.escape(combo(event))}"]:not([disabled])`);
+	const control = document.querySelector(`[data-key="${CSS.escape(name)}"]:not([disabled])`);
 
 	/* F5 would reload the page, and Ctrl+J and the others belong to the browser, unless they are taken here. */
 	if (control) {
