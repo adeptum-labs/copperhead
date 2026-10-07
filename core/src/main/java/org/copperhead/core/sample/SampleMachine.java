@@ -18,6 +18,7 @@ package org.copperhead.core.sample;
 import java.util.List;
 import java.util.stream.IntStream;
 import org.copperhead.core.graphics.AmigaColor;
+import org.copperhead.core.graphics.CopperList;
 import org.copperhead.core.graphics.Palette;
 import org.copperhead.core.graphics.Sprite;
 
@@ -35,6 +36,7 @@ public final class SampleMachine {
 	private static final int LIGHT_FROM = 5;
 	private static final double LIGHT = 2.4;
 	private static final int SHADED_FROM = 19;
+	private static final int COPPER_BASE = 0x3F800;
 
 	private SampleMachine() {
 	}
@@ -51,6 +53,12 @@ public final class SampleMachine {
 	/** A ball lit from the top left: base colour, a highlight and a shaded rim. */
 	public static Sprite ball() {
 		return new Sprite(IntStream.range(0, Sprite.SIDE * Sprite.SIDE).mapToObj(SampleMachine::ballCell).toList());
+	}
+
+	/** The plasma's copper list: one bitplane, then a colour change on two lines. */
+	public static CopperList copperList() {
+		return CopperList.of(COPPER_BASE, 0x0100, 0x1200, 0x0180, 0x0000, 0x3001, 0xFFFE, 0x0180, 0x0A3F,
+			0x3101, 0xFFFE, 0x0180, 0x0B4F, 0xFFFF, 0xFFFE);
 	}
 
 	private static int ballCell(final int cell) {
