@@ -550,4 +550,58 @@ public class StudioFlowTest {
 		assertEquals(500, screen.trigger("#timeline .timeline__ruler", Map.of("at", "soon")).status());
 		assertEquals(before, rig.session().state());
 	}
+
+	@Example
+	public void shouldOpenTheShortcutsAndCloseThemWithEscape() throws Exception {
+		final Screen screen = Screen.open(rig).press("ctrl+/");
+
+		assertEquals("Keyboard shortcuts", screen.find("#modal .modal__title").text());
+		screen.press("escape");
+		assertTrue(screen.find("#modal").hasAttr("hidden"));
+		assertTrue(screen.document().select("#modal .modal__card").isEmpty());
+	}
+
+	@Example
+	public void shouldDescribeTheProjectInItsSettings() throws Exception {
+		final Screen screen = Screen.open(rig).click("#menus [hx-vals*=SETTINGS]");
+
+		assertTrue(screen.document().select("#modal dd").eachText().contains("nightfall.chp (demo)"));
+	}
+
+	@Example
+	public void shouldCloseADialogFromItsBackdrop() throws Exception {
+		final Screen screen = Screen.open(rig).click("#menus [hx-vals*=ABOUT]").click("#modal .modal__backdrop");
+
+		assertTrue(screen.find("#modal").hasAttr("hidden"));
+	}
+
+	/* A control that names an action nobody answers would only show as a 404 in a browser console. */
+	@Example
+	public void shouldBindEveryControlToAnActionThatExists() throws Exception {
+		final Screen screen = Screen.open(rig);
+		final List<String> posted = new ArrayList<>();
+
+		for (final String project : List.of("nightfall", "blitzball")) {
+			screen.click("#menus [hx-vals*=" + project + "]");
+
+			for (final Tool tool : Tool.values()) {
+				screen.click(railTool(tool));
+				posted.addAll(screen.document().select("[hx-post]").eachAttr("hx-post"));
+			}
+		}
+
+		assertAll(posted.stream().distinct().map(path -> () ->
+			assertTrue(rig.actions().knows(path.substring("/action/".length())), path)));
+	}
+
+	@Example
+	public void shouldKeepOneOfEachRegionAfterManyChanges() throws Exception {
+		final Screen screen = Screen.open(rig).press("ctrl+b").press("f8").press("ctrl+2")
+			.click("#menus [hx-vals*=AGA]").press("ctrl+j").press("ctrl+j").press("ctrl+/").press("escape")
+			.click("#menus [hx-vals*=blitzball]");
+
+		assertAll(Arrays.stream(Region.values()).map(region -> () ->
+			assertEquals(1, screen.document().select("#" + region.id()).size(), region.id())));
+		assertEquals(Region.values().length, screen.document().select("[hx-swap-oob]").size());
+	}
 }

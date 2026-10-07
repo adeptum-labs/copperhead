@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+	<body>
+		<div th:fragment="modal" id="modal" class="modal" hx-swap-oob="true" th:hidden="${!view.open()}">
+			<th:block th:if="${view.open()}">
+				<div class="modal__backdrop" hx-post="/action/modal-close"></div>
+				<section class="modal__card" role="dialog" aria-modal="true" th:aria-label="${view.title()}">
+					<header class="modal__header">
+						<h2 class="modal__title" th:text="${view.title()}">Keyboard shortcuts</h2>
+						<button class="modal__close" type="button" hx-post="/action/modal-close"
+							data-key="escape">Esc</button>
+					</header>
+					<dl class="modal__rows" th:unless="${view.rows().isEmpty()}">
+						<th:block th:each="row : ${view.rows()}">
+							<dt th:text="${row.name()}">Play / pause</dt>
+							<dd th:text="${row.value()}">F5</dd>
+						</th:block>
+					</dl>
+					<p class="modal__line" th:each="line : ${view.lines()}" th:text="${line}"></p>
+				</section>
+			</th:block>
+		</div>
+	</body>
+</html>

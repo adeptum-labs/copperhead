@@ -15,12 +15,5 @@
 
 package org.copperhead.ui.view;
 
-import org.copperhead.web.action.View;
-
-/** Holds a region's place on the page until the region is drawn for real. */
-public record Placeholder(Region region) implements View {
-	@Override
-	public String template() {
-		return "fragments/placeholder :: placeholder";
-	}
+public record PairView(String name, String value) {
 }

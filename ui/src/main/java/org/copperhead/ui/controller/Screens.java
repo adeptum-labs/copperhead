@@ -21,7 +21,6 @@ import java.util.Map;
 import java.util.stream.Stream;
 import org.copperhead.ui.session.StudioState;
 import org.copperhead.ui.view.IndexView;
-import org.copperhead.ui.view.Placeholder;
 import org.copperhead.ui.view.Region;
 import org.copperhead.ui.view.Regions;
 import org.copperhead.web.action.View;
@@ -65,7 +64,7 @@ public final class Screens {
 			case STATUS -> StatusViews.of(state);
 			case EMULATOR -> EmulatorViews.of(state);
 			case TIMELINE -> TimelineViews.of(state);
-			default -> new Placeholder(region);
+			case MODAL -> ModalViews.of(state);
 		};
 	}
 }
