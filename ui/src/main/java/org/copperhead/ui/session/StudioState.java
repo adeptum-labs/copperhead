@@ -112,6 +112,11 @@ public record StudioState(Project project, Target target, Tool tool, Modal modal
 		return withSprite(Sprite.blank());
 	}
 
+	public StudioState pickColour(final int index) {
+		SampleMachine.palette().color(index);
+		return withPaletteIndex(index);
+	}
+
 	private void requireLine(final int line) {
 		project.source(file).line(line);
 	}

@@ -283,4 +283,38 @@ public class StudioFlowTest {
 		assertEquals(500, screen.trigger(CELLS + ":nth-of-type(1)", Map.of("cell", "256")).status());
 		assertEquals(before, rig.session().state());
 	}
+
+	@Example
+	public void shouldOpenThePaletteOnColourFour() throws Exception {
+		final Screen screen = Screen.open(rig).click(railTool(Tool.PALETTE));
+
+		assertEquals("COLOR04 $015C", screen.find("#tool .palette__picked").text());
+		assertTrue(screen.find("#tool .palette__entry:nth-of-type(5)").hasClass("palette__entry--on"));
+		assertEquals("12-bit OCS · 4 bits per channel shown", screen.find("#tool .palette__depth").text());
+	}
+
+	@Example
+	public void shouldPickTheColourClicked() throws Exception {
+		final Screen screen = Screen.open(rig).click(railTool(Tool.PALETTE))
+			.click("#tool .palette__entry:nth-of-type(32)");
+
+		assertEquals("COLOR31 $0330", screen.find("#tool .palette__picked").text());
+	}
+
+	@Example
+	public void shouldDescribeTheAgaPaletteAsTwentyFourBit() throws Exception {
+		final Screen screen = Screen.open(rig).click(railTool(Tool.PALETTE)).click("#machine [hx-vals*=AGA]");
+
+		assertEquals("24-bit AGA · 4 bits per channel shown", screen.find("#tool .palette__depth").text());
+		assertEquals("32 colours · 24-bit", screen.find("#tool .tool__meta").text());
+	}
+
+	@Example
+	public void shouldRefuseAColourThePaletteDoesNotHold() throws Exception {
+		final Screen screen = Screen.open(rig).click(railTool(Tool.PALETTE));
+		final StudioState before = rig.session().state();
+
+		assertEquals(500, screen.trigger("#tool .palette__entry:nth-of-type(1)", Map.of("index", "40")).status());
+		assertEquals(before, rig.session().state());
+	}
 }

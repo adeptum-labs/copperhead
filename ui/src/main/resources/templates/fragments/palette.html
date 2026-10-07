@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+	<body>
+		<div th:fragment="palette" class="palette">
+			<div class="palette__list">
+				<button class="palette__entry" type="button" th:each="colour : ${view.colours()}"
+					th:classappend="${colour.selected()} ? 'palette__entry--on'" hx-post="/action/palette-pick"
+					th:hx-vals="${colour.vals()}">
+					<span class="palette__swatch" th:style="${colour.swatch()}"></span>
+					<span class="palette__number" th:text="${colour.number()}">04</span>
+					<span class="palette__hex" th:text="${colour.hex()}">$015C</span>
+				</button>
+			</div>
+			<aside class="palette__side" th:with="picked=${view.selected()}">
+				<div class="palette__preview" th:style="${picked.swatch()}"></div>
+				<p class="palette__picked"><span th:text="${picked.name()}">COLOR04</span> <span
+					th:text="${picked.hex()}">$015C</span></p>
+				<div class="palette__channels" th:style="${picked.channels()}">
+					<span class="palette__channel palette__channel--red"></span>
+					<span class="palette__channel palette__channel--green"></span>
+					<span class="palette__channel palette__channel--blue"></span>
+				</div>
+				<p class="palette__depth" th:text="${view.depth()}">12-bit OCS · 4 bits per channel shown</p>
+				<div class="palette__bar" th:style="${view.bar()}"></div>
+				<p class="palette__note">Copper bar · 64 lines · 1 MOVE per line</p>
+				<button class="button" type="button" disabled title="Coming in a later release">Export copper.i</button>
+			</aside>
+		</div>
+	</body>
+</html>
