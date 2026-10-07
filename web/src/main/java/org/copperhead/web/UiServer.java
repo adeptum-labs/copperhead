@@ -22,8 +22,7 @@ import org.eclipse.jetty.server.ServerConnector;
 
 public class UiServer {
 	/* The interface drives the toolchain on this machine, so it is never reachable from off the machine.
-	   Port zero keeps it off a predictable address that another local process could
-	   guess ahead of time. */
+	   Port zero keeps it off a predictable address that another local process could guess ahead of time. */
 	private static final String LOOPBACK = "127.0.0.1";
 	private static final int EPHEMERAL = 0;
 
