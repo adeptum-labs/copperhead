@@ -105,6 +105,24 @@ public class StudioStateTest {
 	}
 
 	@Example
+	public void shouldWrapTheCounterRegisterWithinAByteOnAStep() {
+		assertEquals(0, opened.withD0(0xFF).step().d0());
+	}
+
+	@Example
+	public void shouldLeaveEveryHitCountAloneWhenAStepReachesNoBreakpoint() {
+		assertEquals(opened.breakpoints(), opened.step().breakpoints());
+	}
+
+	@Example
+	public void shouldNotCountAHitForALineOfAnotherFile() {
+		final StudioState marked = opened.openFile("intro.s").toggleBreakpoint(14);
+
+		assertEquals(0, marked.step().breakpoints().stream().filter(mark -> mark.file().equals("intro.s"))
+			.findFirst().orElseThrow().hits());
+	}
+
+	@Example
 	public void shouldCountAHitWhenAStepReachesABreakpoint() {
 		final StudioState round = opened.step().step().step().step();
 

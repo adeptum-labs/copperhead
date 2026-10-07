@@ -18,6 +18,7 @@ package org.copperhead.ui.controller;
 import java.util.Arrays;
 import java.util.EnumMap;
 import java.util.Map;
+import java.util.stream.Stream;
 import org.copperhead.ui.session.StudioState;
 import org.copperhead.ui.view.IndexView;
 import org.copperhead.ui.view.Placeholder;
@@ -39,8 +40,11 @@ public final class Screens {
 		return new IndexView(TITLE, regions);
 	}
 
+	/* The status bar always comes along, because every change clears its note and a bar left alone would go on
+	   showing one that no longer holds. */
 	public static Regions regions(final StudioState state, final Region... regions) {
-		return new Regions(Arrays.stream(regions).map(region -> render(state, region)).toList());
+		return new Regions(Stream.concat(Arrays.stream(regions), Stream.of(Region.STATUS)).distinct()
+			.map(region -> render(state, region)).toList());
 	}
 
 	public static Regions all(final StudioState state) {

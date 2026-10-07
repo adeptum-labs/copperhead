@@ -396,6 +396,28 @@ public class StudioFlowTest {
 	}
 
 	@Example
+	public void shouldForgetTheNoteOnABreakpointToggle() throws Exception {
+		final Screen screen = Screen.open(rig).press("ctrl+b").click(line(20) + " .code__gutter");
+
+		assertTrue(screen.document().select("#status .status__note").isEmpty());
+	}
+
+	@Example
+	public void shouldForgetTheNoteOnABuildOptionToggle() throws Exception {
+		final Screen screen = Screen.open(rig).press("ctrl+b").click("#menus [hx-vals*=SHRINKLER]");
+
+		assertTrue(screen.document().select("#status .status__note").isEmpty());
+	}
+
+	@Example
+	public void shouldForgetTheNoteOnASpritePaint() throws Exception {
+		final Screen screen = Screen.open(rig).click(railTool(Tool.SPRITES)).press("ctrl+b")
+			.click(CELLS + ":nth-of-type(1)");
+
+		assertTrue(screen.document().select("#status .status__note").isEmpty());
+	}
+
+	@Example
 	public void shouldShowThePartAndFrameTheRunIsAt() throws Exception {
 		final Screen screen = Screen.open(rig);
 

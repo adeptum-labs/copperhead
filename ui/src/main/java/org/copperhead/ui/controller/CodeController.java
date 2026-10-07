@@ -64,7 +64,6 @@ public class CodeController {
 
 	@Action("goto-warning")
 	public Regions onClickWarning() {
-		return Screens.regions(session.change(StudioState::showWarning), Region.MENUS, Region.RAIL, Region.TOOL,
-			Region.STATUS);
+		return Screens.regions(session.change(StudioState::showWarning), Region.MENUS, Region.RAIL, Region.TOOL);
 	}
 }
