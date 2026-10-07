@@ -29,8 +29,12 @@ final class Clock {
 	private Clock() {
 	}
 
+	static long frames(final Duration at) {
+		return at.toMillis() / FRAME_MILLIS;
+	}
+
 	static String frame(final Duration at) {
-		return "frame " + at.toMillis() / FRAME_MILLIS;
+		return "frame " + frames(at);
 	}
 
 	static String time(final Duration at) {

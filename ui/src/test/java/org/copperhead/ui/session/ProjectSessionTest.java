@@ -15,6 +15,9 @@
 
 package org.copperhead.ui.session;
 
+import java.time.Duration;
+import java.time.Instant;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.UnaryOperator;
 import net.jqwik.api.Example;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -22,7 +25,8 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 public class ProjectSessionTest {
-	private final ProjectSession session = new ProjectSession();
+	private final AtomicReference<Instant> now = new AtomicReference<>(Instant.EPOCH);
+	private final ProjectSession session = new ProjectSession(now::get);
 
 	@Example
 	public void shouldForgetTheNoteOfTheLastChange() {
@@ -39,5 +43,27 @@ public class ProjectSessionTest {
 			throw new IllegalArgumentException("refused");
 		}));
 		assertSame(before, session.state());
+	}
+
+	@Example
+	public void shouldMoveTheRunOnWhileTheMachineRuns() {
+		now.set(Instant.EPOCH.plusSeconds(1));
+
+		assertEquals(Duration.ofMillis(24_400), session.state().position());
+	}
+
+	@Example
+	public void shouldHoldTheRunWhileTheMachineIsPaused() {
+		session.change(state -> state.withRunning(false));
+		now.set(Instant.EPOCH.plusSeconds(5));
+
+		assertEquals(Duration.ofMillis(23_400), session.state().position());
+	}
+
+	@Example
+	public void shouldGoRoundToTheStartAfterTheEnd() {
+		now.set(Instant.EPOCH.plusSeconds(90));
+
+		assertEquals(Duration.ofMillis(5_400), session.state().position());
 	}
 }

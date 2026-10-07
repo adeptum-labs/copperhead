@@ -434,4 +434,41 @@ public class StudioFlowTest {
 		assertEquals(500, screen.trigger("#tool [hx-vals*=SHRINKLER]", Map.of("option", "TURBO")).status());
 		assertEquals(before, rig.session().state());
 	}
+
+	@Example
+	public void shouldPauseAndRunAgain() throws Exception {
+		final Screen screen = Screen.open(rig).click("#machine .machine__run");
+
+		assertEquals("▶ Run", screen.find("#machine .machine__run").text());
+		screen.find("#emulator .emulator__dot--paused");
+		assertEquals("❚❚ Pause", screen.click("#machine .machine__run").find("#machine .machine__run").text());
+	}
+
+	@Example
+	public void shouldResetTheMachineToTheStartOfTheRun() throws Exception {
+		final Screen screen = Screen.open(rig).press("shift+f5");
+
+		assertEquals("Part 01 · Loader", screen.find("#status .status__part").text());
+		assertEquals("frame 0", screen.find("#status .status__frame").text());
+		assertEquals("▶ Run", screen.find("#machine .machine__run").text());
+		assertEquals("NIGHTFALL · LOADER", screen.find("#emulator .emulator__title").text());
+	}
+
+	@Example
+	public void shouldShowThePlasmaRunningOnAnA500() throws Exception {
+		final Screen screen = Screen.open(rig);
+
+		assertEquals("Emulator · A500 · OCS · PAL 50Hz", screen.find("#emulator .emulator__name").text());
+		assertEquals("NIGHTFALL · PLASMA", screen.find("#emulator .emulator__title").text());
+		assertEquals("1170", screen.find("#emulator .meter__frame").text());
+	}
+
+	@Example
+	public void shouldShowTheAgaMachine() throws Exception {
+		final Screen screen = Screen.open(rig).click("#machine [hx-vals*=AGA]");
+
+		assertEquals("Emulator · A1200 · AGA · PAL 50Hz", screen.find("#emulator .emulator__name").text());
+		assertEquals("320×256 · 1 bpl + copper · 24-bit AGA", screen.find("#emulator .emulator__info").text());
+		assertEquals("812K / 2M", screen.find("#emulator .meter__chip").text());
+	}
 }

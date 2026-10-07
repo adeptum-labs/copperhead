@@ -112,6 +112,20 @@ public record StudioState(Project project, Target target, Tool tool, Modal modal
 			.map(mark -> mark.file().equals(traced) && mark.line() == next ? mark.hit() : mark).toList());
 	}
 
+	/** The run moved on by the time given; past the end it starts over, as a demo on a loop does. */
+	public StudioState advance(final Duration elapsed) {
+		if (elapsed.isZero()) {
+			return this;
+		}
+
+		return withPosition(Duration.ofMillis(Math.floorMod(position.plus(elapsed).toMillis(),
+			project.length().toMillis())));
+	}
+
+	public StudioState reset() {
+		return withRunning(false).withPosition(Duration.ZERO).withPc(project.trace().first()).withD0(0);
+	}
+
 	public StudioState build(final boolean andRun) {
 		final BuildReport report = Builds.canned(project, target, options);
 

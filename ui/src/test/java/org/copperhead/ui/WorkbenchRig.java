@@ -16,9 +16,12 @@
 package org.copperhead.ui;
 
 import java.net.URI;
+import java.time.Instant;
+import java.time.InstantSource;
 import org.copperhead.ui.controller.BuildController;
 import org.copperhead.ui.controller.CodeController;
 import org.copperhead.ui.controller.DebuggerController;
+import org.copperhead.ui.controller.EmulatorController;
 import org.copperhead.ui.controller.PaletteController;
 import org.copperhead.ui.controller.Screens;
 import org.copperhead.ui.controller.SpriteController;
@@ -35,7 +38,7 @@ import org.copperhead.web.action.Actions;
 public class WorkbenchRig implements AutoCloseable {
 	private final SessionToken token = SessionToken.random();
 	private final RecordingWindow window = new RecordingWindow();
-	private final ProjectSession session = new ProjectSession();
+	private final ProjectSession session = new ProjectSession(InstantSource.fixed(Instant.EPOCH));
 	private final Actions actions = Actions.of(controllers(session));
 	private final UiServer server;
 	private final URI base;
@@ -51,7 +54,7 @@ public class WorkbenchRig implements AutoCloseable {
 	static Object[] controllers(final ProjectSession session) {
 		return new Object[] {new WorkbenchController(session), new CodeController(session),
 			new SpriteController(session), new PaletteController(session), new DebuggerController(session),
-			new BuildController(session)};
+			new BuildController(session), new EmulatorController(session)};
 	}
 
 	public URI base() {
