@@ -1,0 +1,69 @@
+<?xml version="1.0"?>
+<ruleset name="copperhead" xmlns="http://pmd.sourceforge.net/ruleset/2.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	 xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 http://pmd.sourceforge.net/ruleset_2_0_0.xsd">
+	<description>Every PMD rule, less the ones that do not suit this code, for PMD 7. PMD only reports; nothing fails on it.</description>
+	<rule ref="rulesets/internal/all-java.xml">
+		<exclude name="AvoidCatchingGenericException" />
+		<exclude name="AvoidLiteralsInIfCondition" />
+		<exclude name="AvoidSynchronizedAtMethodLevel" />
+		<exclude name="AvoidUsingVolatile" />
+		<exclude name="AtLeastOneConstructor" />
+		<exclude name="AvoidFieldNameMatchingMethodName" />
+		<exclude name="CommentDefaultAccessModifier" />
+		<exclude name="CommentRequired" />
+		<exclude name="CommentSize" />
+		<exclude name="GuardLogStatement" />
+		<exclude name="UnnecessaryImport" />
+		<exclude name="LawOfDemeter" />
+		<exclude name="LocalVariableCouldBeFinal" />
+		<exclude name="ProperLogger" />
+		<exclude name="LongVariable" />
+		<exclude name="LoosePackageCoupling" />
+		<exclude name="MethodArgumentCouldBeFinal" />
+		<exclude name="OnlyOneReturn" />
+		<exclude name="ShortClassName" />
+		<exclude name="ShortVariable" />
+		<exclude name="SignatureDeclareThrowsException" />
+		<exclude name="TestClassWithoutTestCases" />
+		<exclude name="UnitTestAssertionsShouldIncludeMessage" />
+		<exclude name="UnusedPrivateMethod" />
+		<exclude name="UseConcurrentHashMap" />
+		<exclude name="DoNotTerminateVM" />
+		<exclude name="DoNotUseThreads" />
+	</rule>
+	<rule ref="category/java/codestyle.xml/ConfusingTernary">
+		<properties>
+			<property name="ignoreElseIf" value="true" />
+		</properties>
+	</rule>
+	<rule ref="category/java/design.xml/CognitiveComplexity">
+		<properties>
+			<property name="reportLevel" value="10" />
+		</properties>
+	</rule>
+	<rule ref="category/java/design.xml/SignatureDeclareThrowsException">
+		<!-- Tests, with jqwik beside JUnit, declare what their set-up and the code they call throw -->
+		<properties>
+			<property name="IgnoreJUnitCompletely" value="true" />
+			<property name="violationSuppressXPath" value="ancestor-or-self::MethodDeclaration/ModifierList/Annotation[@SimpleName = ('Example', 'Property', 'BeforeTry', 'AfterTry', 'BeforeProperty', 'AfterProperty', 'BeforeContainer', 'AfterContainer')]" />
+		</properties>
+	</rule>
+	<rule ref="category/java/codestyle.xml/LocalVariableCouldBeFinal">
+		<!-- A loop variable is rarely final -->
+		<properties>
+			<property name="violationSuppressXPath" value="./parent::ForInit" />
+		</properties>
+	</rule>
+	<rule ref="category/java/errorprone.xml/ProperLogger">
+		<!-- A logger that is injected is not static -->
+		<properties>
+			<property name="violationSuppressXPath" value="./ModifierList/Annotation[@SimpleName = 'Inject']" />
+		</properties>
+	</rule>
+	<rule ref="category/java/bestpractices.xml/UnusedPrivateMethod">
+		<!-- CDI observer -->
+		<properties>
+			<property name="violationSuppressXPath" value=".//FormalParameter/ModifierList/Annotation[@SimpleName = 'Observes']" />
+		</properties>
+	</rule>
+</ruleset>
