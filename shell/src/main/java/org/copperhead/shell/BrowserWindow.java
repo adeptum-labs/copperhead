@@ -17,6 +17,7 @@ package org.copperhead.shell;
 
 import java.awt.BorderLayout;
 import java.awt.Dimension;
+import java.awt.Frame;
 import java.awt.GraphicsDevice;
 import java.awt.GraphicsEnvironment;
 import java.awt.event.ComponentAdapter;
@@ -33,6 +34,7 @@ import me.friwi.jcefmaven.impl.progress.ConsoleProgressHandler;
 import org.cef.CefApp;
 import org.cef.CefClient;
 import org.cef.browser.CefBrowser;
+import org.cef.callback.CefCommandLine;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.copperhead.web.WindowControl;
@@ -92,11 +94,18 @@ public class BrowserWindow {
 		return control;
 	}
 
-	public void open(final URI uri) throws Exception {
+	/**
+	 * Opens the window on the page. False when another Copperhead already holds the engine's profile: the engine
+	 * then hands this launch to that one, which brings its own window to the front, and nothing opens here.
+	 */
+	public boolean open(final URI uri) throws Exception {
 		final CefAppBuilder builder = new CefAppBuilder();
 		final CefLocation location = new CefLocation();
+		final CefProfile profile = new CefProfile();
 
 		builder.setInstallDir(location.directory());
+		builder.getCefSettings().root_cache_path = profile.directory().toString();
+		builder.getCefSettings().cache_path = profile.directory().toString();
 
 		/* The folder of an installed application is not ours to write to, so a missing or damaged engine
 		   there has to fail with the engine's own error rather than trigger a download or a deletion. */
@@ -126,9 +135,26 @@ public class BrowserWindow {
 					System.exit(0);
 				}
 			}
+
+			@Override
+			public boolean onAlreadyRunningAppRelaunch(final CefCommandLine arguments, final String directory) {
+				LOG.info("Copperhead was started again; its window comes to the front instead");
+				SwingUtilities.invokeLater(BrowserWindow.this::raise);
+				return true;
+			}
 		});
 
 		final CefClient client = builder.build().createClient();
+
+		/* A launch handed over leaves the profile held by the other Copperhead; any other failure leaves it free. */
+		if (CefApp.getState() == CefApp.CefAppState.INITIALIZATION_FAILED) {
+			if (profile.held()) {
+				return false;
+			}
+
+			throw new IllegalStateException("The browser engine did not start");
+		}
+
 		final CefBrowser browser = client.createBrowser(uri.toString(), false, false);
 
 		frame.addWindowListener(shutDownOnClose(browser));
@@ -138,9 +164,9 @@ public class BrowserWindow {
 		   stays empty. */
 		frame.getContentPane().add(browser.getUIComponent(), BorderLayout.CENTER);
 
-		/* The browser engine creates the browser the first time its component is painted. On Windows the
-		   engine's own native child covers the whole of the undecorated frame, which leaves Windows nothing
-		   to ask the frame to paint, so the component is asked to paint itself. */
+		/* The browser engine creates the browser the first time its component is painted. The engine's own
+		   native child covers the whole of the undecorated frame, which can leave nothing asking the frame to
+		   paint, so the component is asked to paint itself. */
 		SwingUtilities.invokeLater(() -> {
 			/* The work area leaves out the taskbar, and on a scaled display it is counted in the same
 			   logical pixels as the size, so a small or scaled screen still shows the whole window. */
@@ -149,14 +175,22 @@ public class BrowserWindow {
 			frame.setVisible(true);
 			browser.getUIComponent().repaint();
 		});
+
+		return true;
+	}
+
+	private void raise() {
+		frame.setExtendedState(frame.getExtendedState() & ~Frame.ICONIFIED);
+		frame.toFront();
+		frame.requestFocus();
 	}
 
 	/* Chromium answers a close request by asking the window to close and cancels its own
 	   unless the browser has been told that closing is allowed, so without that permission
 	   the browser, and with it the process, lives on. The frame is hidden rather than
 	   disposed because the shutdown completes on the event thread, which AWT retires once
-	   the last window is gone. On macOS the engine now and then never finishes shutting
-	   down, which would leave Copperhead running with no window, so it gets a deadline. */
+	   the last window is gone. The engine can fail to finish shutting down, which would
+	   leave Copperhead running with no window, so it gets a deadline. */
 	private WindowAdapter shutDownOnClose(final CefBrowser browser) {
 		return new WindowAdapter() {
 			@Override

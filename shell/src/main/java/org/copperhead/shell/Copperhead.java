@@ -73,10 +73,19 @@ public final class Copperhead {
 		/* The token rides on the first navigation only; the server swaps it for a cookie and
 		   redirects, so it does not linger in the address. */
 		try {
-			window.open(uri.resolve("/?" + SessionToken.PARAMETER + "=" + token.value()));
+			if (!window.open(uri.resolve("/?" + SessionToken.PARAMETER + "=" + token.value()))) {
+				handOver(server);
+			}
 		} catch (Exception | LinkageError e) {
 			giveUp(server, e);
 		}
+	}
+
+	/* The Copperhead already running shows its window instead, so this one leaves without a word to the person. */
+	private static void handOver(final UiServer server) throws Exception {
+		LOG.info("Copperhead is already running and was brought to the front");
+		server.stop();
+		System.exit(0);
 	}
 
 	/* The server's threads would keep the process alive with no window to reach it, and a launcher from
