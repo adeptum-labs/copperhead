@@ -17,7 +17,7 @@
 						<span class="swatch__chip" th:classappend="${swatch.modifier()}"></span>
 					</button>
 					<span class="sprite__colour" th:each="swatch : ${view.swatches()}" th:if="${swatch.selected()}"
-						th:text="${swatch.label()}">Base · $0D42</span>
+						th:text="${swatch.label()}">Base · $D42</span>
 				</div>
 				<div class="sprite__tools">
 					<button class="button button--accent button--narrow" type="button" aria-pressed="true">Pencil</button>

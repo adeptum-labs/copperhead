@@ -21,7 +21,6 @@ import org.copperhead.core.project.Project;
 import org.copperhead.core.project.Target;
 import org.copperhead.core.sample.SampleProjects;
 import org.copperhead.ui.session.ProjectSession;
-import org.copperhead.ui.session.StudioState;
 import org.copperhead.ui.view.Modal;
 import org.copperhead.ui.view.Region;
 import org.copperhead.ui.view.Regions;
@@ -47,12 +46,11 @@ public class WorkbenchController {
 			Region.TOOL);
 	}
 
-	/* A project opens as it was saved, so nothing of the one before it carries over but the machine. */
 	@Action("project")
 	public Regions onClickProject(final Form form) {
 		final Project project = SampleProjects.named(form.get("name"));
 
-		return Screens.all(session.change(state -> StudioState.open(project, state.target())));
+		return Screens.all(session.change(state -> state.switchTo(project)));
 	}
 
 	@Action("target")

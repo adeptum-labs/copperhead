@@ -92,9 +92,9 @@ final class Menus {
 			later("Clean", NO_KEYS),
 			target(state, Target.A500_OCS).withSeparated(true),
 			target(state, Target.A1200_AGA),
-			option(state, "Crunch with Shrinkler -9", BuildOption.SHRINKLER).withSeparated(true),
-			option(state, "Bootblock + trackloader", BuildOption.BOOTBLOCK),
-			option(state, "Debug symbols", BuildOption.SYMBOLS)));
+			option(state, BuildOption.SHRINKLER).withSeparated(true),
+			option(state, BuildOption.BOOTBLOCK),
+			option(state, BuildOption.SYMBOLS)));
 	}
 
 	private static MenuView debug() {
@@ -127,8 +127,8 @@ final class Menus {
 			.withChecked(state.target() == target);
 	}
 
-	private static MenuItemView option(final StudioState state, final String label, final BuildOption option) {
-		return action(label, NO_KEYS, BUILD_OPTION, Vals.of("option", option))
+	private static MenuItemView option(final StudioState state, final BuildOption option) {
+		return action(BuildViews.menuLabel(option), NO_KEYS, BUILD_OPTION, Vals.of("option", option))
 			.withChecked(state.options().on(option));
 	}
 

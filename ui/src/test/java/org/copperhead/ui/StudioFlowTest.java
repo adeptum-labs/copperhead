@@ -129,6 +129,20 @@ public class StudioFlowTest {
 	}
 
 	@Example
+	public void shouldOpenTheOtherProjectInTheSameLayoutWithNothingBuilt() throws Exception {
+		final Screen screen = Screen.open(rig).click(railTool(Tool.SPRITES)).press("ctrl+j")
+			.click("#menus [hx-vals*=blitzball]");
+
+		assertEquals("Sprites", screen.find("#rail .rail__tool--on").attr("title"));
+		assertTrue(screen.find("#timeline").hasAttr("hidden"));
+		assertEquals("0 warnings", screen.find("#status .status__warnings").text());
+		assertEquals("last build not built yet", screen.find("#status .status__build").text());
+		assertEquals("Opened blitzball.chp (game)", screen.find("#status .status__note").text());
+		assertEquals("blitzball.adf · not built yet · A500",
+			screen.click(railTool(Tool.BUILD)).find("#tool .build__summary").text());
+	}
+
+	@Example
 	public void shouldHideTheTimelineAndUncheckIt() throws Exception {
 		final Screen screen = Screen.open(rig).press("ctrl+j");
 
@@ -265,6 +279,7 @@ public class StudioFlowTest {
 
 		assertTrue(screen.find("#tool .swatch:nth-of-type(3)").hasClass("swatch--on"));
 		assertTrue(screen.find(CELLS + ":nth-of-type(1)").hasClass("sprite__cell--2"));
+		assertEquals("Highlight · $FB7", screen.find("#tool .sprite__colour").text());
 	}
 
 	@Example
@@ -335,6 +350,19 @@ public class StudioFlowTest {
 		assertEquals("END", screen.find("#tool .copper__row:last-of-type .copper__decoded").text());
 		assertEquals(4, screen.document().select("#tool .memory__row").size());
 		assertEquals("plasma.s:13", screen.find("#tool .breakpoint__location").text());
+		assertEquals("Pause · F5", screen.find("#tool .debugger__bar [hx-post=/action/run]").text());
+	}
+
+	/* A breakpoint can be set in any file, so the card names none. */
+	@Example
+	public void shouldListTheBreakpointsOfEveryFile() throws Exception {
+		final Screen screen = Screen.open(rig).click("#tool [hx-vals*=intro.s]").click(line(5) + " .code__gutter")
+			.click(railTool(Tool.DEBUGGER));
+
+		assertTrue(screen.document().select("#tool .card__title").eachText()
+			.contains("Breakpoints · click a line number in Code to toggle"));
+		assertEquals(List.of("plasma.s:13", "intro.s:5"),
+			screen.document().select("#tool .breakpoint__location").eachText());
 	}
 
 	@Example
@@ -344,6 +372,7 @@ public class StudioFlowTest {
 		assertEquals("stopped · plasma.s:14", screen.find("#tool .debugger__status").text());
 		assertEquals("00000018", screen.find("#tool .register:nth-of-type(1) .register__value").text());
 		assertEquals("▶ Run", screen.find("#machine .machine__run").text());
+		assertEquals("Run · F5", screen.find("#tool .debugger__bar [hx-post=/action/run]").text());
 	}
 
 	@Example
@@ -386,6 +415,16 @@ public class StudioFlowTest {
 
 		assertEquals("nightfall.adf · 7,016 bytes · 0.9s · A500", screen.find("#tool .build__summary").text());
 		assertFalse(screen.find("#menus [hx-vals*=SHRINKLER]").hasClass("menu__item--checked"));
+	}
+
+	@Example
+	public void shouldNameEachBuildOptionAlikeInTheToolAndTheMenu() throws Exception {
+		final Screen screen = Screen.open(rig).click(railTool(Tool.BUILD));
+
+		assertEquals(List.of("Shrinkler -9", "Bootblock + trackloader", "Debug symbols"),
+			screen.document().select("#tool [hx-post=/action/build-option] span:last-child").eachText());
+		assertEquals(List.of("Crunch with Shrinkler -9", "Bootblock + trackloader", "Debug symbols"),
+			screen.document().select("#menus [hx-post=/action/build-option] .menu__label").eachText());
 	}
 
 	@Example
@@ -467,7 +506,8 @@ public class StudioFlowTest {
 	public void shouldShowThePlasmaRunningOnAnA500() throws Exception {
 		final Screen screen = Screen.open(rig);
 
-		assertEquals("Emulator · A500 · OCS · PAL 50Hz", screen.find("#emulator .emulator__name").text());
+		assertEquals("Emulator", screen.find("#emulator .emulator__name").text());
+		assertEquals("A500 · OCS · PAL 50Hz", screen.find("#emulator .emulator__machine").text());
 		assertEquals("NIGHTFALL · PLASMA", screen.find("#emulator .emulator__title").text());
 		assertEquals("1170", screen.find("#emulator .meter__frame").text());
 	}
@@ -476,7 +516,7 @@ public class StudioFlowTest {
 	public void shouldShowTheAgaMachine() throws Exception {
 		final Screen screen = Screen.open(rig).click("#machine [hx-vals*=AGA]");
 
-		assertEquals("Emulator · A1200 · AGA · PAL 50Hz", screen.find("#emulator .emulator__name").text());
+		assertEquals("A1200 · AGA · PAL 50Hz", screen.find("#emulator .emulator__machine").text());
 		assertEquals("320×256 · 1 bpl + copper · 24-bit AGA", screen.find("#emulator .emulator__info").text());
 		assertEquals("812K / 2M", screen.find("#emulator .meter__chip").text());
 	}
@@ -491,7 +531,7 @@ public class StudioFlowTest {
 		assertEquals("125 BPM · pos 03 row 03", screen.find("#timeline .timeline__tempo").text());
 		assertEquals("125", screen.find("#timeline").attr("data-bpm"));
 		assertEquals("0:18–0:42", screen.find("#timeline .timeline__range").text());
-		assertEquals(List.of("0:00", "0:21", "0:43", "1:04", "1:26", "1:48"),
+		assertEquals(List.of("0:00", "0:18", "0:36", "0:54", "1:12", "1:30"),
 			screen.document().select("#timeline .timeline__tick").eachText());
 	}
 
@@ -592,6 +632,7 @@ public class StudioFlowTest {
 		final Screen screen = Screen.open(rig).press("ctrl+/");
 
 		assertEquals("Keyboard shortcuts", screen.find("#modal .modal__title").text());
+		assertTrue(screen.document().select("#modal dd").eachText().contains("Ctrl+Shift+L"));
 		screen.press("escape");
 		assertTrue(screen.find("#modal").hasAttr("hidden"));
 		assertTrue(screen.document().select("#modal .modal__card").isEmpty());
@@ -602,6 +643,7 @@ public class StudioFlowTest {
 		final Screen screen = Screen.open(rig).click("#menus [hx-vals*=SETTINGS]");
 
 		assertTrue(screen.document().select("#modal dd").eachText().contains("nightfall.chp (demo)"));
+		assertTrue(screen.find("#modal .modal__rows").hasClass("modal__rows--settings"));
 	}
 
 	@Example

@@ -1165,6 +1165,11 @@ html[data-theme="light"] [data-theme-toggle] .menu__check {
 	white-space: nowrap;
 }
 
+.emulator__name {
+	color: var(--fg);
+	font-weight: 500;
+}
+
 .emulator__dot {
 	width: 7px;
 	height: 7px;
@@ -1609,6 +1614,23 @@ html[data-theme="light"] [data-theme-toggle] .menu__check {
 	font-family: var(--mono);
 	font-size: 11px;
 	text-align: right;
+}
+
+.modal__rows--settings {
+	grid-template-columns: auto 1fr;
+	gap: 10px 18px;
+	align-items: center;
+}
+
+.modal__rows--settings dt {
+	color: var(--mute);
+}
+
+.modal__rows--settings dd {
+	color: var(--fg);
+	font-family: inherit;
+	font-size: inherit;
+	text-align: left;
 }
 
 .modal__lines {

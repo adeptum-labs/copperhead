@@ -49,6 +49,6 @@ final class SpriteViews {
 	}
 
 	private static String label(final int index, final List<AmigaColor> colours) {
-		return index == 0 ? "Transparent" : NAMES.get(index - 1) + " · " + colours.get(index - 1).hex();
+		return index == 0 ? "Transparent" : NAMES.get(index - 1) + " · " + colours.get(index - 1).shortHex();
 	}
 }

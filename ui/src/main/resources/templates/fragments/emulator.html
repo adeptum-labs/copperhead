@@ -3,7 +3,8 @@
 	<body>
 		<section th:fragment="emulator" id="emulator" class="emulator" hx-swap-oob="true">
 			<header class="emulator__header">
-				<span class="emulator__name" th:text="${view.name()}">Emulator · A500 · OCS · PAL 50Hz</span>
+				<span class="emulator__name">Emulator</span>
+				<span class="emulator__machine" th:text="${view.machine()}">A500 · OCS · PAL 50Hz</span>
 				<span class="emulator__dot"
 					th:classappend="'emulator__dot--' + (${view.running()} ? 'running' : 'paused')"></span>
 				<span class="emulator__state" th:text="${view.running()} ? 'running' : 'paused'">running</span>

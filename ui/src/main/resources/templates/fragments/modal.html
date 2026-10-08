@@ -10,7 +10,7 @@
 						<button class="modal__close" type="button" hx-post="/action/modal-close"
 							data-key="escape" autofocus>Esc</button>
 					</header>
-					<dl class="modal__rows" th:unless="${view.rows().isEmpty()}">
+					<dl class="modal__rows" th:classappend="${view.modifier()}" th:unless="${view.rows().isEmpty()}">
 						<th:block th:each="row : ${view.rows()}">
 							<dt th:text="${row.name()}">Play / pause</dt>
 							<dd th:text="${row.value()}">F5</dd>

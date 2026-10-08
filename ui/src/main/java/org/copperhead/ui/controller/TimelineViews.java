@@ -45,7 +45,7 @@ final class TimelineViews {
 		final List<PartView> parts = IntStream.range(0, project.parts().size())
 			.mapToObj(index -> part(project.parts().get(index), index, index == at, length)).toList();
 		final List<TickView> ticks = IntStream.range(0, TICKS)
-			.mapToObj(index -> length.multipliedBy(index).dividedBy(TICKS - 1))
+			.mapToObj(index -> length.multipliedBy(index).dividedBy(TICKS))
 			.map(tick -> new TickView(Clock.minutes(tick), "--left:" + percent(tick, length))).toList();
 		final List<EventView> events = project.events().stream()
 			.map(event -> new EventView(event.label(), "--left:" + percent(event.at(), length))).toList();

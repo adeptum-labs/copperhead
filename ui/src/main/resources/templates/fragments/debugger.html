@@ -5,7 +5,8 @@
 			<div class="debugger__bar">
 				<button class="button button--accent" type="button" hx-post="/action/step">Step · F8</button>
 				<button class="button" type="button" hx-post="/action/step-over">Over · F10</button>
-				<button class="button" type="button" hx-post="/action/run">Run/Pause · F5</button>
+				<button class="button" type="button" hx-post="/action/run"
+					th:text="(${view.running()} ? 'Pause' : 'Run') + ' · F5'">Pause · F5</button>
 				<span class="debugger__status" th:text="${view.status()}">stopped · plasma.s:13</span>
 			</div>
 			<div class="debugger__cards">
@@ -40,8 +41,7 @@
 					</div>
 				</section>
 				<section class="card card--wide">
-					<h3 class="card__title"
-						th:text="'Breakpoints in ' + ${view.file()} + ' · click a line number in Code to toggle'"></h3>
+					<h3 class="card__title">Breakpoints · click a line number in Code to toggle</h3>
 					<div class="breakpoint" th:each="mark : ${view.breakpoints()}">
 						<span class="breakpoint__location" th:text="${mark.location()}">plasma.s:13</span>
 						<span class="breakpoint__hits" th:text="${mark.hits()}">1,170 hits</span>

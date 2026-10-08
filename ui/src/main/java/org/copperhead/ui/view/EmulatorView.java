@@ -18,7 +18,7 @@ package org.copperhead.ui.view;
 import org.copperhead.web.action.View;
 
 /** The machine's screen and what it reports while it runs; the meters reach the stylesheet as {@code --fill}. */
-public record EmulatorView(String name, boolean running, String title, String info, long frame, int raster,
+public record EmulatorView(String machine, boolean running, String title, String info, long frame, int raster,
 	String chip, int chipUsed, int blitter) implements View {
 
 	public String rasterFill() {

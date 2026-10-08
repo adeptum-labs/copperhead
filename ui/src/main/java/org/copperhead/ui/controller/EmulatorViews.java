@@ -36,7 +36,7 @@ final class EmulatorViews {
 		final boolean aga = state.target() == Target.A1200_AGA;
 		final Part part = state.project().parts().get(state.project().partAt(state.position()));
 
-		return new EmulatorView("Emulator · " + state.target().label() + " · PAL 50Hz", state.running(),
+		return new EmulatorView(state.target().label() + " · PAL 50Hz", state.running(),
 			(state.project().name() + " · " + part.name()).toUpperCase(Locale.ROOT),
 			"320×256 · 1 bpl + copper · " + (aga ? "24-bit AGA" : "12-bit OCS"), Clock.frames(state.position()),
 			aga ? RASTER_AGA : RASTER_OCS, state.target().chipUsed(), aga ? CHIP_AGA : CHIP_OCS, BLITTER);

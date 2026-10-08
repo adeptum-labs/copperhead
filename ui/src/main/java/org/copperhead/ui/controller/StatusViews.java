@@ -16,7 +16,6 @@
 package org.copperhead.ui.controller;
 
 import java.util.List;
-import java.util.Locale;
 import org.copperhead.core.build.BuildReport;
 import org.copperhead.core.build.BuildWarning;
 import org.copperhead.core.project.Part;
@@ -28,17 +27,14 @@ final class StatusViews {
 	}
 
 	static StatusView of(final StudioState state) {
-		final BuildReport report = state.build();
-		final List<BuildWarning> warnings = report.warnings();
+		final List<BuildWarning> warnings = state.build().map(BuildReport::warnings).orElse(List.of());
 		final int at = state.project().partAt(state.position());
 		final Part part = state.project().parts().get(at);
 
 		return new StatusView(warnings.isEmpty() ? "0 warnings" : warnings.size()
 				+ (warnings.size() == 1 ? " warning · " : " warnings · ") + warnings.getFirst().location(),
-			!warnings.isEmpty(),
-			String.format(Locale.ROOT, "last build %,d bytes · %.1fs", report.bytes(),
-				report.took().toMillis() / 1000.0),
-			state.note(), "Part %02d · %s".formatted(at + 1, part.name()), Clock.frames(state.position()),
+			!warnings.isEmpty(), "last build " + BuildViews.outcome(state), state.note(),
+			"Part %02d · %s".formatted(at + 1, part.name()), Clock.frames(state.position()),
 			state.target().label());
 	}
 }

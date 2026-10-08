@@ -55,6 +55,11 @@ public record AmigaColor(int rgb) {
 		return "$%04X".formatted(rgb);
 	}
 
+	/** {@code $RGB}, the way a copper list and the sprite tool write a colour. */
+	public String shortHex() {
+		return "$%03X".formatted(rgb);
+	}
+
 	/** The colour on a modern screen, each four-bit channel repeated to fill eight bits. */
 	public String css() {
 		return "#%1$X%1$X%2$X%2$X%3$X%3$X".formatted(red(), green(), blue());

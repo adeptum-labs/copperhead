@@ -18,9 +18,8 @@ package org.copperhead.ui.view;
 import java.util.List;
 import org.copperhead.web.action.View;
 
-public record DebuggerView(String status, List<RegisterView> registers, String pc, String sr,
-	List<CopperRowView> copper, List<MemoryRowView> memory, List<BreakpointView> breakpoints, String file)
-	implements View {
+public record DebuggerView(boolean running, String status, List<RegisterView> registers, String pc, String sr,
+	List<CopperRowView> copper, List<MemoryRowView> memory, List<BreakpointView> breakpoints) implements View {
 
 	public DebuggerView {
 		registers = List.copyOf(registers);

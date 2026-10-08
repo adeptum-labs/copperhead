@@ -18,6 +18,7 @@ package org.copperhead.ui.session;
 import java.time.Duration;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.stream.Stream;
 import lombok.With;
 import org.copperhead.core.build.BuildOption;
@@ -39,7 +40,7 @@ import org.copperhead.ui.view.Tool;
 @With
 public record StudioState(Project project, Target target, Tool tool, Modal modal, boolean running,
 	boolean timelineShown, String note, String file, int cursor, List<Breakpoint> breakpoints, int pc, int d0,
-	Sprite sprite, int spriteColour, int paletteIndex, BuildOptions options, BuildReport build,
+	Sprite sprite, int spriteColour, int paletteIndex, BuildOptions options, Optional<BuildReport> build,
 	Duration position) {
 
 	private static final int BYTE = 0xFF;
@@ -60,8 +61,17 @@ public record StudioState(Project project, Target target, Tool tool, Modal modal
 
 		return new StudioState(project, target, Tool.CODE, Modal.NONE, true, true, "", traced, project.breakpoint(),
 			List.of(new Breakpoint(traced, project.breakpoint(), FIRST_HITS)), project.breakpoint(), FIRST_D0,
-			SampleMachine.ball(), BASE_COLOUR, FIRST_PICK, options, Builds.canned(project, target, options),
-			FIRST_POSITION);
+			SampleMachine.ball(), BASE_COLOUR, FIRST_PICK, options,
+			Optional.of(Builds.canned(project, target, options)), FIRST_POSITION);
+	}
+
+	/**
+	 * Another project, opened as it was saved and not built yet. Nothing of the one before carries over but the
+	 * machine and how the window is laid out, which belong to the person rather than to a project.
+	 */
+	public StudioState switchTo(final Project other) {
+		return open(other, target).withTool(tool).withTimelineShown(timelineShown).withBuild(Optional.empty())
+			.withNote("Opened %s (%s)".formatted(other.file(), other.kind().name().toLowerCase(Locale.ROOT)));
 	}
 
 	public boolean breakpointAt(final String in, final int line) {
@@ -98,7 +108,7 @@ public record StudioState(Project project, Target target, Tool tool, Modal modal
 
 	/** Shows the line the first warning of the last build points at. */
 	public StudioState showWarning() {
-		return build.warnings().stream().findFirst()
+		return build.stream().flatMap(report -> report.warnings().stream()).findFirst()
 			.map(warning -> withTool(Tool.CODE).withFile(warning.file()).withCursor(warning.line()))
 			.orElse(this);
 	}
@@ -108,7 +118,7 @@ public record StudioState(Project project, Target target, Tool tool, Modal modal
 		final String traced = project.trace().file();
 		final int next = project.trace().after(pc);
 
-		return withRunning(false).withPc(next).withD0(d0 + 1 & BYTE).withBreakpoints(breakpoints.stream()
+		return withRunning(false).withPc(next).withD0((d0 + 1) & BYTE).withBreakpoints(breakpoints.stream()
 			.map(mark -> mark.file().equals(traced) && mark.line() == next ? mark.hit() : mark).toList());
 	}
 
@@ -146,7 +156,7 @@ public record StudioState(Project project, Target target, Tool tool, Modal modal
 	public StudioState build(final boolean andRun) {
 		final BuildReport report = Builds.canned(project, target, options);
 
-		return withBuild(report).withRunning(running || andRun)
+		return withBuild(Optional.of(report)).withRunning(running || andRun)
 			.withNote(String.format(Locale.ROOT, "Built %s · %,d bytes", report.adf(), report.bytes()));
 	}
 

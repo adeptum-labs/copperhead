@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Locale;
 import org.copperhead.core.project.Project;
 import org.copperhead.ui.session.StudioState;
+import org.copperhead.ui.view.Modal;
 import org.copperhead.ui.view.ModalView;
 import org.copperhead.ui.view.PairView;
 
@@ -42,15 +43,15 @@ final class ModalViews {
 		final String kind = project.kind().name().toLowerCase(Locale.ROOT);
 
 		return switch (state.modal()) {
-			case NONE -> new ModalView(false, "", List.of(), List.of());
-			case SHORTCUTS -> new ModalView(true, "Keyboard shortcuts", SHORTCUTS, List.of());
-			case ABOUT -> new ModalView(true, "About Copperhead", List.of(), List.of(
+			case NONE -> new ModalView(Modal.NONE, "", List.of(), List.of());
+			case SHORTCUTS -> new ModalView(Modal.SHORTCUTS, "Keyboard shortcuts", SHORTCUTS, List.of());
+			case ABOUT -> new ModalView(Modal.ABOUT, "About Copperhead", List.of(), List.of(
 				"Copperhead · Amiga demo & game studio",
 				"vasm 1.9h · Shrinkler 4.7 · FS-UAE 3.1 core · OCS/ECS/AGA",
 				"Project: " + project.file() + " · " + project.parts().size() + " parts · "
 					+ project.sources().size() + " sources",
 				"Copyright © 2026 Adam Waldenberg · GNU General Public License, version 3"));
-			case SETTINGS -> new ModalView(true, "Project settings", List.of(
+			case SETTINGS -> new ModalView(Modal.SETTINGS, "Project settings", List.of(
 				new PairView("Project", project.file() + " (" + kind + ")"),
 				new PairView("Target", state.target().label()),
 				new PairView("Video", "PAL · 50 Hz · 320×256"),

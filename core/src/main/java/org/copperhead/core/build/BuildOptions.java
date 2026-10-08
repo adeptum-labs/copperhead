@@ -29,7 +29,7 @@ public record BuildOptions(boolean shrinkler, boolean bootblock, boolean symbols
 	}
 
 	public BuildOptions toggle(final BuildOption option) {
-		return new BuildOptions(shrinkler ^ option == BuildOption.SHRINKLER,
-			bootblock ^ option == BuildOption.BOOTBLOCK, symbols ^ option == BuildOption.SYMBOLS);
+		return new BuildOptions(shrinkler ^ (option == BuildOption.SHRINKLER),
+			bootblock ^ (option == BuildOption.BOOTBLOCK), symbols ^ (option == BuildOption.SYMBOLS));
 	}
 }

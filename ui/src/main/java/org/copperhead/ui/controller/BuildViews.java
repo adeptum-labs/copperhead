@@ -30,23 +30,44 @@ import org.copperhead.ui.view.ToolView;
 import org.copperhead.ui.view.Vals;
 
 final class BuildViews {
-	private static final List<String> LABELS = List.of("Shrinkler -9", "Bootblock + trackloader", "Debug symbols");
+	private static final double MILLIS_PER_SECOND = 1000.0;
 
 	private BuildViews() {
 	}
 
 	static ToolView tool(final StudioState state) {
-		final BuildReport report = state.build();
+		final String adf = state.project().adf();
 
-		return new ToolView(List.of(ToolViews.title("Build & export")), report.adf(), new BuildView(
+		return new ToolView(List.of(ToolViews.title("Build & export")), adf, new BuildView(
 			Arrays.stream(Target.values()).map(target -> new TargetCardView(target.label(), target.memory(),
 				target == state.target(), Vals.of("target", target.chipset()))).toList(),
-			Arrays.stream(BuildOption.values()).map(option -> new OptionView(LABELS.get(option.ordinal()),
+			Arrays.stream(BuildOption.values()).map(option -> new OptionView(label(option),
 				state.options().on(option), Vals.of("option", option))).toList(),
-			report.log().stream()
+			state.build().map(BuildReport::log).orElse(List.of()).stream()
 				.map(line -> new BuildLineView(line.text(), line.tone().name().toLowerCase(Locale.ROOT)))
 				.toList(),
-			String.format(Locale.ROOT, "%s · %,d bytes · %.1fs · %s", report.adf(), report.bytes(),
-				report.took().toMillis() / 1000.0, state.target().machine())));
+			adf + " · " + outcome(state) + " · " + state.target().machine()));
+	}
+
+	/** What the last build came to, as the build tool and the status bar both put it. */
+	static String outcome(final StudioState state) {
+		return state.build().map(report -> String.format(Locale.ROOT, "%,d bytes · %.1fs", report.bytes(),
+			report.took().toMillis() / MILLIS_PER_SECOND)).orElse("not built yet");
+	}
+
+	static String label(final BuildOption option) {
+		return switch (option) {
+			case SHRINKLER -> "Shrinkler -9";
+			case BOOTBLOCK -> "Bootblock + trackloader";
+			case SYMBOLS -> "Debug symbols";
+		};
+	}
+
+	/* The menu has room to say what Shrinkler does with the program; the build tool only names the option. */
+	static String menuLabel(final BuildOption option) {
+		return switch (option) {
+			case SHRINKLER -> "Crunch with " + label(option);
+			case BOOTBLOCK, SYMBOLS -> label(option);
+		};
 	}
 }

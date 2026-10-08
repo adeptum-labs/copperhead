@@ -16,13 +16,25 @@
 package org.copperhead.ui.view;
 
 import java.util.List;
+import java.util.Locale;
 import org.copperhead.web.action.View;
 
-/** The dialog over the studio, if one is open: a title and either rows of name and value or lines of text. */
-public record ModalView(boolean open, String title, List<PairView> rows, List<String> lines) implements View {
+/**
+ * The dialog over the studio, if one is open: a title and either rows of name and value or lines of text. Each
+ * kind lays its rows out its own way: shortcuts name the keys at the far side, settings give values beside names.
+ */
+public record ModalView(Modal kind, String title, List<PairView> rows, List<String> lines) implements View {
 	public ModalView {
 		rows = List.copyOf(rows);
 		lines = List.copyOf(lines);
+	}
+
+	public boolean open() {
+		return kind != Modal.NONE;
+	}
+
+	public String modifier() {
+		return "modal__rows--" + kind.name().toLowerCase(Locale.ROOT);
 	}
 
 	@Override

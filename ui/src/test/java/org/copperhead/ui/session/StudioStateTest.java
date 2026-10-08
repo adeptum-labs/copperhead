@@ -51,7 +51,20 @@ public class StudioStateTest {
 	public void shouldOpenOnTheCodeWithTheLastBuildShown() {
 		assertEquals(Tool.CODE, opened.tool());
 		assertEquals(Modal.NONE, opened.modal());
-		assertEquals("nightfall.adf", opened.build().adf());
+		assertEquals("nightfall.adf", opened.build().orElseThrow().adf());
+	}
+
+	@Example
+	public void shouldSwitchToAnotherProjectInTheSameLayoutWithNothingBuilt() {
+		final StudioState game = opened.withTarget(Target.A1200_AGA).withTool(Tool.SPRITES).withTimelineShown(false)
+			.switchTo(SampleProjects.blitzball());
+
+		assertEquals("blitzball.chp", game.project().file());
+		assertEquals(Target.A1200_AGA, game.target());
+		assertEquals(Tool.SPRITES, game.tool());
+		assertFalse(game.timelineShown());
+		assertTrue(game.build().isEmpty());
+		assertEquals("Opened blitzball.chp (game)", game.note());
 	}
 
 	@Example

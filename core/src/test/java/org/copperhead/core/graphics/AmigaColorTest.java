@@ -44,6 +44,12 @@ public class AmigaColorTest {
 	}
 
 	@Example
+	public void shouldWriteTheShortFormWithOneDigitAChannel() {
+		assertEquals("$D42", AmigaColor.of(0xD, 0x4, 0x2).shortHex());
+		assertEquals("$015", AmigaColor.of(0x0, 0x1, 0x5).shortHex());
+	}
+
+	@Example
 	public void shouldRepeatEachChannelToFillAModernScreen() {
 		assertEquals("#DD4422", AmigaColor.parse("$0D42").css());
 	}

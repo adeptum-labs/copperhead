@@ -40,7 +40,7 @@ final class DebuggerViews {
 		final String at = state.project().trace().file() + ":" + state.pc();
 
 		return new ToolView(List.of(ToolViews.title("Debugger")), state.running() ? "running" : "stopped at " + at,
-			new DebuggerView(status(state, at),
+			new DebuggerView(state.running(), status(state, at),
 				SampleMachine.registers(state.d0()).stream()
 					.map(register -> new RegisterView(register.name(), register.hex())).toList(),
 				"%08X".formatted(CODE_BASE + state.pc() * INSTRUCTION), SUPERVISOR,
@@ -49,8 +49,7 @@ final class DebuggerViews {
 				SampleMachine.memory().stream()
 					.map(row -> new MemoryRowView(row.address(), row.words(), row.text())).toList(),
 				state.breakpoints().stream()
-					.map(mark -> new BreakpointView(mark.location(), hits(mark.hits()))).toList(),
-				state.project().trace().file()));
+					.map(mark -> new BreakpointView(mark.location(), hits(mark.hits()))).toList()));
 	}
 
 	private static String status(final StudioState state, final String at) {
