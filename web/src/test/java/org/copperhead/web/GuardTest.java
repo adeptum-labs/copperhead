@@ -46,6 +46,18 @@ public class GuardTest extends ServedTest {
 	}
 
 	@Example
+	public void shouldFindTheSessionCookieBehindOtherCookies() throws Exception {
+		final String cookies = "other-session=elsewhere; " + SessionToken.COOKIE + "=" + token().value();
+
+		assertEquals(200, anonymous().header("Cookie", cookies).get("/").statusCode());
+	}
+
+	@Example
+	public void shouldRefuseAnotherCookieCarryingTheToken() throws Exception {
+		assertEquals(403, anonymous().header("Cookie", "other-session=" + token().value()).get("/").statusCode());
+	}
+
+	@Example
 	public void shouldRefuseARequestSentFromSomebodyElsesPage() throws Exception {
 		final HttpResponse<String> response = admitted()
 			.header("Origin", "https://elsewhere.example")

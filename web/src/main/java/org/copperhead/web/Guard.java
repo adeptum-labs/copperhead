@@ -15,8 +15,7 @@
 
 package org.copperhead.web;
 
-import java.net.HttpCookie;
-import java.util.List;
+import org.eclipse.jetty.http.HttpCookie;
 import org.eclipse.jetty.http.HttpHeader;
 import org.eclipse.jetty.http.HttpStatus;
 import org.eclipse.jetty.server.Handler;
@@ -74,23 +73,8 @@ public class Guard extends Handler.Wrapper {
 	}
 
 	private String cookie(final Request request) {
-		for (final String header : request.getHeaders().getValuesList(HttpHeader.COOKIE)) {
-			for (final HttpCookie cookie : parse(header)) {
-				if (SessionToken.COOKIE.equals(cookie.getName())) {
-					return cookie.getValue();
-				}
-			}
-		}
-
-		return null;
-	}
-
-	private List<HttpCookie> parse(final String header) {
-		try {
-			return HttpCookie.parse(header);
-		} catch (IllegalArgumentException _) {
-			return List.of();
-		}
+		return Request.getCookies(request).stream().filter(cookie -> SessionToken.COOKIE.equals(cookie.getName()))
+			.map(HttpCookie::getValue).findFirst().orElse(null);
 	}
 
 	/* A page in the user's own browser can reach this port. It cannot read the responses, but
