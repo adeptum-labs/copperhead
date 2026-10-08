@@ -30,9 +30,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * What the installed package does for the desktop it was installed on, looked for after a real install on this
- * computer: the menu entry the package ships. A runner has no desktop menu to register that entry with, so it is
- * the file itself that is looked at. The removal comes last, and what it should take with it is looked for then.
- * It installs software, so it runs only where copperhead.installed is true, which only the workflow sets.
+ * computer: the menu entry the package ships. A headless machine has no desktop menu to register that entry with,
+ * so it is the file itself that is looked at. The removal comes last, and what it should take with it is looked
+ * for then. It installs software, so it runs only when the build is started with -Dcopperhead.installed=true,
+ * which Maven hands on to the forked failsafe JVM as a system property.
  */
 @EnabledOnOs(OS.LINUX)
 @EnabledIfSystemProperty(named = "copperhead.installed", matches = "true")

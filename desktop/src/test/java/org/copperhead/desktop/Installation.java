@@ -24,7 +24,8 @@ import java.util.stream.Stream;
 
 /**
  * Installs the Debian package the build made the way a person would, and says where its launcher is.
- * Installing changes the computer for good, so only the installed-package test on a CI runner uses it.
+ * Installing changes the computer for good, so only the installed-package test uses it, and that test runs only
+ * when the build is started with -Dcopperhead.installed=true.
  */
 final class Installation {
 	private static final long INSTALL_SECONDS = 600;
