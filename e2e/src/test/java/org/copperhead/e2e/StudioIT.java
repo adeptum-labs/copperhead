@@ -17,6 +17,7 @@ package org.copperhead.e2e;
 
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.options.BoundingBox;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import net.jqwik.api.Example;
 import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
@@ -25,8 +26,16 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class StudioIT extends BrowserTest {
-	private static final Map<String, String> TABS = Map.of("Sprites", "ball.spr", "Palette & copper", "palette.pal",
-		"Debugger", "Debugger", "Build & export", "Build & export", "Code", "plasma.s");
+	private static final Map<String, String> TABS = new LinkedHashMap<>();
+
+	static {
+		TABS.put("Sprites", "ball.spr");
+		TABS.put("Palette & copper", "palette.pal");
+		TABS.put("Debugger", "Debugger");
+		TABS.put("Build & export", "Build & export");
+		TABS.put("Code", "plasma.s");
+	}
+
 	private static final double SETTLE_MILLIS = 600;
 	private static final int DRAG = 200;
 
@@ -78,11 +87,9 @@ public class StudioIT extends BrowserTest {
 		page().waitForTimeout(SETTLE_MILLIS);
 		assertNotEquals(before, clock.textContent());
 
-		page().evaluate("document.addEventListener('htmx:load', event => {"
-			+ " if (event.detail.elt.id === 'timeline') { window.timelineLoaded = true; } })");
 		page().click("#machine .machine__run");
 		assertThat(page().locator("#machine .machine__run")).hasText("▶ Run");
-		page().waitForFunction("window.timelineLoaded");
+		assertThat(page().locator("#timeline[data-running=false]")).isAttached();
 
 		final String paused = clock.textContent();
 

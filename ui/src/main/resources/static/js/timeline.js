@@ -17,10 +17,12 @@
    drawn anew the page takes up the position it carries and plays on from there. */
 let anchor = { at: 0, since: performance.now(), running: false, length: 1 };
 
+/* Truncates to hundredths exactly as the server writes the same moment, so a paused page shows the text it was sent. */
 const clock = (millis) => {
-	const seconds = millis / 1000;
+	const centis = Math.floor(millis / 10);
+	const seconds = String(Math.floor(centis / 100) % 60).padStart(2, "0");
 
-	return `${Math.floor(seconds / 60)}:${(seconds % 60).toFixed(2).padStart(5, "0")}`;
+	return `${Math.floor(centis / 6000)}:${seconds}.${String(centis % 100).padStart(2, "0")}`;
 };
 
 const position = () => anchor.running

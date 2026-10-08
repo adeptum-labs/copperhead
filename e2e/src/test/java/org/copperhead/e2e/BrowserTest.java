@@ -53,12 +53,17 @@ public abstract class BrowserTest {
 		browser = playwright.chromium().launch();
 	}
 
-	/* Closing Playwright closes its browsers too; it is missing only when it could not start, and that failure
-	   is the one worth reporting. */
+	/* Each is missing only when the one before it could not start, and that failure is the one worth reporting. */
 	@AfterContainer
 	public static void quit() {
-		if (playwright != null) {
-			playwright.close();
+		try {
+			if (browser != null) {
+				browser.close();
+			}
+		} finally {
+			if (playwright != null) {
+				playwright.close();
+			}
 		}
 	}
 
@@ -94,8 +99,22 @@ public abstract class BrowserTest {
 	   that exact spot. */
 	@AfterTry
 	public void close() throws Exception {
-		context.close();
-		rig.close();
+		try {
+			if (page != null) {
+				page.close();
+			}
+		} finally {
+			try {
+				if (context != null) {
+					context.close();
+				}
+			} finally {
+				if (rig != null) {
+					rig.close();
+				}
+			}
+		}
+
 		assertEquals(List.of(), troubles);
 	}
 

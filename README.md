@@ -18,6 +18,9 @@ mvn -Pbrowser install       # also drive the interface in a real browser
 mvn -Pinstaller install     # also build the DEB and RPM packages
 ```
 
+Playwright refuses hosts it does not recognise (LMDE and other Debian derivatives); run
+`mvn -Pbrowser install` with `PLAYWRIGHT_HOST_PLATFORM_OVERRIDE=debian12-x64` set there.
+
 ## Licence
 
 Copyright © 2026 Adam Waldenberg. Licensed under the GNU General Public License, version 3; see `COPYING`.
