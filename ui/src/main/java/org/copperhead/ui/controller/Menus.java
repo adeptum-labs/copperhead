@@ -29,6 +29,9 @@ import org.copperhead.ui.view.Vals;
 
 /** The menu bar: every command of the studio, with its shortcut and whether it is in effect. */
 final class Menus {
+	/* Linux desktops take Ctrl+Alt+T to open a terminal before the page ever sees it. */
+	static final String LIGHT_DARK = "Ctrl+Shift+L";
+
 	private static final String NO_KEYS = "";
 	private static final String NO_VALS = "";
 	private static final String TOOL = "tool";
@@ -79,7 +82,7 @@ final class Menus {
 			action("Show timeline", "Ctrl+J", "timeline", NO_VALS).withChecked(state.timelineShown())
 				.withSeparated(true),
 			later("Focus emulator", "Ctrl+E"),
-			new MenuItemView("Light mode", "Ctrl+Alt+T", NO_VALS, NO_VALS, false, true, ItemKind.THEME)));
+			new MenuItemView("Light mode", LIGHT_DARK, NO_VALS, NO_VALS, false, true, ItemKind.THEME)));
 	}
 
 	private static MenuView build(final StudioState state) {

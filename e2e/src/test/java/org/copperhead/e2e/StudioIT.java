@@ -83,6 +83,28 @@ public class StudioIT extends BrowserTest {
 		assertThat(page().locator("#modal .modal__title")).hasText("Keyboard shortcuts");
 	}
 
+	/* On a French keyboard the key marked 2 types "é" until Shift is held. */
+	@Example
+	public void shouldSwitchToolsWhereTheDigitsNeedShift() {
+		page().evaluate("document.body.dispatchEvent(new KeyboardEvent('keydown',"
+			+ " {key: 'é', code: 'Digit2', ctrlKey: true, bubbles: true}))");
+
+		assertThat(page().locator("#tool .tool__tab--active")).hasText("ball.spr");
+	}
+
+	/* Actions are sent one at a time, so once the dialog has closed any switch asked for before it has landed. */
+	@Example
+	public void shouldKeepTheKeysToAnOpenDialog() {
+		page().keyboard().press("Control+Slash");
+		assertThat(page().locator("#modal .modal__close")).isFocused();
+
+		page().keyboard().press("Control+2");
+		page().keyboard().press("Escape");
+
+		assertThat(page().locator("#modal")).isHidden();
+		assertThat(page().locator("#tool .tool__tab--active")).hasText("plasma.s");
+	}
+
 	/* The server keeps the run's time, so the moment it pauses at can only be later than the one the page showed. */
 	@Example
 	public void shouldMoveThePlayheadOnlyWhileTheMachineRunsAndNeverBack() {

@@ -14,12 +14,14 @@
  */
 
 /* A stand-in for the emulator's picture: copper bars rolling down a PAL screen while the machine runs. The
-   pane is drawn anew on every change to the machine, so the canvas is looked up on each frame. */
+   pane is drawn anew on every change to the machine, so the canvas is looked up on each frame; a still picture is
+   drawn once on each canvas that arrives. */
 const BARS = 6;
 const HALF_BAR = 8;
 const reduced = matchMedia("(prefers-reduced-motion: reduce)");
 let shown = 0;
 let last = performance.now();
+let drawn = null;
 
 const draw = (canvas, time) => {
 	const context = canvas.getContext("2d");
@@ -46,15 +48,17 @@ const draw = (canvas, time) => {
 
 const tick = (now) => {
 	const canvas = document.querySelector("[data-emulator]");
+	const moving = canvas !== null && canvas.dataset.running === "true" && !reduced.matches;
 
-	if (canvas && canvas.dataset.running === "true" && !reduced.matches) {
+	if (moving) {
 		shown += now - last;
 	}
 
 	last = now;
 
-	if (canvas) {
+	if (canvas !== null && (moving || canvas !== drawn)) {
 		draw(canvas, shown);
+		drawn = canvas;
 	}
 
 	requestAnimationFrame(tick);

@@ -38,6 +38,8 @@ import org.jsoup.nodes.Element;
  */
 public final class Screen {
 	private static final Set<String> UNDERSTOOD = Set.of("hx-post", "hx-swap", "hx-vals", "hx-swap-oob");
+	private static final String SYNC = "hx-sync";
+	private static final String QUEUED = "body:queue all";
 	private static final String NONE = "none";
 	private static final String OUT_OF_BAND = "true";
 	private static final String SCRIPTED = "js:";
@@ -190,9 +192,17 @@ public final class Screen {
 
 		for (Element holder = element; holder != null; holder = holder.parent()) {
 			for (final Attribute attribute : holder.attributes()) {
-				refuseWhatIsNotUnderstood(element, holder, withoutData(attribute.getKey()));
+				if (!queuedOnTheBody(holder, attribute)) {
+					refuseWhatIsNotUnderstood(element, holder, withoutData(attribute.getKey()));
+				}
 			}
 		}
+	}
+
+	/* Requests sent one after another, each answered before the next, is all this screen ever does. */
+	private static boolean queuedOnTheBody(final Element holder, final Attribute attribute) {
+		return "body".equals(holder.normalName()) && SYNC.equals(attribute.getKey())
+			&& QUEUED.equals(attribute.getValue());
 	}
 
 	/* htmx sends the enclosing form's fields and the control's own value along with the action, and this screen

@@ -15,7 +15,9 @@
 		<script src="/static/js/timeline.js" defer></script>
 		<script src="/static/js/splitter.js" defer></script>
 	</head>
-	<body class="studio" hx-swap="none">
+	<!-- Answers are drawn outside the session's lock and could arrive out of order, so actions are sent one at a time
+		and an older answer never lands over a newer one. -->
+	<body class="studio" hx-swap="none" hx-sync="body:queue all">
 		<header class="titlebar" data-drag>
 			<span class="titlebar__brand">Copperhead</span>
 			<th:block th:with="view=${view.region('MENUS')}"><div th:replace="~{__${view.template()}__}"></div></th:block>

@@ -71,4 +71,14 @@ public class ScreenTest {
 
 		assertThrows(UnsupportedOperationException.class, () -> screen.click("button"));
 	}
+
+	@Example
+	public void shouldRefuseAnySyncButQueuingEveryRequestOnTheBody() {
+		final Screen dropping = Screen.over(client,
+			"<html><body hx-swap=\"none\" hx-sync=\"body:drop\">" + SEND + "</body></html>");
+		final Screen elsewhere = over("<div hx-sync=\"body:queue all\">" + SEND + "</div>");
+
+		assertThrows(UnsupportedOperationException.class, () -> dropping.click("button"));
+		assertThrows(UnsupportedOperationException.class, () -> elsewhere.click("button"));
+	}
 }

@@ -8,7 +8,7 @@
 					<header class="modal__header">
 						<h2 class="modal__title" th:text="${view.title()}">Keyboard shortcuts</h2>
 						<button class="modal__close" type="button" hx-post="/action/modal-close"
-							data-key="escape">Esc</button>
+							data-key="escape" autofocus>Esc</button>
 					</header>
 					<dl class="modal__rows" th:unless="${view.rows().isEmpty()}">
 						<th:block th:each="row : ${view.rows()}">

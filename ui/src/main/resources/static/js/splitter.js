@@ -36,11 +36,14 @@ const recall = (key) => {
 
 const clamp = (value, low, high) => Math.min(high, Math.max(low, value));
 
+/* The capture is lost when the button is released and when the drag is cancelled, so the split lets go of the
+   pointer in both cases. */
 const drag = (handle, move) => {
 	handle.addEventListener("pointerdown", (event) => {
 		handle.setPointerCapture(event.pointerId);
 		handle.addEventListener("pointermove", move);
-		handle.addEventListener("pointerup", () => handle.removeEventListener("pointermove", move), { once: true });
+		handle.addEventListener("lostpointercapture", () => handle.removeEventListener("pointermove", move),
+			{ once: true });
 	});
 };
 

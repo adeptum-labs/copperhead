@@ -30,7 +30,7 @@ final class ModalViews {
 		new PairView("Build ADF / build & run", "Ctrl+B · Ctrl+Shift+B"),
 		new PairView("Switch tool", "Ctrl+1 – Ctrl+5"),
 		new PairView("Show / hide timeline", "Ctrl+J"),
-		new PairView("Light / dark mode", "Ctrl+Alt+T"),
+		new PairView("Light / dark mode", Menus.LIGHT_DARK),
 		new PairView("Open menu", "click · hover to switch"),
 		new PairView("Close menu / dialog", "Esc"));
 

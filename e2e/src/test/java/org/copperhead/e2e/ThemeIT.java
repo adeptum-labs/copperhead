@@ -39,6 +39,13 @@ public class ThemeIT extends BrowserTest {
 	}
 
 	@Example
+	public void shouldSwitchTheThemeWithCtrlShiftL() {
+		page().keyboard().press("Control+Shift+L");
+
+		assertThat(page().locator("html")).hasAttribute(THEME, "light");
+	}
+
+	@Example
 	public void shouldSwitchTheThemeFromTheViewMenu() {
 		page().click(".menu__button:text-is('View')");
 		page().click(".menu__item:has-text('Light mode')");
