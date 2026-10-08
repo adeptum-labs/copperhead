@@ -53,7 +53,8 @@ public abstract class BrowserTest {
 		browser = playwright.chromium().launch();
 	}
 
-	/* Each is missing only when the one before it could not start, and that failure is the one worth reporting. */
+	/* The browser is missing only when Playwright could not launch it, and Playwright only when it could not start;
+	   that failure is the one worth reporting. */
 	@AfterContainer
 	public static void quit() {
 		try {
@@ -100,18 +101,12 @@ public abstract class BrowserTest {
 	@AfterTry
 	public void close() throws Exception {
 		try {
-			if (page != null) {
-				page.close();
+			if (context != null) {
+				context.close();
 			}
 		} finally {
-			try {
-				if (context != null) {
-					context.close();
-				}
-			} finally {
-				if (rig != null) {
-					rig.close();
-				}
+			if (rig != null) {
+				rig.close();
 			}
 		}
 

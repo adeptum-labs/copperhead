@@ -14,8 +14,9 @@
  */
 
 /* The playhead runs here while the machine runs. The server keeps the same time, so each time the timeline is
-   drawn anew the page takes up the position it carries and plays on from there. */
-let anchor = { at: 0, since: performance.now(), running: false, length: 1 };
+   drawn anew the page takes up the position it carries and plays on from there. The anchor remembers the node it
+   was read from, so a node swapped in is never painted with the time of the one it replaced. */
+let anchor = { element: null, at: 0, since: performance.now(), running: false, length: 1 };
 
 /* Truncates to hundredths exactly as the server writes the same moment, so a paused page shows the text it was sent. */
 const clock = (millis) => {
@@ -29,23 +30,24 @@ const position = () => anchor.running
 	? (anchor.at + performance.now() - anchor.since) % anchor.length
 	: anchor.at;
 
-const sync = () => {
-	const timeline = document.getElementById("timeline");
-
-	if (timeline) {
-		anchor = {
-			at: Number(timeline.dataset.position),
-			since: performance.now(),
-			running: timeline.dataset.running === "true",
-			length: Number(timeline.dataset.length)
-		};
-	}
+const sync = (timeline) => {
+	anchor = {
+		element: timeline,
+		at: Number(timeline.dataset.position),
+		since: performance.now(),
+		running: timeline.dataset.running === "true",
+		length: Number(timeline.dataset.length)
+	};
 };
 
 const paint = () => {
 	const timeline = document.getElementById("timeline");
 
 	if (timeline) {
+		if (timeline !== anchor.element) {
+			sync(timeline);
+		}
+
 		const at = position();
 		const shown = timeline.querySelector("[data-clock]");
 
@@ -68,11 +70,4 @@ window.copperhead = {
 	}
 };
 
-document.addEventListener("htmx:load", (event) => {
-	if (event.detail.elt.id === "timeline") {
-		sync();
-	}
-});
-
-sync();
 requestAnimationFrame(paint);
