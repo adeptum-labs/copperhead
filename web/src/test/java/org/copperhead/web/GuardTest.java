@@ -67,6 +67,19 @@ public class GuardTest extends ServedTest {
 	}
 
 	@Example
+	public void shouldAdmitARequestSentFromItsOwnPage() throws Exception {
+		final String origin = "http://" + base().getHost() + ":" + base().getPort();
+
+		assertEquals(204, admitted().header("Origin", origin).post("/window/minimise").statusCode());
+	}
+
+	/* A sandboxed frame or a page opened from a file sends this origin, and could be anybody's. */
+	@Example
+	public void shouldRefuseARequestFromAnOpaqueOrigin() throws Exception {
+		assertEquals(403, admitted().header("Origin", "null").post("/window/minimise").statusCode());
+	}
+
+	@Example
 	public void shouldGuardTheAssetsToo() throws Exception {
 		assertEquals(403, anonymous().get("/static/css/testing.css").statusCode());
 		assertEquals(200, admitted().get("/static/css/testing.css").statusCode());

@@ -15,7 +15,6 @@
 
 package org.copperhead.web;
 
-import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Locale;
 import java.util.Optional;
@@ -65,19 +64,5 @@ public interface WindowControl {
 	}
 
 	default void endResize() {
-	}
-
-	/**
-	 * Asks the person for a file with the host's own dialog and answers with where it is. A page
-	 * can only ever be handed a file's contents, never its place on disk, and a disk image is too
-	 * large to copy through a request. Empty when the dialog was dismissed.
-	 */
-	default Optional<Path> chooseFile(final String title) {
-		return Optional.empty();
-	}
-
-	/** Asks the person where to save a file, suggesting a name, with the host's own dialog. Empty when dismissed. */
-	default Optional<Path> saveFile(final String title, final String name) {
-		return Optional.empty();
 	}
 }

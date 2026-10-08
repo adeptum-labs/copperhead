@@ -63,7 +63,7 @@ public final class Copperhead {
 		final BrowserWindow window = new BrowserWindow(options.windowSystem());
 		final SessionToken token = SessionToken.random();
 		final ProjectSession session = container.select(ProjectSession.class).get();
-		final UiServer server = new UiServer(Routes.create(new Templates(false), token, window.control(), actions,
+		final UiServer server = new UiServer(Routes.create(new Templates(true), token, window.control(), actions,
 			() -> Screens.index(session.state())
 		));
 		final URI uri = server.start();

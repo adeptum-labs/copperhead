@@ -18,8 +18,7 @@ package org.copperhead.shell;
 /**
  * What the browser engine draws the page on in a Linux desktop session. The frame around it is an X11 window
  * even on a Wayland desktop, drawn through Xwayland, and the engine can only be embedded in it from X11. Left
- * to choose, it runs on Wayland there and draws the page in a window of its own, and on GNOME it loads GTK 4,
- * which deadlocks the GTK 3 the file picker needs.
+ * to choose, it runs on Wayland there and draws the page in a window of its own.
  */
 public enum WindowSystem {
 	X11("--ozone-platform=x11"),

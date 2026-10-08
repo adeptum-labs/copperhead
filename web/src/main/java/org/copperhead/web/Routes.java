@@ -54,8 +54,8 @@ public final class Routes {
 		   so an unknown path renders the interface rather than a Jetty error page. */
 		return new Guard(new Handler.Sequence(
 			new ContextHandler(assets, ASSET_PATH),
-			new ContextHandler(new WindowHandler(window), WINDOW_PATH),
-			new ContextHandler(new ActionHandler(actions, templates), ACTION_PATH),
+			new ContextHandler(new PostOnly(new WindowHandler(window)), WINDOW_PATH),
+			new ContextHandler(new PostOnly(new ActionHandler(actions, templates)), ACTION_PATH),
 			new UiHandler(templates, index)
 		), token);
 	}

@@ -16,7 +16,6 @@
 package org.copperhead.web;
 
 import java.net.http.HttpResponse;
-import java.nio.file.Path;
 import java.util.List;
 import net.jqwik.api.Example;
 import org.eclipse.jetty.server.Handler;
@@ -59,27 +58,6 @@ public class WindowHandlerTest extends ServedTest {
 	}
 
 	@Example
-	public void shouldAnswerWithTheFileTheHostChose() throws Exception {
-		final Path disk = Path.of("/mnt/backup/demo.adf");
-
-		window.picking(disk);
-
-		final HttpResponse<String> response = admitted().post("/window/choose-file?title=Pick+a+disk");
-
-		assertEquals(200, response.statusCode());
-		assertEquals(disk.toString(), response.body());
-		assertEquals(List.of("choose-file:Pick a disk"), window.commands());
-	}
-
-	@Example
-	public void shouldAnswerWithNothingWhenTheDialogWasDismissed() throws Exception {
-		final HttpResponse<String> response = admitted().post("/window/choose-file?title=Pick+a+disk");
-
-		assertEquals(204, response.statusCode());
-		assertEquals("", response.body());
-	}
-
-	@Example
 	public void shouldNotInventCommandsItDoesNotHave() throws Exception {
 		admitted().post("/window/selfdestruct");
 		admitted().post("/window/resize/start/top");
@@ -93,21 +71,11 @@ public class WindowHandlerTest extends ServedTest {
 	}
 
 	@Example
-	public void shouldAnswerWithWhereTheHostWillSave() throws Exception {
-		final Path history = Path.of("/home/ann/history.csv");
+	public void shouldNotActOnAnythingButAPost() throws Exception {
+		final HttpResponse<String> response = admitted().get("/window/close");
 
-		window.picking(history);
-
-		final HttpResponse<String> response = admitted()
-			.post("/window/save-file?title=Save+the+history&name=history.csv");
-
-		assertEquals(200, response.statusCode());
-		assertEquals(history.toString(), response.body());
-		assertEquals(List.of("save-file:Save the history:history.csv"), window.commands());
-	}
-
-	@Example
-	public void shouldAnswerWithNothingWhenSavingWasCancelled() throws Exception {
-		assertEquals(204, admitted().post("/window/save-file?title=Save&name=a.csv").statusCode());
+		assertEquals(405, response.statusCode());
+		assertEquals("POST", response.headers().firstValue("Allow").orElse(""));
+		assertEquals(List.of(), window.commands());
 	}
 }

@@ -99,6 +99,12 @@ public class ActionHandlerTest extends ServedTest {
 	}
 
 	@Example
+	public void shouldNotActOnAnythingButAPost() throws Exception {
+		assertEquals(405, admitted().get("/action/insert-disk?disk=x").statusCode());
+		assertEquals(List.of(), machine.disks());
+	}
+
+	@Example
 	public void shouldReportAFailedActionRatherThanPretendItWorked() throws Exception {
 		assertEquals(500, admitted().post("/action/break-machine").statusCode());
 	}

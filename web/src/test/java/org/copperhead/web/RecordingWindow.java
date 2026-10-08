@@ -15,27 +15,19 @@
 
 package org.copperhead.web;
 
-import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
-import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
- * A host that remembers every command it was given, in the words the page uses for them, and
- * answers a file dialog with whatever file it was told the person picked. Commands arrive on the
+ * A host that remembers every command it was given, in the words the page uses for them. Commands arrive on the
  * server's threads, so a caller that has to wait for them does so with {@link #await}.
  */
 public class RecordingWindow implements WindowControl {
 	private static final long POLL_MILLIS = 10;
 
 	private final List<String> commands = new CopyOnWriteArrayList<>();
-	private volatile Path picked;
-
-	public void picking(final Path file) {
-		picked = file;
-	}
 
 	public List<String> commands() {
 		return List.copyOf(commands);
@@ -50,18 +42,6 @@ public class RecordingWindow implements WindowControl {
 		}
 
 		return commands();
-	}
-
-	@Override
-	public Optional<Path> chooseFile(final String title) {
-		commands.add("choose-file:" + title);
-		return Optional.ofNullable(picked);
-	}
-
-	@Override
-	public Optional<Path> saveFile(final String title, final String name) {
-		commands.add("save-file:" + title + ":" + name);
-		return Optional.ofNullable(picked);
 	}
 
 	@Override
