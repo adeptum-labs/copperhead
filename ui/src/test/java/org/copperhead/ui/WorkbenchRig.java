@@ -16,7 +16,6 @@
 package org.copperhead.ui;
 
 import java.net.URI;
-import java.time.Instant;
 import java.time.InstantSource;
 import org.copperhead.ui.controller.BuildController;
 import org.copperhead.ui.controller.CodeController;
@@ -39,12 +38,15 @@ import org.copperhead.web.action.Actions;
 public class WorkbenchRig implements AutoCloseable {
 	private final SessionToken token = SessionToken.random();
 	private final RecordingWindow window = new RecordingWindow();
-	private final ProjectSession session = new ProjectSession(InstantSource.fixed(Instant.EPOCH));
-	private final Actions actions = Actions.of(controllers(session));
+	private final ProjectSession session;
+	private final Actions actions;
 	private final UiServer server;
 	private final URI base;
 
-	public WorkbenchRig() throws Exception {
+	/** The studio with its run timed by the clock given: a test's own, or the real one for a browser. */
+	public WorkbenchRig(final InstantSource clock) throws Exception {
+		session = new ProjectSession(clock);
+		actions = Actions.of(controllers(session));
 		server = new UiServer(Routes.create(new Templates(false), token, window, actions,
 			() -> Screens.index(session.state())
 		));

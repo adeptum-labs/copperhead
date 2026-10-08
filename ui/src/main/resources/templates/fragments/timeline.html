@@ -3,7 +3,8 @@
 	<body>
 		<section th:fragment="timeline" id="timeline" class="timeline" hx-swap-oob="true" th:hidden="${!view.shown()}"
 			th:style="${view.at()}"
-			th:attr="data-length=${view.length()}, data-position=${view.position()}, data-running=${view.running()}">
+			th:attr="data-length=${view.length()}, data-position=${view.position()}, data-running=${view.running()},
+				data-next=${view.next()}, data-bpm=${view.bpm()}">
 			<div class="timeline__transport">
 				<span class="timeline__title">Timeline</span>
 				<div class="timeline__buttons">
@@ -15,7 +16,8 @@
 				</div>
 				<span class="timeline__clock" data-clock th:text="${view.time()}">0:23.40</span>
 				<span class="timeline__total" th:text="'/ ' + ${view.total()}">/ 1:48.00</span>
-				<span class="timeline__tempo" th:text="${view.tempo()}">125 BPM · pos 03 row 03</span>
+				<span class="timeline__tempo"><span th:text="${view.bpm()}">125</span> BPM · <span data-pattern
+					th:text="${view.pattern()}">pos 03 row 03</span></span>
 			</div>
 			<div class="timeline__part" th:with="part=${view.selected()}">
 				<span class="timeline__label">Part</span>
@@ -65,6 +67,7 @@
 				</div>
 				<div class="timeline__playhead" aria-hidden="true"></div>
 			</div>
+			<button type="button" hidden data-boundary hx-post="/action/catch-up"></button>
 		</section>
 	</body>
 </html>

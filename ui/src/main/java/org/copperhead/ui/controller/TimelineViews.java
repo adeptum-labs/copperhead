@@ -32,9 +32,6 @@ import org.copperhead.ui.view.Vals;
 
 final class TimelineViews {
 	private static final int TICKS = 6;
-	/* A ProTracker module at speed 6 plays a row every 15 / BPM seconds. */
-	private static final long ROW_MILLIS_AT_ONE_BPM = 15_000;
-	private static final long PATTERN_ROWS = 64;
 	private static final String COPPER = "copper.i · 212 WAITs";
 	private static final double PERCENT = 100.0;
 
@@ -52,11 +49,12 @@ final class TimelineViews {
 			.map(tick -> new TickView(Clock.minutes(tick), "--left:" + percent(tick, length))).toList();
 		final List<EventView> events = project.events().stream()
 			.map(event -> new EventView(event.label(), "--left:" + percent(event.at(), length))).toList();
+		final Part playing = project.parts().get(at);
 
 		return new TimelineView(state.timelineShown(), state.running(), length.toMillis(),
-			state.position().toMillis(), Clock.time(state.position()), Clock.time(length),
-			tempo(project, state.position()), parts.get(at), parts, ticks, project.module(), COPPER, events,
-			loop(project.parts().get(at)));
+			state.position().toMillis(), playing.end().toMillis(), project.bpm(), Clock.time(state.position()),
+			Clock.time(length), Clock.pattern(state.position(), project.bpm()), parts.get(at), parts, ticks,
+			project.module(), COPPER, events, loop(playing));
 	}
 
 	private static PartView part(final Part part, final int index, final boolean selected, final Duration length) {
@@ -73,12 +71,6 @@ final class TimelineViews {
 		return new LoopView(part.loops(), "↻ " + part.name() + " · " + pass + " per pass · exits:",
 			part.exits().stream()
 			.map(exit -> new ExitView(exit.on() + " → " + exit.to(), Vals.of("to", exit.to()))).toList());
-	}
-
-	private static String tempo(final Project project, final Duration at) {
-		final long rows = at.toMillis() * project.bpm() / ROW_MILLIS_AT_ONE_BPM;
-
-		return "%d BPM · pos %02X row %02X".formatted(project.bpm(), rows / PATTERN_ROWS, rows % PATTERN_ROWS);
 	}
 
 	private static String percent(final Duration at, final Duration length) {

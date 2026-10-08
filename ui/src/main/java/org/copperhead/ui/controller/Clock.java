@@ -17,10 +17,17 @@ package org.copperhead.ui.controller;
 
 import java.time.Duration;
 
-/** Moments of the run, written the way the transport, the parts and the status bar show them. */
+/**
+ * Moments of the run, written the way the transport, the parts and the status bar show them. While the run plays,
+ * timeline.js writes the time, the frame and the pattern position the same way, so a paused page shows exactly what
+ * it was sent.
+ */
 final class Clock {
 	/* A PAL Amiga draws fifty frames a second. */
 	private static final long FRAME_MILLIS = 20;
+	/* A ProTracker module at speed 6 plays a row every 15 / BPM seconds. */
+	private static final long ROW_MILLIS_AT_ONE_BPM = 15_000;
+	private static final long PATTERN_ROWS = 64;
 	private static final long CENTIS = 10;
 	private static final long MINUTE_CENTIS = 6000;
 	private static final long SECOND_CENTIS = 100;
@@ -33,8 +40,10 @@ final class Clock {
 		return at.toMillis() / FRAME_MILLIS;
 	}
 
-	static String frame(final Duration at) {
-		return "frame " + frames(at);
+	static String pattern(final Duration at, final int bpm) {
+		final long rows = at.toMillis() * bpm / ROW_MILLIS_AT_ONE_BPM;
+
+		return "pos %02X row %02X".formatted(rows / PATTERN_ROWS, rows % PATTERN_ROWS);
 	}
 
 	static String time(final Duration at) {

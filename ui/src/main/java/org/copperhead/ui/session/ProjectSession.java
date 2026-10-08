@@ -35,12 +35,19 @@ public class ProjectSession {
 	private Instant since;
 
 	public ProjectSession() {
-		this(InstantSource.system());
+		this(steady());
 	}
 
 	public ProjectSession(final InstantSource clock) {
 		this.clock = clock;
 		this.since = clock.instant();
+	}
+
+	/* The wall clock can be set back or jump ahead while the machine runs; the run should only ever see time pass. */
+	private static InstantSource steady() {
+		final long origin = System.nanoTime();
+
+		return () -> Instant.EPOCH.plusNanos(System.nanoTime() - origin);
 	}
 
 	public synchronized StudioState state() {

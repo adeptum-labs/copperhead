@@ -38,7 +38,7 @@ final class StatusViews {
 			!warnings.isEmpty(),
 			String.format(Locale.ROOT, "last build %,d bytes · %.1fs", report.bytes(),
 				report.took().toMillis() / 1000.0),
-			state.note(), "Part %02d · %s".formatted(at + 1, part.name()), Clock.frame(state.position()),
+			state.note(), "Part %02d · %s".formatted(at + 1, part.name()), Clock.frames(state.position()),
 			state.target().label());
 	}
 }

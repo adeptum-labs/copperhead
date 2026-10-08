@@ -18,7 +18,7 @@ package org.copperhead.ui.view;
 import org.copperhead.web.action.View;
 
 /** The status bar: what the last build said, what just happened, and where the run is. */
-public record StatusView(String warnings, boolean warns, String lastBuild, String note, String part, String frame,
+public record StatusView(String warnings, boolean warns, String lastBuild, String note, String part, long frame,
 	String machine) implements View {
 
 	@Override

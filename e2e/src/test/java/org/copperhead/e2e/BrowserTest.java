@@ -19,6 +19,7 @@ import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
+import java.time.InstantSource;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import net.jqwik.api.lifecycle.AfterContainer;
@@ -68,9 +69,11 @@ public abstract class BrowserTest {
 		}
 	}
 
+	/* The run moves on in real time, as it does in the window, so the page's playhead and the server's clock are
+	   seen to agree rather than assumed to. */
 	@BeforeTry
 	public void open() throws Exception {
-		rig = new WorkbenchRig();
+		rig = new WorkbenchRig(InstantSource.system());
 		context = browser.newContext(new Browser.NewContextOptions().setViewportSize(1280, 800));
 		page = context.newPage();
 

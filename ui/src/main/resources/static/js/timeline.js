@@ -18,7 +18,12 @@
    was read from, so a node swapped in is never painted with the time of the one it replaced. */
 let anchor = { element: null, at: 0, since: performance.now(), running: false, length: 1 };
 
-/* Truncates to hundredths exactly as the server writes the same moment, so a paused page shows the text it was sent. */
+/* A PAL frame lasts 20 ms; a ProTracker module at speed 6 plays a row every 15 / BPM seconds, 64 to a pattern. */
+const FRAME_MILLIS = 20;
+const ROW_MILLIS_AT_ONE_BPM = 15000;
+const PATTERN_ROWS = 64;
+
+/* Each readout truncates exactly as the server writes the same moment, so a paused page shows the text it was sent. */
 const clock = (millis) => {
 	const centis = Math.floor(millis / 10);
 	const seconds = String(Math.floor(centis / 100) % 60).padStart(2, "0");
@@ -26,9 +31,20 @@ const clock = (millis) => {
 	return `${Math.floor(centis / 6000)}:${seconds}.${String(centis % 100).padStart(2, "0")}`;
 };
 
-const position = () => anchor.running
-	? (anchor.at + performance.now() - anchor.since) % anchor.length
-	: anchor.at;
+const frame = (millis) => String(Math.floor(millis / FRAME_MILLIS));
+
+const hex = (value) => value.toString(16).toUpperCase().padStart(2, "0");
+
+const pattern = (millis) => {
+	const rows = Math.floor(millis * anchor.bpm / ROW_MILLIS_AT_ONE_BPM);
+
+	return `pos ${hex(Math.floor(rows / PATTERN_ROWS))} row ${hex(rows % PATTERN_ROWS)}`;
+};
+
+/* How far the run got since the anchor, before it wraps round at the end. */
+const travelled = () => anchor.at + performance.now() - anchor.since;
+
+const position = () => anchor.running ? travelled() % anchor.length : anchor.at;
 
 const sync = (timeline) => {
 	anchor = {
@@ -36,9 +52,25 @@ const sync = (timeline) => {
 		at: Number(timeline.dataset.position),
 		since: performance.now(),
 		running: timeline.dataset.running === "true",
-		length: Number(timeline.dataset.length)
+		length: Number(timeline.dataset.length),
+		next: Number(timeline.dataset.next),
+		bpm: Number(timeline.dataset.bpm),
+		asked: false
 	};
 };
+
+const write = (selector, text) => {
+	for (const readout of document.querySelectorAll(selector)) {
+		if (readout.textContent !== text) {
+			readout.textContent = text;
+		}
+	}
+};
+
+/* The playing part names itself in the status bar, on the emulator's screen and on the timeline, and only the
+   server knows the parts, so once the playhead runs past the part's end the run is drawn anew. That is asked once
+   for each timeline drawn: the answer brings a new one, with the next end to wait for. */
+const crossed = () => anchor.running && !anchor.asked && travelled() >= anchor.next;
 
 const paint = () => {
 	const timeline = document.getElementById("timeline");
@@ -49,12 +81,15 @@ const paint = () => {
 		}
 
 		const at = position();
-		const shown = timeline.querySelector("[data-clock]");
 
 		timeline.style.setProperty("--at", String(at / anchor.length));
+		write("[data-clock]", clock(at));
+		write("[data-frame]", frame(at));
+		write("[data-pattern]", pattern(at));
 
-		if (shown) {
-			shown.textContent = clock(at);
+		if (crossed()) {
+			anchor.asked = true;
+			timeline.querySelector("[data-boundary]").click();
 		}
 	}
 

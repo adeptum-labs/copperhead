@@ -16,6 +16,7 @@
 package org.copperhead.ui;
 
 import java.net.http.HttpResponse;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -23,6 +24,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 import net.jqwik.api.Example;
@@ -41,11 +43,13 @@ public class StudioFlowTest {
 	private static final Pattern FONT = Pattern.compile("url\\(\"\\.\\./fonts/([^\"]+)\"\\)");
 	private static final String CELLS = "#tool .sprite__grid .sprite__cell";
 
+	/* Still unless a test moves it, so every page shows exactly the same text. */
+	private final AtomicReference<Instant> now = new AtomicReference<>(Instant.EPOCH);
 	private WorkbenchRig rig;
 
 	@BeforeTry
 	public void serve() throws Exception {
-		rig = new WorkbenchRig();
+		rig = new WorkbenchRig(now::get);
 	}
 
 	@AfterTry
@@ -485,9 +489,36 @@ public class StudioFlowTest {
 		assertEquals("Plasma", screen.find("#timeline .block--selected").text());
 		assertEquals("0:23.40", screen.find("#timeline [data-clock]").text());
 		assertEquals("125 BPM · pos 03 row 03", screen.find("#timeline .timeline__tempo").text());
+		assertEquals("125", screen.find("#timeline").attr("data-bpm"));
 		assertEquals("0:18–0:42", screen.find("#timeline .timeline__range").text());
 		assertEquals(List.of("0:00", "0:21", "0:43", "1:04", "1:26", "1:48"),
 			screen.document().select("#timeline .timeline__tick").eachText());
+	}
+
+	@Example
+	public void shouldDrawTheNextPartOnceThePlayheadRunsIntoIt() throws Exception {
+		final Screen screen = Screen.open(rig);
+
+		assertEquals("42000", screen.find("#timeline").attr("data-next"));
+		now.set(Instant.EPOCH.plusMillis(19_000));
+		screen.click("#timeline [data-boundary]");
+
+		assertEquals("Part 04 · Vector balls", screen.find("#status .status__part").text());
+		assertEquals("frame 2120", screen.find("#status .status__frame").text());
+		assertEquals("NIGHTFALL · VECTOR BALLS", screen.find("#emulator .emulator__title").text());
+		assertEquals("Vector balls", screen.find("#timeline .block--selected").text());
+		assertEquals("68000", screen.find("#timeline").attr("data-next"));
+	}
+
+	@Example
+	public void shouldChangeNothingButTheTimeToDrawTheNextPart() throws Exception {
+		final Screen screen = Screen.open(rig).press("ctrl+b");
+		final StudioState before = rig.session().state();
+
+		screen.click("#timeline [data-boundary]");
+
+		assertEquals(before, rig.session().state());
+		assertEquals("Built nightfall.adf · 2,911 bytes", screen.find("#status .status__note").text());
 	}
 
 	@Example

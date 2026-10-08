@@ -17,6 +17,7 @@ package org.copperhead.e2e;
 
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.options.BoundingBox;
+import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import net.jqwik.api.Example;
@@ -38,6 +39,9 @@ public class StudioIT extends BrowserTest {
 
 	private static final double SETTLE_MILLIS = 600;
 	private static final int DRAG = 200;
+	private static final long MILLIS_PER_CENTI = 10;
+	/* A second before Plasma gives way to Vector balls, at 0:42 of the 1:48 run. */
+	private static final double BEFORE_VECTOR_BALLS = 41.0 / 108;
 
 	@Example
 	public void shouldSwitchEveryToolFromTheRail() {
@@ -79,13 +83,16 @@ public class StudioIT extends BrowserTest {
 		assertThat(page().locator("#modal .modal__title")).hasText("Keyboard shortcuts");
 	}
 
+	/* The server keeps the run's time, so the moment it pauses at can only be later than the one the page showed. */
 	@Example
-	public void shouldMoveThePlayheadOnlyWhileTheMachineRuns() {
+	public void shouldMoveThePlayheadOnlyWhileTheMachineRunsAndNeverBack() {
 		final Locator clock = page().locator("#timeline [data-clock]");
-		final String before = clock.textContent();
+		final String opened = clock.textContent();
 
 		page().waitForTimeout(SETTLE_MILLIS);
-		assertNotEquals(before, clock.textContent());
+		assertNotEquals(opened, clock.textContent());
+
+		final long before = millis(clock.textContent());
 
 		page().click("#machine .machine__run");
 		assertThat(page().locator("#machine .machine__run")).hasText("▶ Run");
@@ -93,6 +100,7 @@ public class StudioIT extends BrowserTest {
 
 		final String paused = clock.textContent();
 
+		assertTrue(millis(paused) >= before, paused + " is before " + before + " ms");
 		page().waitForTimeout(SETTLE_MILLIS);
 		assertEquals(paused, clock.textContent());
 	}
@@ -102,6 +110,30 @@ public class StudioIT extends BrowserTest {
 		page().locator("#timeline .timeline__ruler").click(new Locator.ClickOptions().setPosition(2, 5));
 
 		assertThat(page().locator("#status .status__part")).hasText("Part 01 · Loader");
+	}
+
+	@Example
+	public void shouldFollowThePlayheadIntoTheNextPart() {
+		final Locator ruler = page().locator("#timeline .timeline__ruler");
+		final Locator part = page().locator("#status .status__part");
+		final Locator frame = page().locator("#status [data-frame]");
+
+		ruler.click(new Locator.ClickOptions().setPosition(ruler.boundingBox().width * BEFORE_VECTOR_BALLS, 5));
+		page().waitForFunction("document.getElementById('timeline').dataset.position > 40000");
+		assertThat(part).hasText("Part 03 · Plasma");
+
+		final String seeked = frame.textContent();
+
+		assertThat(part).hasText("Part 04 · Vector balls");
+		assertThat(page().locator("#emulator .emulator__title")).hasText("NIGHTFALL · VECTOR BALLS");
+		assertNotEquals(seeked, frame.textContent());
+	}
+
+	private static long millis(final String clock) {
+		final String[] fields = clock.split("[:.]");
+
+		return Duration.ofMinutes(Long.parseLong(fields[0])).plusSeconds(Long.parseLong(fields[1]))
+			.plusMillis(Long.parseLong(fields[2]) * MILLIS_PER_CENTI).toMillis();
 	}
 
 	@Example

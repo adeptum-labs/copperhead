@@ -21,11 +21,12 @@ import org.copperhead.web.action.View;
 
 /**
  * The run laid out in time. The page moves the playhead itself while the machine runs, starting from the
- * position and length carried here; {@code --at} places it as a share of the run.
+ * position and length carried here; {@code --at} places it as a share of the run. Where the playing part ends,
+ * at {@code next}, the page asks for the run to be drawn anew, since the part shows in more places than this one.
  */
-public record TimelineView(boolean shown, boolean running, long length, long position, String time, String total,
-	String tempo, PartView selected, List<PartView> parts, List<TickView> ticks, String music, String copper,
-	List<EventView> events, LoopView loop) implements View {
+public record TimelineView(boolean shown, boolean running, long length, long position, long next, int bpm,
+	String time, String total, String pattern, PartView selected, List<PartView> parts, List<TickView> ticks,
+	String music, String copper, List<EventView> events, LoopView loop) implements View {
 
 	public TimelineView {
 		parts = List.copyOf(parts);

@@ -11,7 +11,7 @@
 			<span class="status__note" th:unless="${view.note().isEmpty()}" th:text="${view.note()}"></span>
 			<span class="status__spacer"></span>
 			<span class="status__part" th:text="${view.part()}">Part 03 · Plasma</span>
-			<span class="status__frame" th:text="${view.frame()}">frame 1170</span>
+			<span class="status__frame">frame <span data-frame th:text="${view.frame()}">1170</span></span>
 			<span class="status__machine" th:text="${view.machine()}">A500 · OCS</span>
 		</footer>
 	</body>

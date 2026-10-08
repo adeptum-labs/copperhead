@@ -53,4 +53,11 @@ public class TimelineController {
 	public Regions onClickExit(final Form form) {
 		return Screens.regions(session.change(state -> state.takeExit(form.get("to"))), MOVED);
 	}
+
+	/* The page has played into the next part. Only the time has moved, and the session already keeps it, so nothing
+	   is changed: the run is drawn where it now is. */
+	@Action("catch-up")
+	public Regions onPlayIntoNextPart() {
+		return Screens.playback(session.state());
+	}
 }
