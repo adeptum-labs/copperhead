@@ -16,14 +16,18 @@
 				<p class="palette__picked"><span th:text="${picked.name()}">COLOR04</span> <span
 					th:text="${picked.hex()}">$015C</span></p>
 				<div class="palette__channels" th:style="${picked.channels()}">
-					<span class="palette__channel palette__channel--red"></span>
-					<span class="palette__channel palette__channel--green"></span>
-					<span class="palette__channel palette__channel--blue"></span>
+					<span class="palette__letter">R</span><span class="palette__channel palette__channel--red"></span><span
+						th:text="${picked.red()}">1</span>
+					<span class="palette__letter">G</span><span class="palette__channel palette__channel--green"></span><span
+						th:text="${picked.green()}">5</span>
+					<span class="palette__letter">B</span><span class="palette__channel palette__channel--blue"></span><span
+						th:text="${picked.blue()}">12</span>
 				</div>
 				<p class="palette__depth" th:text="${view.depth()}">12-bit OCS · 4 bits per channel shown</p>
 				<div class="palette__bar" th:style="${view.bar()}"></div>
 				<p class="palette__note">Copper bar · 64 lines · 1 MOVE per line</p>
-				<button class="button" type="button" disabled title="Coming in a later release">Export copper.i</button>
+				<button class="button button--narrow" type="button" disabled
+					title="Coming in a later release">Export copper.i</button>
 			</aside>
 		</div>
 	</body>

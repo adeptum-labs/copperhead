@@ -22,17 +22,10 @@
 			<span class="titlebar__spacer"></span>
 			<th:block th:with="view=${view.region('MACHINE')}"><div th:replace="~{__${view.template()}__}"></div></th:block>
 			<span class="titlebar__spacer"></span>
+			<button class="titlebar__theme" type="button" data-theme-toggle aria-label="Switch theme">
+				<span class="titlebar__light">Light</span><span class="titlebar__dark">Dark</span>
+			</button>
 			<div class="titlebar__controls">
-				<button class="titlebar__button titlebar__button--theme" type="button" data-theme-toggle
-					aria-label="Switch theme">
-					<svg class="titlebar__sun" viewBox="0 0 10 10" aria-hidden="true">
-						<circle cx="5" cy="5" r="2"/>
-						<path d="M5 0.5v1.5M5 8v1.5M0.5 5h1.5M8 5h1.5M1.8 1.8l1.1 1.1M7.1 7.1l1.1 1.1M1.8 8.2l1.1-1.1M7.1 2.9l1.1-1.1"/>
-					</svg>
-					<svg class="titlebar__moon" viewBox="0 0 10 10" aria-hidden="true">
-						<path d="M6.8 7.6A3.6 3.6 0 1 1 6.8 2.4A2.8 2.8 0 0 0 6.8 7.6Z"/>
-					</svg>
-				</button>
 				<button class="titlebar__button" type="button" data-window="minimise" aria-label="Minimise">
 					<svg viewBox="0 0 10 10" aria-hidden="true"><path d="M0 5h10"/></svg>
 				</button>

@@ -3,9 +3,9 @@
 	<body>
 		<section th:fragment="emulator" id="emulator" class="emulator" hx-swap-oob="true">
 			<header class="emulator__header">
+				<span class="emulator__name" th:text="${view.name()}">Emulator · A500 · OCS · PAL 50Hz</span>
 				<span class="emulator__dot"
 					th:classappend="'emulator__dot--' + (${view.running()} ? 'running' : 'paused')"></span>
-				<span class="emulator__name" th:text="${view.name()}">Emulator · A500 · OCS · PAL 50Hz</span>
 				<span class="emulator__state" th:text="${view.running()} ? 'running' : 'paused'">running</span>
 			</header>
 			<div class="emulator__screen">
@@ -14,29 +14,30 @@
 				<span class="emulator__title" th:text="${view.title()}">NIGHTFALL · PLASMA</span>
 			</div>
 			<div class="emulator__bar">
-				<button class="button" type="button" hx-post="/action/reset">Reset</button>
-				<button class="button" type="button" disabled title="Coming in a later release">Insert ADF</button>
+				<button class="button button--small" type="button" hx-post="/action/reset">Reset</button>
+				<button class="button button--small" type="button" disabled
+					title="Coming in a later release">Insert ADF</button>
 				<span class="emulator__info" th:text="${view.info()}">320×256 · 1 bpl + copper · 12-bit OCS</span>
 			</div>
 			<dl class="meters">
 				<div class="meter">
 					<dt>Frame</dt>
-					<dd class="meter__frame" th:text="${view.frame()}">1170</dd>
+					<dd><span class="meter__value meter__frame" th:text="${view.frame()}">1170</span></dd>
 				</div>
 				<div class="meter">
 					<dt>Raster</dt>
-					<dd><span class="meter__bar" th:style="${view.rasterFill()}"></span><span
-						th:text="${view.raster()} + '%'">60%</span></dd>
+					<dd><span class="meter__bar meter__bar--accent" th:style="${view.rasterFill()}"></span><span
+						class="meter__value" th:text="${view.raster()} + '%'">60%</span></dd>
 				</div>
 				<div class="meter">
 					<dt>Chip RAM</dt>
-					<dd><span class="meter__bar" th:style="${view.chipFill()}"></span><span class="meter__chip"
+					<dd><span class="meter__bar" th:style="${view.chipFill()}"></span><span class="meter__value meter__chip"
 						th:text="${view.chip()}">812K</span></dd>
 				</div>
 				<div class="meter">
 					<dt>Blitter</dt>
 					<dd><span class="meter__bar" th:style="${view.blitterFill()}"></span><span
-						th:text="${view.blitter()} + '%'">34%</span></dd>
+						class="meter__value" th:text="${view.blitter()} + '%'">34%</span></dd>
 				</div>
 			</dl>
 		</section>

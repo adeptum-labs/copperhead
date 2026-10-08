@@ -16,7 +16,9 @@
 							<dd th:text="${row.value()}">F5</dd>
 						</th:block>
 					</dl>
-					<p class="modal__line" th:each="line : ${view.lines()}" th:text="${line}"></p>
+					<div class="modal__lines" th:unless="${view.lines().isEmpty()}">
+						<p class="modal__line" th:each="line : ${view.lines()}" th:text="${line}"></p>
+					</div>
 				</section>
 			</th:block>
 		</div>

@@ -196,7 +196,7 @@ public class StudioFlowTest {
 		final Screen screen = Screen.open(rig);
 
 		assertEquals("plasma.s", screen.find("#tool .tool__tab--active").text());
-		screen.find("#tool .tool__tab--active .tool__mark");
+		screen.find("#tool .tool__tab--active .tool__mark--on");
 		assertTrue(screen.find(line(13)).hasClass("code__line--pc"));
 		assertTrue(screen.find(line(13) + " .code__dot").hasClass("code__dot--on"));
 		assertEquals("68000 · UTF-8 · ln 13 · 1 breakpoint", screen.find("#tool .tool__meta").text());

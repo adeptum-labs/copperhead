@@ -8,30 +8,36 @@
 					aria-label="Paint cell"></button>
 			</div>
 			<div class="sprite__side">
+				<p class="sprite__name">ball.spr</p>
 				<p class="sprite__caption">16×16 · hardware sprite 0 · 3 colours + transparent · not attached</p>
 				<div class="sprite__swatches">
 					<button class="swatch" type="button" th:each="swatch : ${view.swatches()}"
 						th:classappend="${swatch.selected()} ? 'swatch--on'" hx-post="/action/sprite-colour"
-						th:hx-vals="${swatch.vals()}">
+						th:hx-vals="${swatch.vals()}" th:title="${swatch.label()}" th:aria-label="${swatch.label()}">
 						<span class="swatch__chip" th:classappend="${swatch.modifier()}"></span>
-						<span th:text="${swatch.label()}">Base · $0D42</span>
 					</button>
+					<span class="sprite__colour" th:each="swatch : ${view.swatches()}" th:if="${swatch.selected()}"
+						th:text="${swatch.label()}">Base · $0D42</span>
 				</div>
 				<div class="sprite__tools">
-					<button class="button button--accent" type="button" aria-pressed="true">Pencil</button>
-					<button class="button" type="button" disabled title="Coming in a later release">Fill</button>
-					<button class="button" type="button" disabled title="Coming in a later release">Mirror X</button>
-					<button class="button" type="button" hx-post="/action/sprite-clear">Clear</button>
+					<button class="button button--accent button--narrow" type="button" aria-pressed="true">Pencil</button>
+					<button class="button button--narrow" type="button" disabled
+						title="Coming in a later release">Fill</button>
+					<button class="button button--narrow" type="button" disabled
+						title="Coming in a later release">Mirror X</button>
+					<button class="button button--narrow" type="button" hx-post="/action/sprite-clear">Clear</button>
 				</div>
-				<div class="sprite__previews" aria-label="1× and 2× preview">
+				<div class="sprite__previews">
 					<div class="sprite__preview sprite__preview--single">
 						<span th:each="cell : ${view.cells()}" th:class="${cell.modifier()}"></span>
 					</div>
 					<div class="sprite__preview sprite__preview--double">
 						<span th:each="cell : ${view.cells()}" th:class="${cell.modifier()}"></span>
 					</div>
+					<span class="sprite__note">1× · 2× preview</span>
 				</div>
-				<p class="sprite__caption">Export → sprites.dat · SPR0POS/CTL generated on build · click a cell to paint</p>
+				<p class="sprite__note sprite__note--foot">Export → sprites.dat · SPR0POS/CTL generated on build · click a
+					cell to paint</p>
 			</div>
 		</div>
 	</body>

@@ -6,8 +6,9 @@
 				<button class="tool__tab" type="button" th:each="tab : ${view.tabs()}"
 					th:classappend="${tab.active()} ? 'tool__tab--active'"
 					th:attr="hx-post=${tab.post()}, hx-vals=${tab.vals()}">
-					<span class="tool__mark" th:if="${tab.marked()}" aria-hidden="true"></span>
 					<span th:text="${tab.label()}">plasma.s</span>
+					<span class="tool__mark" th:if="${tab.post() != null}"
+						th:classappend="${tab.marked()} ? 'tool__mark--on'" aria-hidden="true"></span>
 				</button>
 				<span class="tool__meta" th:text="${view.meta()}">68000 · UTF-8</span>
 			</div>

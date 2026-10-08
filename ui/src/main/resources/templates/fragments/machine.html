@@ -8,9 +8,10 @@
 				<button class="machine__chipset" type="button" th:classappend="${view.aga()} ? 'machine__chipset--on'"
 					hx-post="/action/target" hx-vals='{"target":"AGA"}'>AGA</button>
 			</div>
-			<button class="button button--accent machine__run" type="button" hx-post="/action/run"
-				th:text="${view.running()} ? '❚❚ Pause' : '▶ Run'">▶ Run</button>
-			<button class="button" type="button" hx-post="/action/build">Build ADF</button>
+			<button class="button button--accent button--strong machine__run" type="button" hx-post="/action/run"><span
+				th:text="${view.running()} ? '❚❚' : '▶'">▶</span> <span
+				th:text="${view.running()} ? 'Pause' : 'Run'">Run</span></button>
+			<button class="button button--strong" type="button" hx-post="/action/build">Build ADF</button>
 		</div>
 	</body>
 </html>

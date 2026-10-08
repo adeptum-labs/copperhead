@@ -9,8 +9,7 @@
 				<span class="debugger__status" th:text="${view.status()}">stopped · plasma.s:13</span>
 			</div>
 			<div class="debugger__cards">
-				<section class="card">
-					<h3 class="card__title">Registers</h3>
+				<section class="card" aria-label="Registers">
 					<div class="registers">
 						<div class="register" th:each="register : ${view.registers()}">
 							<span class="register__name" th:text="${register.name()}">D0</span>
@@ -32,7 +31,7 @@
 						<span class="copper__decoded" th:text="${row.decoded()}"></span>
 					</div>
 				</section>
-				<section class="card">
+				<section class="card card--wide">
 					<h3 class="card__title">Memory · chip</h3>
 					<div class="memory__row" th:each="row : ${view.memory()}">
 						<span class="memory__address" th:text="${row.address()}"></span>
@@ -40,9 +39,9 @@
 						<span class="memory__text" th:text="${row.text()}"></span>
 					</div>
 				</section>
-				<section class="card">
-					<h3 class="card__title">Breakpoints</h3>
-					<p class="card__note" th:text="'Breakpoints in ' + ${view.file()} + ' · click a line number in Code to toggle'"></p>
+				<section class="card card--wide">
+					<h3 class="card__title"
+						th:text="'Breakpoints in ' + ${view.file()} + ' · click a line number in Code to toggle'"></h3>
 					<div class="breakpoint" th:each="mark : ${view.breakpoints()}">
 						<span class="breakpoint__location" th:text="${mark.location()}">plasma.s:13</span>
 						<span class="breakpoint__hits" th:text="${mark.hits()}">1,170 hits</span>

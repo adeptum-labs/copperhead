@@ -31,7 +31,7 @@ public class ThemeIT extends BrowserTest {
 	public void shouldKeepTheChosenThemeOnceThePageIsLoadedAgain() {
 		final Locator html = page().locator("html");
 
-		page().click(".titlebar__button--theme");
+		page().click(".titlebar__theme");
 		assertThat(html).hasAttribute(THEME, "light");
 
 		page().reload();

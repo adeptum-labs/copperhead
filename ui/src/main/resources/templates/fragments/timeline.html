@@ -5,24 +5,28 @@
 			th:style="${view.at()}"
 			th:attr="data-length=${view.length()}, data-position=${view.position()}, data-running=${view.running()}">
 			<div class="timeline__transport">
-				<button class="timeline__button" type="button" hx-post="/action/seek" hx-vals='{"at":"0"}'
-					title="To the start">|◀</button>
-				<button class="timeline__button" type="button" hx-post="/action/run" title="Play or pause"
-					th:text="${view.running()} ? '❚❚' : '▶'">❚❚</button>
-				<button class="timeline__button" type="button" hx-post="/action/reset" title="Stop">■</button>
-				<span class="timeline__clock"><span data-clock th:text="${view.time()}">0:23.40</span> / <span
-					th:text="${view.total()}">1:48.00</span></span>
+				<span class="timeline__title">Timeline</span>
+				<div class="timeline__buttons">
+					<button class="timeline__button" type="button" hx-post="/action/seek" hx-vals='{"at":"0"}'
+						title="To the start">|◀</button>
+					<button class="timeline__button timeline__button--accent" type="button" hx-post="/action/run"
+						title="Play or pause" th:text="${view.running()} ? '❚❚' : '▶'">❚❚</button>
+					<button class="timeline__button" type="button" hx-post="/action/reset" title="Stop">■</button>
+				</div>
+				<span class="timeline__clock" data-clock th:text="${view.time()}">0:23.40</span>
+				<span class="timeline__total" th:text="'/ ' + ${view.total()}">/ 1:48.00</span>
 				<span class="timeline__tempo" th:text="${view.tempo()}">125 BPM · pos 03 row 03</span>
 			</div>
 			<div class="timeline__part" th:with="part=${view.selected()}">
+				<span class="timeline__label">Part</span>
 				<span class="timeline__name" th:text="${part.name()}">Plasma</span>
 				<span class="timeline__range" th:text="${part.range()}">0:18–0:42</span>
 				<span class="timeline__meta" th:text="${part.file()} + ' · ' + ${part.meta()}">plasma.s</span>
-				<span class="timeline__spacer"></span>
-				<button class="button" type="button" disabled title="Coming in a later release">Split</button>
-				<button class="button" type="button" disabled title="Coming in a later release">+ Part</button>
-				<button class="button" type="button" disabled title="Coming in a later release">↻ Loop</button>
-				<button class="button button--danger" type="button" disabled title="Coming in a later release">Delete</button>
+				<button class="button button--mini" type="button" disabled title="Coming in a later release">Split</button>
+				<button class="button button--mini" type="button" disabled title="Coming in a later release">+ Part</button>
+				<button class="button button--mini" type="button" disabled title="Coming in a later release">↻ Loop</button>
+				<button class="button button--mini button--danger" type="button" disabled
+					title="Coming in a later release">Delete</button>
 			</div>
 			<div class="timeline__loop" th:if="${view.loop().shown()}">
 				<span th:text="${view.loop().text()}">↻ Level 1 · 0:30 per pass · exits:</span>
@@ -44,17 +48,19 @@
 				</div>
 				<div class="track">
 					<span class="track__name">Music</span>
-					<div class="track__lane"><span class="track__bar" th:text="${view.music()}"></span></div>
+					<div class="track__lane"><span class="track__bar track__bar--music"><span class="track__label"
+						th:text="${view.music()}"></span></span></div>
 				</div>
 				<div class="track">
 					<span class="track__name">Copper</span>
-					<div class="track__lane"><span class="track__bar" th:text="${view.copper()}"></span></div>
+					<div class="track__lane"><span class="track__bar track__bar--copper"><span class="track__label"
+						th:text="${view.copper()}"></span></span></div>
 				</div>
 				<div class="track">
 					<span class="track__name">Events</span>
 					<div class="track__lane">
-						<span class="event" th:each="event : ${view.events()}" th:style="${event.place()}"
-							th:title="${event.label()}"></span>
+						<span class="event" th:each="event : ${view.events()}" th:style="${event.place()}"><span
+							class="event__mark"></span><span class="event__label" th:text="${event.label()}"></span></span>
 					</div>
 				</div>
 				<div class="timeline__playhead" aria-hidden="true"></div>

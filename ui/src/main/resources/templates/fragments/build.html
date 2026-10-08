@@ -3,7 +3,7 @@
 	<body>
 		<div th:fragment="build" class="build">
 			<div class="build__cards">
-				<section class="card">
+				<section class="card card--roomy">
 					<h3 class="card__title">Target</h3>
 					<button class="build__choice" type="button" th:each="target : ${view.targets()}"
 						hx-post="/action/target" th:hx-vals="${target.vals()}">
@@ -11,7 +11,7 @@
 						<span th:text="${target.label()} + ' · ' + ${target.memory()}">A500 · OCS</span>
 					</button>
 				</section>
-				<section class="card">
+				<section class="card card--roomy">
 					<h3 class="card__title">Options</h3>
 					<button class="build__choice" type="button" th:each="option : ${view.options()}"
 						hx-post="/action/build-option" th:hx-vals="${option.vals()}">
@@ -23,8 +23,9 @@
 			<pre class="build__log"><span class="build__line" th:each="line : ${view.log()}"
 				th:classappend="'build__line--' + ${line.tone()}" th:text="${line.text()}"></span></pre>
 			<div class="build__bar">
-				<button class="button button--accent" type="button" hx-post="/action/build">Build ADF</button>
-				<button class="button" type="button" hx-post="/action/build-run">Build &amp; run</button>
+				<button class="button button--accent button--strong button--large" type="button"
+					hx-post="/action/build">Build ADF</button>
+				<button class="button button--large" type="button" hx-post="/action/build-run">Build &amp; run</button>
 				<span class="build__summary" th:text="${view.summary()}">nightfall.adf · 2,911 bytes · 0.9s · A500</span>
 			</div>
 		</div>
