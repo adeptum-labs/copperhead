@@ -125,7 +125,7 @@
 				<version>1.8.0</version>
 				<configuration>
 					<name>Copperhead</name>
-					<vendor>Adam Waldenberg</vendor>
+					<vendor>Adeptum AB</vendor>
 					<description>Copperhead: an Amiga demo and game studio for Linux.</description>
 					<copyright>Copyright © 2026 Adam Waldenberg and Adeptum AB</copyright>
 					<!-- Installers take a plain number, which a snapshot is not. -->
