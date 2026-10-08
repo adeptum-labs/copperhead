@@ -1,0 +1,14 @@
+[Desktop Entry]
+Name=APPLICATION_NAME
+GenericName=Amiga Development Studio
+Comment=APPLICATION_DESCRIPTION
+Exec=APPLICATION_LAUNCHER
+Icon=APPLICATION_ICON
+Terminal=false
+Type=Application
+Categories=Development;IDE;
+Keywords=Amiga;68000;assembler;demoscene;copper;
+# The class the window toolkit gives the window of the Copperhead main class, which is how a dock matches the
+# running window to this entry, to pin it and to group its windows.
+StartupWMClass=org-copperhead-shell-Copperhead
+DESKTOP_MIMES

@@ -28,6 +28,14 @@
 				<module>e2e</module>
 			</modules>
 		</profile>
+		<profile>
+			<!-- Builds the native installers. It needs the platform's packaging tools and fetches the browser
+			     engine, so it stays out of the everyday build. -->
+			<id>installer</id>
+			<modules>
+				<module>desktop</module>
+			</modules>
+		</profile>
 	</profiles>
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
