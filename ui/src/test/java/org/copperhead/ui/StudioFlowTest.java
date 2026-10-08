@@ -562,6 +562,16 @@ public class StudioFlowTest {
 	}
 
 	@Example
+	public void shouldLeaveTheToolPaneAloneWhenDrawingTheNextPart() throws Exception {
+		final Screen screen = Screen.open(rig);
+
+		screen.find("#tool").attr("data-untouched", "true");
+		screen.click("#timeline [data-boundary]");
+
+		assertEquals("true", screen.find("#tool").attr("data-untouched"));
+	}
+
+	@Example
 	public void shouldPlayFromThePartClicked() throws Exception {
 		final Screen screen = Screen.open(rig).click("#timeline .track__lane .block:nth-of-type(5)");
 

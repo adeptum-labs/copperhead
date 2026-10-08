@@ -55,9 +55,9 @@ public class TimelineController {
 	}
 
 	/* The page has played into the next part. Only the time has moved, and the session already keeps it, so nothing
-	   is changed: the run is drawn where it now is. */
+	   is changed: the run is drawn where it now is, leaving the tool pane and its scroll alone. */
 	@Action("catch-up")
 	public Regions onPlayIntoNextPart() {
-		return Screens.playback(session.state());
+		return Screens.regions(session.state(), MOVED);
 	}
 }
