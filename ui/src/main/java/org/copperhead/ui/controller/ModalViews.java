@@ -1,6 +1,6 @@
 /*
     Copperhead
-    Copyright © 2026 Adam Waldenberg
+    Copyright © 2026 Adam Waldenberg and Adeptum AB
 
     This program is free software: you can redistribute it and/or modify it under the terms of the
     GNU General Public License as published by the Free Software Foundation, version 3 of the License.
@@ -50,7 +50,7 @@ final class ModalViews {
 				"vasm 1.9h · Shrinkler 4.7 · FS-UAE 3.1 core · OCS/ECS/AGA",
 				"Project: " + project.file() + " · " + project.parts().size() + " parts · "
 					+ project.sources().size() + " sources",
-				"Copyright © 2026 Adam Waldenberg · GNU General Public License, version 3"));
+				"Copyright © 2026 Adam Waldenberg and Adeptum AB · GNU General Public License, version 3"));
 			case SETTINGS -> new ModalView(Modal.SETTINGS, "Project settings", List.of(
 				new PairView("Project", project.file() + " (" + kind + ")"),
 				new PairView("Target", state.target().label()),

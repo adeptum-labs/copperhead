@@ -23,4 +23,4 @@ Playwright refuses hosts it does not recognise (LMDE and other Debian derivative
 
 ## Licence
 
-Copyright © 2026 Adam Waldenberg. Licensed under the GNU General Public License, version 3; see `COPYING`.
+Copyright © 2026 Adam Waldenberg and Adeptum AB. Licensed under the GNU General Public License, version 3; see `COPYING`.

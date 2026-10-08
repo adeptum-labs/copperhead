@@ -127,7 +127,7 @@
 					<name>Copperhead</name>
 					<vendor>Adam Waldenberg</vendor>
 					<description>Copperhead: an Amiga demo and game studio for Linux.</description>
-					<copyright>Copyright © 2026 Adam Waldenberg</copyright>
+					<copyright>Copyright © 2026 Adam Waldenberg and Adeptum AB</copyright>
 					<!-- Installers take a plain number, which a snapshot is not. -->
 					<appVersion>${parsedVersion.majorVersion}.${parsedVersion.minorVersion}.${parsedVersion.incrementalVersion}</appVersion>
 					<destination>${dist}</destination>
