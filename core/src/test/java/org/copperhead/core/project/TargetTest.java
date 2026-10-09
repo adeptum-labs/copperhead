@@ -33,6 +33,12 @@ public class TargetTest {
 	}
 
 	@Example
+	public void shouldEndChipRamWhereTheMachineDoes() {
+		assertEquals(0x8_0000, Target.A500_OCS.chipEnd());
+		assertEquals(0x20_0000, Target.A1200_AGA.chipEnd());
+	}
+
+	@Example
 	public void shouldBeFoundByItsChipset() {
 		assertEquals(Target.A1200_AGA, Target.chipset("AGA"));
 		assertThrows(IllegalArgumentException.class, () -> Target.chipset("ECS"));

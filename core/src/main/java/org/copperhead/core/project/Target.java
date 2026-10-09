@@ -19,22 +19,24 @@ import java.util.Arrays;
 
 /** The machine a build is made for, and what its chipset gives a demo to work with. */
 public enum Target {
-	A500_OCS("A500", "OCS", 32, "212K", "812K", "512K chip + 512K slow"),
-	A1200_AGA("A1200", "AGA", 256, "1.2M", "812K / 2M", "2M chip");
+	A500_OCS("A500", "OCS", 32, 0x8_0000, "212K", "812K", "512K chip + 512K slow"),
+	A1200_AGA("A1200", "AGA", 256, 0x20_0000, "1.2M", "812K / 2M", "2M chip");
 
 	private final String machine;
 	private final String chipset;
 	private final int colours;
+	private final int chipEnd;
 	private final String chipFree;
 	private final String chipUsed;
 	private final String memory;
 
-	Target(final String machine, final String chipset, final int colours, final String chipFree,
+	Target(final String machine, final String chipset, final int colours, final int chipEnd, final String chipFree,
 		final String chipUsed, final String memory) {
 
 		this.machine = machine;
 		this.chipset = chipset;
 		this.colours = colours;
+		this.chipEnd = chipEnd;
 		this.chipFree = chipFree;
 		this.chipUsed = chipUsed;
 		this.memory = memory;
@@ -55,6 +57,11 @@ public enum Target {
 
 	public int colours() {
 		return colours;
+	}
+
+	/** The first address past chip RAM: a trackloaded program and its crunched copy must both end below it. */
+	public int chipEnd() {
+		return chipEnd;
 	}
 
 	public String chipFree() {
