@@ -24,7 +24,6 @@ import lombok.With;
 import org.copperhead.core.build.BuildOption;
 import org.copperhead.core.build.BuildOptions;
 import org.copperhead.core.build.BuildReport;
-import org.copperhead.core.build.Builds;
 import org.copperhead.core.debug.Breakpoint;
 import org.copperhead.core.graphics.Sprite;
 import org.copperhead.core.project.Project;
@@ -49,20 +48,20 @@ public record StudioState(Project project, Target target, Tool tool, Modal modal
 	private static final int BASE_COLOUR = 1;
 	private static final int FIRST_PICK = 4;
 	private static final Duration FIRST_POSITION = Duration.ofMillis(23_400);
+	private static final String NOTHING_TO_BUILD = "Nothing to build: open or create a project on disk first";
 
 	public StudioState {
 		breakpoints = List.copyOf(breakpoints);
 	}
 
-	/** A project as it opens: stopped at its breakpoint, playing from inside its third part, last build shown. */
+	/** A project as it opens: stopped at its breakpoint, playing from inside its third part, not built yet. */
 	public static StudioState open(final Project project, final Target target) {
 		final String traced = project.trace().file();
-		final BuildOptions options = BuildOptions.defaults();
 
 		return new StudioState(project, target, Tool.CODE, Modal.NONE, true, true, "", traced, project.breakpoint(),
 			List.of(new Breakpoint(traced, project.breakpoint(), FIRST_HITS)), project.breakpoint(), FIRST_D0,
-			SampleMachine.ball(), BASE_COLOUR, FIRST_PICK, options,
-			Optional.of(Builds.canned(project, target, options)), FIRST_POSITION);
+			SampleMachine.ball(), BASE_COLOUR, FIRST_PICK, BuildOptions.defaults(), Optional.empty(),
+			FIRST_POSITION);
 	}
 
 	/**
@@ -70,7 +69,7 @@ public record StudioState(Project project, Target target, Tool tool, Modal modal
 	 * machine and how the window is laid out, which belong to the person rather than to a project.
 	 */
 	public StudioState switchTo(final Project other) {
-		return open(other, target).withTool(tool).withTimelineShown(timelineShown).withBuild(Optional.empty())
+		return open(other, target).withTool(tool).withTimelineShown(timelineShown)
 			.withNote("Opened %s (%s)".formatted(other.file(), other.kind().name().toLowerCase(Locale.ROOT)));
 	}
 
@@ -154,10 +153,7 @@ public record StudioState(Project project, Target target, Tool tool, Modal modal
 	}
 
 	public StudioState build(final boolean andRun) {
-		final BuildReport report = Builds.canned(project, target, options);
-
-		return withBuild(Optional.of(report)).withRunning(running || andRun)
-			.withNote(String.format(Locale.ROOT, "Built %s · %,d bytes", report.adf(), report.bytes()));
+		return withRunning(running || andRun).withNote(NOTHING_TO_BUILD);
 	}
 
 	public StudioState toggleOption(final BuildOption option) {

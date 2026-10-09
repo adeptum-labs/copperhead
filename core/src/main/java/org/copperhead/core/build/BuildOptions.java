@@ -15,21 +15,20 @@
 
 package org.copperhead.core.build;
 
-public record BuildOptions(boolean shrinkler, boolean bootblock, boolean symbols) {
+public record BuildOptions(boolean shrinkler, boolean symbols) {
 	public static BuildOptions defaults() {
-		return new BuildOptions(true, true, false);
+		return new BuildOptions(true, false);
 	}
 
 	public boolean on(final BuildOption option) {
 		return switch (option) {
 			case SHRINKLER -> shrinkler;
-			case BOOTBLOCK -> bootblock;
 			case SYMBOLS -> symbols;
 		};
 	}
 
 	public BuildOptions toggle(final BuildOption option) {
 		return new BuildOptions(shrinkler ^ (option == BuildOption.SHRINKLER),
-			bootblock ^ (option == BuildOption.BOOTBLOCK), symbols ^ (option == BuildOption.SYMBOLS));
+			symbols ^ (option == BuildOption.SYMBOLS));
 	}
 }

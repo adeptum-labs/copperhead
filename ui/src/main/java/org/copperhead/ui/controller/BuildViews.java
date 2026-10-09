@@ -58,7 +58,6 @@ final class BuildViews {
 	static String label(final BuildOption option) {
 		return switch (option) {
 			case SHRINKLER -> "Shrinkler -9";
-			case BOOTBLOCK -> "Bootblock + trackloader";
 			case SYMBOLS -> "Debug symbols";
 		};
 	}
@@ -67,7 +66,7 @@ final class BuildViews {
 	static String menuLabel(final BuildOption option) {
 		return switch (option) {
 			case SHRINKLER -> "Crunch with " + label(option);
-			case BOOTBLOCK, SYMBOLS -> label(option);
+			case SYMBOLS -> label(option);
 		};
 	}
 }

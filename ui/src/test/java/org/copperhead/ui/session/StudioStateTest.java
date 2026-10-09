@@ -17,7 +17,10 @@ package org.copperhead.ui.session;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.Optional;
 import net.jqwik.api.Example;
+import org.copperhead.core.build.BuildReport;
+import org.copperhead.core.build.BuildWarning;
 import org.copperhead.core.debug.Breakpoint;
 import org.copperhead.core.project.Target;
 import org.copperhead.core.sample.SampleProjects;
@@ -30,6 +33,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class StudioStateTest {
+	private static final BuildReport WARNED = new BuildReport("nightfall.adf", List.of(),
+		List.of(new BuildWarning("plasma.s", 24, "scaled index needs 68020")), List.of(), 2911, Duration.ZERO);
+
 	private final StudioState opened = StudioState.open(SampleProjects.nightfall(), Target.A500_OCS);
 
 	@Example
@@ -48,10 +54,19 @@ public class StudioStateTest {
 	}
 
 	@Example
-	public void shouldOpenOnTheCodeWithTheLastBuildShown() {
+	public void shouldOpenOnTheCodeWithNothingBuilt() {
 		assertEquals(Tool.CODE, opened.tool());
 		assertEquals(Modal.NONE, opened.modal());
-		assertEquals("nightfall.adf", opened.build().orElseThrow().adf());
+		assertTrue(opened.build().isEmpty());
+	}
+
+	@Example
+	public void shouldBuildNothingOfASampleButStillRunIt() {
+		final StudioState built = opened.withRunning(false).build(true);
+
+		assertTrue(built.build().isEmpty());
+		assertTrue(built.running());
+		assertEquals("Nothing to build: open or create a project on disk first", built.note());
 	}
 
 	@Example
@@ -94,7 +109,8 @@ public class StudioStateTest {
 
 	@Example
 	public void shouldShowTheFirstWarningOfTheBuildInTheCode() {
-		final StudioState shown = opened.withTool(Tool.SPRITES).openFile("intro.s").showWarning();
+		final StudioState shown = opened.withBuild(Optional.of(WARNED)).withTool(Tool.SPRITES).openFile("intro.s")
+			.showWarning();
 
 		assertEquals(Tool.CODE, shown.tool());
 		assertEquals("plasma.s", shown.file());

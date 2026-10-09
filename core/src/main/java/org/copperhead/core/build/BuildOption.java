@@ -17,6 +17,5 @@ package org.copperhead.core.build;
 
 public enum BuildOption {
 	SHRINKLER,
-	BOOTBLOCK,
 	SYMBOLS
 }

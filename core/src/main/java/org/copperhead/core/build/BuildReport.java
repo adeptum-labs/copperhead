@@ -18,9 +18,17 @@ package org.copperhead.core.build;
 import java.time.Duration;
 import java.util.List;
 
-public record BuildReport(String adf, List<BuildLine> log, List<BuildWarning> warnings, int bytes, Duration took) {
+public record BuildReport(String adf, List<BuildLine> log, List<BuildWarning> warnings, List<BuildWarning> errors,
+	int bytes, Duration took) {
+
 	public BuildReport {
 		log = List.copyOf(log);
 		warnings = List.copyOf(warnings);
+		errors = List.copyOf(errors);
+	}
+
+	/** A build came off only when it raised no error and wrote a disk. */
+	public boolean ok() {
+		return errors.isEmpty() && !adf.isEmpty();
 	}
 }

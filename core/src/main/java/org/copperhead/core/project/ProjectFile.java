@@ -34,6 +34,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import org.copperhead.core.build.BuildOptions;
 import org.copperhead.core.build.LoadAddress;
 import org.copperhead.core.debug.Breakpoint;
 
@@ -149,6 +150,10 @@ public record ProjectFile(int format, String name, ProjectKind kind, Target targ
 
 	public ProjectFile withBreakpoints(final List<Breakpoint> breakpoints) {
 		return new ProjectFile(format, name, kind, target, loadAddress, entry, crunch, symbols, breakpoints, extras);
+	}
+
+	public BuildOptions options() {
+		return new BuildOptions(crunch, symbols);
 	}
 
 	private static ProjectFile read(final JsonObject json, final int format) {

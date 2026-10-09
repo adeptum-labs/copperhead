@@ -16,6 +16,7 @@
 package org.copperhead.ui;
 
 import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -24,12 +25,15 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 import net.jqwik.api.Example;
 import net.jqwik.api.lifecycle.AfterTry;
 import net.jqwik.api.lifecycle.BeforeTry;
+import org.copperhead.core.build.BuildReport;
+import org.copperhead.core.build.BuildWarning;
 import org.copperhead.ui.session.StudioState;
 import org.copperhead.ui.view.Region;
 import org.copperhead.ui.view.Tool;
@@ -42,6 +46,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 public class StudioFlowTest {
 	private static final Pattern FONT = Pattern.compile("url\\(\"\\.\\./fonts/([^\"]+)\"\\)");
 	private static final String CELLS = "#tool .sprite__grid .sprite__cell";
+	private static final String NOTHING_TO_BUILD = "Nothing to build: open or create a project on disk first";
 
 	/* Still unless a test moves it, so every page shows exactly the same text. */
 	private final AtomicReference<Instant> now = new AtomicReference<>(Instant.EPOCH);
@@ -392,46 +397,42 @@ public class StudioFlowTest {
 	}
 
 	@Example
-	public void shouldWarnOfTheScaledIndexWhenBuildingForOcs() throws Exception {
+	public void shouldSayASampleHasNothingToBuild() throws Exception {
 		final Screen screen = Screen.open(rig).press("ctrl+b");
 
-		assertEquals("1 warning · plasma.s:24", screen.find("#status .status__warning").text());
-		assertEquals("Built nightfall.adf · 2,911 bytes", screen.find("#status .status__note").text());
-		assertEquals("last build 2,911 bytes · 0.9s", screen.find("#status .status__build").text());
-	}
-
-	@Example
-	public void shouldBuildCleanForAga() throws Exception {
-		final Screen screen = Screen.open(rig).click("#machine [hx-vals*=AGA]").press("ctrl+b");
-
-		assertTrue(screen.document().select("#status .status__warning").isEmpty());
+		assertEquals(NOTHING_TO_BUILD, screen.find("#status .status__note").text());
+		assertEquals("last build not built yet", screen.find("#status .status__build").text());
 		assertEquals("0 warnings", screen.find("#status .status__warnings").text());
 	}
 
 	@Example
-	public void shouldShipUncrunchedOnceShrinklerIsOff() throws Exception {
-		final Screen screen = Screen.open(rig).click(railTool(Tool.BUILD))
-			.click("#tool [hx-vals*=SHRINKLER]").click("#tool [hx-post=/action/build]");
+	public void shouldUncheckShrinklerInTheMenuOnceItIsOffInTheTool() throws Exception {
+		final Screen screen = Screen.open(rig).click(railTool(Tool.BUILD)).click("#tool [hx-vals*=SHRINKLER]");
 
-		assertEquals("nightfall.adf · 7,016 bytes · 0.9s · A500", screen.find("#tool .build__summary").text());
 		assertFalse(screen.find("#menus [hx-vals*=SHRINKLER]").hasClass("menu__item--checked"));
+		assertFalse(rig.session().state().options().shrinkler());
 	}
 
 	@Example
 	public void shouldNameEachBuildOptionAlikeInTheToolAndTheMenu() throws Exception {
 		final Screen screen = Screen.open(rig).click(railTool(Tool.BUILD));
 
-		assertEquals(List.of("Shrinkler -9", "Bootblock + trackloader", "Debug symbols"),
+		assertEquals(List.of("Shrinkler -9", "Debug symbols"),
 			screen.document().select("#tool [hx-post=/action/build-option] span:last-child").eachText());
-		assertEquals(List.of("Crunch with Shrinkler -9", "Bootblock + trackloader", "Debug symbols"),
+		assertEquals(List.of("Crunch with Shrinkler -9", "Debug symbols"),
 			screen.document().select("#menus [hx-post=/action/build-option] .menu__label").eachText());
 	}
 
 	@Example
 	public void shouldJumpToTheLineAWarningNames() throws Exception {
-		final Screen screen = Screen.open(rig).click(railTool(Tool.SPRITES)).press("ctrl+b")
-			.click("#status .status__warning");
+		rig.session().change(state -> state.withBuild(Optional.of(new BuildReport("nightfall.adf", List.of(),
+			List.of(new BuildWarning("plasma.s", 24, "scaled index needs 68020")), List.of(), 2911,
+			Duration.ofMillis(900)))));
+		final Screen screen = Screen.open(rig).click(railTool(Tool.SPRITES));
 
+		assertEquals("1 warning · plasma.s:24", screen.find("#status .status__warning").text());
+		assertEquals("last build 2,911 bytes · 0.9s", screen.find("#status .status__build").text());
+		screen.click("#status .status__warning");
 		assertEquals("plasma.s", screen.find("#tool .tool__tab--active").text());
 		assertTrue(screen.find(line(24)).hasClass("code__line--cursor"));
 	}
@@ -479,7 +480,7 @@ public class StudioFlowTest {
 		final Screen screen = Screen.open(rig).click(railTool(Tool.BUILD));
 		final StudioState before = rig.session().state();
 
-		assertEquals(500, screen.trigger("#tool [hx-vals*=SHRINKLER]", Map.of("option", "TURBO")).status());
+		assertEquals(500, screen.trigger("#tool [hx-vals*=SHRINKLER]", Map.of("option", "BOOTBLOCK")).status());
 		assertEquals(before, rig.session().state());
 	}
 
@@ -558,7 +559,7 @@ public class StudioFlowTest {
 		screen.click("#timeline [data-boundary]");
 
 		assertEquals(before, rig.session().state());
-		assertEquals("Built nightfall.adf · 2,911 bytes", screen.find("#status .status__note").text());
+		assertEquals(NOTHING_TO_BUILD, screen.find("#status .status__note").text());
 	}
 
 	@Example

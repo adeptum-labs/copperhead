@@ -29,6 +29,7 @@ import net.jqwik.api.Example;
 import net.jqwik.api.ForAll;
 import net.jqwik.api.Property;
 import net.jqwik.api.Provide;
+import org.copperhead.core.build.BuildOptions;
 import org.copperhead.core.debug.Breakpoint;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -201,6 +202,12 @@ public class ProjectFileTest {
 
 		assertEquals(new ProjectFile(1, "nightfall", ProjectKind.DEMO, Target.A1200_AGA, 0x4_0000, "src/intro.s",
 			false, true, List.of(new Breakpoint("intro.s", 3, 0)), JsonValue.EMPTY_JSON_OBJECT), changed);
+	}
+
+	@Example
+	public void shouldBuildWithTheOptionsItKeeps() {
+		assertEquals(new BuildOptions(true, false), DEMO.options());
+		assertEquals(new BuildOptions(false, true), DEMO.withCrunch(false).withSymbols(true).options());
 	}
 
 	@Example

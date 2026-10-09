@@ -93,7 +93,6 @@ final class Menus {
 			target(state, Target.A500_OCS).withSeparated(true),
 			target(state, Target.A1200_AGA),
 			option(state, BuildOption.SHRINKLER).withSeparated(true),
-			option(state, BuildOption.BOOTBLOCK),
 			option(state, BuildOption.SYMBOLS)));
 	}
 

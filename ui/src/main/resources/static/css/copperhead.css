@@ -1079,6 +1079,10 @@ html[data-theme="light"] [data-theme-toggle] .menu__check {
 	color: var(--warn);
 }
 
+.build__line--err {
+	color: var(--err);
+}
+
 .build__line--ok {
 	color: var(--ok);
 }

@@ -71,7 +71,8 @@ public class StudioIT extends BrowserTest {
 	public void shouldBuildWithCtrlB() {
 		page().keyboard().press("Control+b");
 
-		assertThat(page().locator("#status .status__note")).hasText("Built nightfall.adf · 2,911 bytes");
+		assertThat(page().locator("#status .status__note"))
+			.hasText("Nothing to build: open or create a project on disk first");
 	}
 
 	/* On a Swedish keyboard "/" is Shift+7, so Ctrl+/ arrives with Shift held. */

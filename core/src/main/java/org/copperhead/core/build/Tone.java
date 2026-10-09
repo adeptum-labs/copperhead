@@ -18,5 +18,6 @@ package org.copperhead.core.build;
 public enum Tone {
 	PLAIN,
 	WARN,
+	ERR,
 	OK
 }

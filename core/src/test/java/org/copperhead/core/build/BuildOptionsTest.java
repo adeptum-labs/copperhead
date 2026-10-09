@@ -24,8 +24,8 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 public class BuildOptionsTest {
 	@Example
-	public void shouldCrunchAndBootButLeaveSymbolsOutAtFirst() {
-		assertEquals(new BuildOptions(true, true, false), BuildOptions.defaults());
+	public void shouldCrunchButLeaveSymbolsOutAtFirst() {
+		assertEquals(new BuildOptions(true, false), BuildOptions.defaults());
 	}
 
 	@Property

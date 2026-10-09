@@ -17,6 +17,6 @@ package org.copperhead.core.build;
 
 public record BuildWarning(String file, int line, String message) {
 	public String location() {
-		return file + ":" + line;
+		return file.isEmpty() ? "" : file + ":" + line;
 	}
 }
