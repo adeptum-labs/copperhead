@@ -163,6 +163,37 @@ public class ProjectFileTest {
 	}
 
 	@Example
+	public void shouldRefuseAFormatThatIsNoPositiveInt() {
+		assertAll(Stream.of("\"2\"", "4294967297", "0", "-1", "1.5", "true", "null", "[]")
+			.map(format -> () -> assertTrue(refusal("{\"format\": " + format + ", \"name\": \"nightfall\", "
+				+ "\"kind\": \"DEMO\"}").startsWith("not a project file"), format)));
+	}
+
+	@Example
+	public void shouldRefuseAKeyOfTheWrongTypeInsteadOfTakingItsDefault() {
+		assertAll(Stream.of("\"target\": 5", "\"loadAddress\": 131072", "\"entry\": 7",
+			"\"build\": {\"crunch\": \"no\"}", "\"build\": {\"symbols\": 1}", "\"build\": []",
+			"\"breakpoints\": {}")
+			.map(json -> () -> assertTrue(refusal("{\"name\": \"nightfall\", \"kind\": \"DEMO\", " + json + "}")
+				.startsWith("not a project file"), json)));
+	}
+
+	@Example
+	public void shouldRefuseABreakpointNoSourceLineCanHold() {
+		assertAll(Stream.of("{\"file\": \"main.s\", \"line\": 4294967297}", "{\"file\": \"main.s\", \"line\": 1.5}",
+			"{\"file\": \"main.s\", \"line\": 0}", "{\"file\": \"main.s\", \"line\": \"3\"}",
+			"{\"file\": \"../../x\", \"line\": 3}", "{\"file\": \"src/main.s\", \"line\": 3}",
+			"{\"file\": 7, \"line\": 3}")
+			.map(mark -> () -> assertTrue(refusal("{\"name\": \"nightfall\", \"kind\": \"DEMO\", "
+				+ "\"breakpoints\": [" + mark + "]}").startsWith("not a project file"), mark)));
+	}
+
+	@Example
+	public void shouldNotShowARawCastFailureForAWrongType() {
+		assertFalse(refusal("{\"name\": \"nightfall\", \"kind\": \"DEMO\", \"build\": true}").contains("cast"));
+	}
+
+	@Example
 	public void shouldChangeOnlyWhatEachWithNames() {
 		final ProjectFile changed = DEMO.withTarget(Target.A1200_AGA).withLoadAddress(0x4_0000)
 			.withEntry("src/intro.s").withCrunch(false).withSymbols(true)

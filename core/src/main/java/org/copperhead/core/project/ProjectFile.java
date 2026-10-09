@@ -15,8 +15,10 @@
 
 package org.copperhead.core.project;
 
+import jakarta.json.JsonArray;
 import jakarta.json.JsonArrayBuilder;
 import jakarta.json.JsonException;
+import jakarta.json.JsonNumber;
 import jakarta.json.JsonObject;
 import jakarta.json.JsonObjectBuilder;
 import jakarta.json.JsonReader;
@@ -31,6 +33,7 @@ import java.io.StringWriter;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.copperhead.core.build.LoadAddress;
 import org.copperhead.core.debug.Breakpoint;
 
@@ -89,16 +92,18 @@ public record ProjectFile(int format, String name, ProjectKind kind, Target targ
 			throw new ProjectFormatException("not a project file: " + e.getMessage(), e);
 		}
 
-		final int format = object.getInt(FORMAT_KEY, FORMAT);
-
-		if (format > FORMAT) {
-			throw new ProjectFormatException("project format " + format
-				+ " is newer than this version of Copperhead");
-		}
-
 		try {
+			final int format = integer(object, FORMAT_KEY, FORMAT, 1);
+
+			if (format > FORMAT) {
+				throw new ProjectFormatException("project format " + format
+					+ " is newer than this version of Copperhead");
+			}
+
 			return read(object, format);
-		} catch (final ClassCastException | IllegalArgumentException e) {
+		} catch (final ProjectFormatException e) {
+			throw e;
+		} catch (final IllegalArgumentException e) {
 			throw new ProjectFormatException("not a project file: " + e.getMessage(), e);
 		}
 	}
@@ -148,21 +153,60 @@ public record ProjectFile(int format, String name, ProjectKind kind, Target targ
 
 	private static ProjectFile read(final JsonObject json, final int format) {
 		final ProjectFile fresh = create(text(json, NAME), kind(text(json, KIND)),
-			Target.chipset(json.getString(TARGET, Target.A500_OCS.chipset())));
-		final JsonObject build = json.containsKey(BUILD) ? json.getJsonObject(BUILD) : JsonValue.EMPTY_JSON_OBJECT;
+			Target.chipset(text(json, TARGET, Target.A500_OCS.chipset())));
+		final JsonObject build = value(json, BUILD, JsonObject.class).orElse(JsonValue.EMPTY_JSON_OBJECT);
 
 		return new ProjectFile(format, fresh.name(), fresh.kind(), fresh.target(),
-			LoadAddress.parse(json.getString(LOAD, LoadAddress.format(fresh.loadAddress()))),
-			json.getString(ENTRY, fresh.entry()), build.getBoolean(CRUNCH, fresh.crunch()),
-			build.getBoolean(SYMBOLS, fresh.symbols()), breakpoints(json), json);
+			LoadAddress.parse(text(json, LOAD, LoadAddress.format(fresh.loadAddress()))),
+			text(json, ENTRY, fresh.entry()), flag(build, CRUNCH, fresh.crunch()),
+			flag(build, SYMBOLS, fresh.symbols()), breakpoints(json), json);
+	}
+
+	/* An absent key takes its default; a key of the wrong type is refused, or a save would overwrite what it held. */
+	private static <T extends JsonValue> Optional<T> value(final JsonObject json, final String key,
+		final Class<T> type) {
+		final JsonValue value = json.get(key);
+
+		if (value != null && !type.isInstance(value)) {
+			throw new IllegalArgumentException(key + " is of the wrong type");
+		}
+
+		return Optional.ofNullable(type.cast(value));
 	}
 
 	private static String text(final JsonObject json, final String key) {
-		if (json.get(key) instanceof JsonString text) {
-			return text.getString();
+		return value(json, key, JsonString.class).map(JsonString::getString)
+			.orElseThrow(() -> new IllegalArgumentException("no " + key + " given"));
+	}
+
+	private static String text(final JsonObject json, final String key, final String fallback) {
+		return value(json, key, JsonString.class).map(JsonString::getString).orElse(fallback);
+	}
+
+	private static boolean flag(final JsonObject json, final String key, final boolean fallback) {
+		return switch (json.getOrDefault(key, fallback ? JsonValue.TRUE : JsonValue.FALSE).getValueType()) {
+			case TRUE -> true;
+			case FALSE -> false;
+			default -> throw new IllegalArgumentException(key + " is of the wrong type");
+		};
+	}
+
+	private static int integer(final JsonObject json, final String key, final int fallback, final int minimum) {
+		final int number = value(json, key, JsonNumber.class).map(found -> whole(found, key)).orElse(fallback);
+
+		if (number < minimum) {
+			throw new IllegalArgumentException(key + " must be " + minimum + " or more");
 		}
 
-		throw new IllegalArgumentException("no " + key + " given");
+		return number;
+	}
+
+	private static int whole(final JsonNumber number, final String key) {
+		try {
+			return number.intValueExact();
+		} catch (final ArithmeticException e) {
+			throw new IllegalArgumentException(key + " must be a whole number that fits an int", e);
+		}
 	}
 
 	private static ProjectKind kind(final String kind) {
@@ -171,22 +215,22 @@ public record ProjectFile(int format, String name, ProjectKind kind, Target targ
 	}
 
 	private static List<Breakpoint> breakpoints(final JsonObject json) {
-		if (!json.containsKey(BREAKPOINTS)) {
-			return List.of();
-		}
-
-		return json.getJsonArray(BREAKPOINTS).getValuesAs(JsonObject.class).stream()
-			.map(mark -> new Breakpoint(text(mark, FILE), line(mark), 0)).toList();
+		return value(json, BREAKPOINTS, JsonArray.class).orElse(JsonValue.EMPTY_JSON_ARRAY).stream()
+			.map(ProjectFile::breakpoint).toList();
 	}
 
-	private static int line(final JsonObject mark) {
-		final int line = mark.getInt(LINE, 0);
-
-		if (line < 1) {
-			throw new IllegalArgumentException("a breakpoint needs a line from 1 on");
+	private static Breakpoint breakpoint(final JsonValue mark) {
+		if (!(mark instanceof JsonObject json)) {
+			throw new IllegalArgumentException("a breakpoint must be an object");
 		}
 
-		return line;
+		final String file = text(json, FILE);
+
+		if (!ProjectLayout.validSource(file)) {
+			throw new IllegalArgumentException("a breakpoint needs a source in " + SOURCES + ", not " + file);
+		}
+
+		return new Breakpoint(file, integer(json, LINE, 0, 1), 0);
 	}
 
 	private static JsonObject unknown(final JsonObject keys) {
