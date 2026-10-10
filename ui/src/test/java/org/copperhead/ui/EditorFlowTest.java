@@ -19,6 +19,7 @@ import jakarta.json.JsonObject;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -28,14 +29,21 @@ import net.jqwik.api.lifecycle.AfterTry;
 import net.jqwik.api.lifecycle.BeforeTry;
 import org.copperhead.core.debug.Breakpoint;
 import org.copperhead.core.project.ProjectFile;
+import org.copperhead.core.project.Target;
 import org.copperhead.ui.session.StudioState;
+import org.copperhead.web.action.ActionFailed;
+import org.copperhead.web.action.Form;
 import static org.copperhead.ui.Flows.GUTTER;
 import static org.copperhead.ui.Flows.lines;
+import static org.copperhead.ui.Flows.noted;
 import static org.copperhead.ui.Flows.saved;
 import static org.copperhead.ui.Flows.source;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.assumeFalse;
 
 /** The editor's text lives in the page; saving it, its breakpoints and the file on disk are the studio's. */
 public class EditorFlowTest {
@@ -64,6 +72,30 @@ public class EditorFlowTest {
 		return ProjectFile.parse(Files.readString(rig.project().chp())).breakpoints();
 	}
 
+	/* What the studio answers when the disk refuses the write: the failure itself, with the studio as it was. */
+	private Throwable refused(final String action, final String body) throws Exception {
+		final Path src = rig.project().dir().resolve("src");
+		final StudioState before = rig.session().state();
+
+		Files.setPosixFilePermissions(src, PosixFilePermissions.fromString("r-xr-xr-x"));
+
+		try {
+			assumeFalse(Files.isWritable(src), "a folder that cannot be written is writable to this user");
+
+			final ActionFailed failed = assertThrows(ActionFailed.class,
+				() -> rig.actions().invoke(action, Form.parse(body)));
+
+			assertEquals(before, rig.session().state());
+			return failed.getCause();
+		} finally {
+			Files.setPosixFilePermissions(src, PosixFilePermissions.fromString("rwxr-xr-x"));
+		}
+	}
+
+	private Path secret() throws Exception {
+		return Files.writeString(rig.home().resolve("secret"), "private key");
+	}
+
 	@Example
 	public void shouldSendEverySourceAsItIsOnDisk() throws Exception {
 		final JsonObject sent = source(Screen.open(rig)).getJsonArray("files").getJsonObject(0);
@@ -76,10 +108,16 @@ public class EditorFlowTest {
 
 	@Example
 	public void shouldSaveTheBufferToItsFile() throws Exception {
+		Files.setLastModifiedTime(file("main.s"), FileTime.fromMillis(1_000_000));
+
 		final Screen screen = saved(Screen.open(rig), "start:\n\trts\n");
+		final JsonObject sent = source(screen).getJsonArray("files").getJsonObject(0);
 
 		assertEquals("start:\n\trts\n", Files.readString(file("main.s")));
-		assertEquals("start:\n\trts\n", source(screen).getJsonArray("files").getJsonObject(0).getString("text"));
+		assertEquals("start:\n\trts\n", sent.getString("text"));
+		assertNotEquals(1_000_000, sent.getJsonNumber("modified").longValue());
+		assertEquals(Files.getLastModifiedTime(file("main.s")).toMillis(),
+			sent.getJsonNumber("modified").longValue());
 		assertEquals("Saved main.s", screen.find("#status .status__note").text());
 	}
 
@@ -149,6 +187,94 @@ public class EditorFlowTest {
 		Screen.open(rig).click("#menus [hx-vals*=SHRINKLER]");
 
 		assertFalse(ProjectFile.parse(Files.readString(rig.project().chp())).crunch());
+	}
+
+	@Example
+	public void shouldNameTheSourceThatCouldNotBeSavedWithoutTheStagingFile() throws Exception {
+		final String message = refused("file-save", "name=main.s&text=x").getMessage();
+
+		assertTrue(message.startsWith("main.s could not be saved: "), message);
+		assertFalse(message.contains(".tmp"), message);
+	}
+
+	@Example
+	public void shouldNameTheFirstSourceThatCouldNotBeSavedWhenSavingAll() throws Exception {
+		Files.writeString(file("tables.i"), "sine:\n");
+
+		final String message = refused("file-save-all", "files=main.s,tables.i&main.s=a&tables.i=b").getMessage();
+
+		assertTrue(message.startsWith("main.s could not be saved: "), message);
+		assertFalse(message.contains(".tmp") || message.contains("already saved"), message);
+	}
+
+	@Example
+	public void shouldOfferSaveAndSaveAllOnlyWithAProjectOpen() throws Exception {
+		final Screen with = Screen.open(rig);
+
+		assertFalse(with.find(SAVE).hasAttr("disabled"));
+		assertFalse(with.find(SAVE_ALL).hasAttr("disabled"));
+		rig.close();
+		rig = WorkbenchRig.empty(now::get);
+
+		final Screen without = Screen.open(rig);
+
+		assertTrue(without.find(SAVE).hasAttr("disabled"));
+		assertTrue(without.find(SAVE_ALL).hasAttr("disabled"));
+	}
+
+	@Example
+	public void shouldKeepTheMachineInTheProjectFile() throws Exception {
+		Screen.open(rig).click("#menus [hx-post=/action/target][hx-vals*=AGA]");
+
+		assertEquals(Target.A1200_AGA, ProjectFile.parse(Files.readString(rig.project().chp())).target());
+		rig = rig.restart(now::get);
+		assertEquals(Target.A1200_AGA, rig.session().state().target());
+	}
+
+	@Example
+	public void shouldDrawTheEditorAnewWithoutTheTabOfASourceThatLeftTheProject() throws Exception {
+		Files.writeString(file("tables.i"), "sine:\n");
+
+		final Screen screen = Screen.open(rig);
+
+		Files.delete(file("tables.i"));
+		screen.trigger(CHECK, Map.of("name", "tables.i", "modified", "1"));
+
+		assertEquals(200, screen.status());
+		assertEquals(List.of("main.s"), screen.document().select("#tool .tool__tab").eachText());
+	}
+
+	@Example
+	public void shouldRefuseToCheckANameThatIsNoSourceName() throws Exception {
+		assertEquals(500, Screen.open(rig).trigger(CHECK, Map.of("name", "../demo.chp", "modified", "1")).status());
+	}
+
+	@Example
+	public void shouldNotShowASourceThatIsALinkToAFileElsewhere() throws Exception {
+		Files.createSymbolicLink(file("tables.i"), secret());
+
+		final Screen screen = Screen.open(rig);
+
+		assertEquals(List.of("main.s"), screen.document().select("#tool .tool__tab").eachText());
+		assertFalse(screen.document().html().contains("private key"));
+		assertEquals(500, screen.trigger("#tool [hx-post=\"/action/file-open\"]", Map.of("name", "tables.i"))
+			.status());
+		assertEquals(500, screen.trigger(SAVE, Map.of("name", "tables.i", "text", "x")).status());
+		assertEquals("private key", Files.readString(secret()));
+	}
+
+	@Example
+	public void shouldOpenAProjectWhoseEntryIsALinkWithoutItsTextAndSayWhy() throws Exception {
+		Files.delete(file("main.s"));
+		Files.createSymbolicLink(file("main.s"), secret());
+		rig = rig.restart(now::get);
+
+		final Screen screen = noted(Screen.open(rig), rig);
+
+		assertEquals(List.of(), screen.document().select("#tool .tool__tab").eachText());
+		assertFalse(screen.document().html().contains("private key"));
+		assertEquals("Opened demo.chp (demo); the entry source main.s is missing or a link",
+			screen.find("#status .status__note").text());
 	}
 
 	@Example

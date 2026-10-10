@@ -32,6 +32,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.assumeFalse;
 
 public class ProjectDirectoryTest extends ScratchTest {
 	private static final long NOON = 1_791_547_200_000L;
@@ -142,6 +143,43 @@ public class ProjectDirectoryTest extends ScratchTest {
 			() -> assertEquals("src is a link",
 				assertThrows(IOException.class, project::sources).getMessage())));
 		assertEquals(before, Files.readString(elsewhere.resolve("main.s")));
+	}
+
+	@Example
+	public void shouldSkipAndRefuseASourceThatIsALink() throws IOException {
+		final ProjectDirectory project = demo();
+		final Path secret = Files.writeString(scratch().resolve("secret"), "private key");
+		final Path src = project.dir().resolve("src");
+
+		Files.createSymbolicLink(src.resolve("tables.i"), secret);
+		Files.delete(src.resolve("main.s"));
+		Files.createSymbolicLink(src.resolve("main.s"), secret);
+
+		assertEquals(List.of(), project.sources());
+		assertAll(List.of("main.s", "tables.i").stream().map(name -> () -> {
+			assertEquals(name + " is a link",
+				assertThrows(IOException.class, () -> project.read(name)).getMessage());
+			assertEquals(name + " is a link",
+				assertThrows(IOException.class, () -> project.modified(name)).getMessage());
+			assertEquals(name + " is a link",
+				assertThrows(IOException.class, () -> project.write(name, "evil")).getMessage());
+		}));
+		assertEquals("private key", Files.readString(secret));
+	}
+
+	@Example
+	public void shouldNameTheFailureWithoutTheStagingFile() throws IOException {
+		final ProjectDirectory project = demo();
+		final Path src = project.dir().resolve("src");
+
+		Files.setPosixFilePermissions(src, PosixFilePermissions.fromString("r-xr-xr-x"));
+		try {
+			assumeFalse(Files.isWritable(src), "a folder that cannot be written is writable to this user");
+			assertFalse(assertThrows(IOException.class, () -> project.write("main.s", "half")).getMessage()
+				.contains(".tmp"));
+		} finally {
+			Files.setPosixFilePermissions(src, PosixFilePermissions.fromString("rwxr-xr-x"));
+		}
 	}
 
 	@Example

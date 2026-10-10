@@ -17,6 +17,7 @@ package org.copperhead.toolchain;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.FileSystemException;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
@@ -25,6 +26,7 @@ import java.nio.file.StandardOpenOption;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Stream;
 import org.copperhead.core.project.ProjectFile;
@@ -77,7 +79,7 @@ public record ProjectDirectory(Path dir, ProjectFile file) {
 		final String entry = Path.of(file.entry()).getFileName().toString();
 		final Comparator<String> entryFirst = Comparator.comparing(name -> !name.equals(entry));
 
-		return listed(sourceFolder()).stream().filter(Files::isRegularFile)
+		return listed(sourceFolder()).stream().filter(path -> Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS))
 			.map(path -> path.getFileName().toString()).filter(ProjectLayout::validSource)
 			.sorted(entryFirst.thenComparing(Comparator.naturalOrder())).toList();
 	}
@@ -105,7 +107,13 @@ public record ProjectDirectory(Path dir, ProjectFile file) {
 		if (!ProjectLayout.validSource(name)) {
 			throw new IOException("not a source: " + name);
 		}
-		return sourceFolder().resolve(name);
+
+		final Path path = sourceFolder().resolve(name);
+
+		if (Files.isSymbolicLink(path)) {
+			throw new IOException(name + " is a link");
+		}
+		return path;
 	}
 
 	/* A cloned project can plant a link here, and the sources would then be read and written elsewhere. */
@@ -127,6 +135,10 @@ public record ProjectDirectory(Path dir, ProjectFile file) {
 			Files.write(staged, content, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE,
 				LinkOption.NOFOLLOW_LINKS);
 			Files.move(staged, file, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+		} catch (FileSystemException e) {
+			/* The exception names the staging file, which the person never saw and which is gone by now. */
+			throw new IOException(Optional.ofNullable(e.getReason())
+				.orElseGet(() -> e.getClass().getSimpleName()), e);
 		} finally {
 			Files.deleteIfExists(staged);
 		}

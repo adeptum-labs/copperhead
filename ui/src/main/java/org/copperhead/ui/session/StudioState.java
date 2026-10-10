@@ -15,6 +15,7 @@
 
 package org.copperhead.ui.session;
 
+import java.io.IOException;
 import java.time.Duration;
 import java.util.List;
 import java.util.Locale;
@@ -84,8 +85,21 @@ public record StudioState(Project project, Target target, Tool tool, Modal modal
 			.withEnvironment(environment).withWorkspace(Optional.of(directory))
 			.withFile(sourceName(opened.entry())).withBreakpoints(opened.breakpoints())
 			.withOptions(opened.options())
-			.withNote("Opened %s (%s)".formatted(ProjectLayout.chp(opened.name()),
-				opened.kind().name().toLowerCase(Locale.ROOT)));
+			.withNote("Opened %s (%s)%s".formatted(ProjectLayout.chp(opened.name()),
+				opened.kind().name().toLowerCase(Locale.ROOT), missingEntry(directory)));
+	}
+
+	/* A cloned project can name a link as its entry, which is never opened, so the editor has no tab for it.
+	   Sources that cannot be listed at all are reported where the editor draws them. */
+	private static String missingEntry(final ProjectDirectory directory) {
+		final String entry = sourceName(directory.file().entry());
+
+		try {
+			return directory.sources().contains(entry) ? ""
+				: "; the entry source " + entry + " is missing or a link";
+		} catch (IOException e) {
+			return "";
+		}
 	}
 
 	/** The name the editor knows a source by, from the path a project file or the assembler gives it. */

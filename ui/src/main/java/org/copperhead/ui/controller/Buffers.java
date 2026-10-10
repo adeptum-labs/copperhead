@@ -19,6 +19,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.UnaryOperator;
 import org.copperhead.toolchain.ProjectDirectory;
 import org.copperhead.web.action.Form;
 
@@ -53,14 +54,20 @@ final class Buffers {
 	 * is written. A write the disk refuses stops the rest and reports what was saved before it.
 	 */
 	static List<String> save(final ProjectDirectory directory, final Form form) {
-		final List<String> names = names(form);
+		return save(directory, names(form), form::get);
+	}
+
+	/** The same for the names given, each one's text asked of {@code texts}, which answers null for none. */
+	static List<String> save(final ProjectDirectory directory, final List<String> names,
+		final UnaryOperator<String> texts) {
+
 		final List<String> saved = new ArrayList<>();
 
-		names.forEach(name -> text(form, Workspaces.source(directory, name)));
+		names.forEach(name -> text(texts, Workspaces.source(directory, name)));
 
 		for (final String name : names) {
 			try {
-				directory.write(name, text(form, name));
+				directory.write(name, text(texts, name));
 				saved.add(name);
 			} catch (IOException e) {
 				throw new Failed(name, saved, e);
@@ -70,8 +77,8 @@ final class Buffers {
 		return saved;
 	}
 
-	private static String text(final Form form, final String name) {
-		return Optional.ofNullable(form.get(name))
+	private static String text(final UnaryOperator<String> texts, final String name) {
+		return Optional.ofNullable(texts.apply(name))
 			.orElseThrow(() -> new IllegalArgumentException("No text came for " + name));
 	}
 }

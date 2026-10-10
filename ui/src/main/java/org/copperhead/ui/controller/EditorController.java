@@ -18,6 +18,7 @@ package org.copperhead.ui.controller;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import java.util.List;
+import org.copperhead.core.project.ProjectLayout;
 import org.copperhead.toolchain.ProjectDirectory;
 import org.copperhead.ui.session.ProjectSession;
 import org.copperhead.ui.session.StudioState;
@@ -51,15 +52,9 @@ public class EditorController {
 
 	@Action("file-save")
 	public Regions onSave(final Form form) {
-		final ProjectDirectory directory = Workspaces.open(session.state());
-		final String name = Workspaces.source(directory, form.get(NAME));
-		final String text = form.get("text");
+		final String name = form.get(NAME);
 
-		if (text == null) {
-			throw new IllegalArgumentException("No text came to save in " + name);
-		}
-
-		Workspaces.write(() -> directory.write(name, text));
+		Buffers.save(Workspaces.open(session.state()), List.of(name), buffer -> form.get("text"));
 		return Screens.regions(session.change(state -> state.withNote("Saved " + name)), Region.TOOL);
 	}
 
@@ -105,13 +100,19 @@ public class EditorController {
 		return Screens.regions(session.change(StudioState::showWarning), Region.MENUS, Region.RAIL, Region.TOOL);
 	}
 
-	/* Nothing changed on disk since the page loaded the source, so nothing is drawn anew and the answer is empty. */
+	/* Nothing changed on disk since the page loaded the source, so nothing is drawn anew and the answer is empty.
+	   A source that has since left the project is drawn anew too, without its tab. */
 	@Action("source-check")
 	public Regions onShowSource(final Form form) {
 		final ProjectDirectory directory = Workspaces.open(session.state());
-		final String name = Workspaces.source(directory, form.get(NAME));
+		final String name = form.get(NAME);
 
-		if (Workspaces.read(() -> directory.modified(name)) == Long.parseLong(form.get("modified"))) {
+		if (!ProjectLayout.validSource(name)) {
+			throw new IllegalArgumentException("The project holds no source " + name);
+		}
+
+		if (Workspaces.sources(directory).contains(name)
+			&& Workspaces.read(() -> directory.modified(name)) == Long.parseLong(form.get("modified"))) {
 			return null;
 		}
 
