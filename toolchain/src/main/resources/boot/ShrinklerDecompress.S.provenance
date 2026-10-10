@@ -1,0 +1,24 @@
+ShrinklerDecompress.S from Shrinkler 4.7 by Aske Simon Christensen
+
+Vendored rather than fetched at build time, so that the boot loader assembles offline and what ships is what
+was reviewed. Only the data decompressor is kept: the file is cut where ShrinklerLoad and ShrinklerFree begin,
+which need dos.library and would not fit in a boot block.
+
+  source     https://codeload.github.com/askeksa/Shrinkler/tar.gz/refs/tags/v4.7
+  tag        v4.7
+  tarball    sha256 513ac06190e6a5dcf3af8e5a7db2cd8f4ab22bba2ae7a4eeaae3616c450bd3a4
+  path       Shrinkler-4.7/decrunchers/ShrinklerDecompress.S (342 lines, sha256
+             4479d5f529c48e7ae779978225557a161127519c4050c3e0afc08a22a5003d49), lines 1 to 207 kept
+  kept       sha256 b14625af050ad0156a660778c2b56555ea929a66be12ba094dbf1d9ab0a85431, 3583 bytes
+
+Licence: the file's own header, kept above, makes the code free to use, in whole or in part, modified or as
+is, for any legal purpose, with no warranty. The rest of Shrinkler is under its LICENSE.txt (use, copy and
+modify freely; keep the licence with source copies; do not misattribute binaries); Copperhead ships none of
+it and compiles the cruncher from the pinned tarball on the user's machine.
+
+Made with
+  sed -n '/^; Load and decompress a Shrinkler-compressed data file with header\./q;p' \
+    Shrinkler-4.7/decrunchers/ShrinklerDecompress.S > ShrinklerDecompress.S
+
+Verify a replacement before committing it:
+  sha256sum ShrinklerDecompress.S
