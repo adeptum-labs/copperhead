@@ -19,6 +19,7 @@ import java.io.IOException;
 import java.net.http.HttpClient;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -51,6 +52,8 @@ public class LiveToolchainIT {
 	private static final Duration COMPILE = Duration.ofMinutes(5);
 	private static final Duration STEP = Duration.ofMinutes(2);
 	private static final TrustPrompt REFUSE = (tool, version, sha256) -> false;
+	/* The disks stay after the run, for CI to boot them in an emulator. */
+	private static final Path DISKS = Path.of("target", "disks");
 
 	private static Path root;
 	private static Path vasm;
@@ -147,6 +150,8 @@ public class LiveToolchainIT {
 		assertTrue(loader <= Bootblock.SIZE, loader + " bytes");
 		assertArrayEquals(payload, Arrays.copyOfRange(image, TrackDisk.PAYLOAD_OFFSET,
 			TrackDisk.PAYLOAD_OFFSET + payload.length));
+		Files.copy(project.adf(), Files.createDirectories(DISKS).resolve(project.adf().getFileName()),
+			StandardCopyOption.REPLACE_EXISTING);
 	}
 
 	private static ProjectDirectory project(final String name, final ProjectKind kind, final Target target,
