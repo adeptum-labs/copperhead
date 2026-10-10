@@ -36,6 +36,7 @@ import org.copperhead.ui.view.Tool;
 import static org.copperhead.ui.Flows.POLL;
 import static org.copperhead.ui.Flows.build;
 import static org.copperhead.ui.Flows.finished;
+import static org.copperhead.ui.Flows.owned;
 import static org.copperhead.ui.Flows.rail;
 import static org.copperhead.ui.Flows.saved;
 import static org.copperhead.ui.Flows.source;
@@ -144,7 +145,8 @@ public class BuildFlowTest {
 		final String kept = Files.readString(source);
 
 		assertEquals(500, screen.client().submit("/action/build",
-			"files=main.s&main.s=" + URLEncoder.encode("start:\n\tnop\n", StandardCharsets.UTF_8)).statusCode());
+			"files=main.s&project=" + URLEncoder.encode(rig.project().dir().toString(), StandardCharsets.UTF_8)
+				+ "&main.s=" + URLEncoder.encode("start:\n\tnop\n", StandardCharsets.UTF_8)).statusCode());
 		assertEquals(kept, Files.readString(source));
 		cancelled(screen);
 	}
@@ -182,7 +184,7 @@ public class BuildFlowTest {
 	public void shouldRefuseToChangeTheSettingsWhileABuildRuns() throws Exception {
 		final Screen screen = Screen.open(rig).click("#menus [hx-vals*=SETTINGS]");
 
-		screen.trigger(BUILD, Map.of("files", "main.s", "main.s", "start:\n\t" + StubTools.SLOW + "\n"));
+		screen.trigger(BUILD, owned(rig, Map.of("files", "main.s", "main.s", "start:\n\t" + StubTools.SLOW + "\n")));
 		screen.trigger(SETTINGS_SAVE, Map.of("name", "nova", "target", "OCS", "loadAddress", "$20000",
 			"entry", "src/main.s"));
 
@@ -224,7 +226,7 @@ public class BuildFlowTest {
 	@Example
 	public void shouldSaveWhatItIsSentBeforeBuilding() throws Exception {
 		final Screen screen = finished(Screen.open(rig).trigger(BUILD,
-			Map.of("files", "main.s", "main.s", "start:\n\t" + StubTools.WARNING + "\n")));
+			owned(rig, Map.of("files", "main.s", "main.s", "start:\n\t" + StubTools.WARNING + "\n"))));
 
 		assertEquals("start:\n\t" + StubTools.WARNING + "\n",
 			Files.readString(rig.project().dir().resolve("src/main.s")));

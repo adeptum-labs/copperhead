@@ -610,7 +610,8 @@ html[data-theme="light"] [data-theme-toggle] .menu__check {
 }
 
 .code[data-editor-host] .cm-editor.cm-focused {
-	outline: none;
+	outline: 1px solid var(--acct);
+	outline-offset: -1px;
 }
 
 .code[data-editor-host] .cm-scroller {
@@ -739,6 +740,22 @@ html[data-theme="light"] [data-theme-toggle] .menu__check {
 	gap: 8px;
 	padding: 6px 14px;
 	color: var(--warn);
+}
+
+/* Over the top of the text, since the editor fills the tool body and has no room beside it for a line of its own. */
+.code[data-editor-host] {
+	position: relative;
+}
+
+.code[data-editor-host] .code__missing {
+	position: absolute;
+	inset: 0 0 auto;
+	z-index: 2;
+	padding: 6px 14px;
+	border-bottom: 1px solid var(--line);
+	background: var(--panel);
+	color: var(--warn);
+	font: var(--fs)/1.35 var(--sans);
 }
 
 /* The question asked before the window closes on unsaved text, drawn as the studio's own dialogs are. */

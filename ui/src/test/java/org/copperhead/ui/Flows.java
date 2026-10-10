@@ -19,6 +19,7 @@ import jakarta.json.Json;
 import jakarta.json.JsonObject;
 import java.io.StringReader;
 import java.time.Duration;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Predicate;
@@ -53,7 +54,16 @@ final class Flows {
 
 	/** Saves the entry file with the text given, as Ctrl+S does from the editor. */
 	static Screen saved(final Screen screen, final String text) throws Exception {
-		return screen.trigger("[data-key=\"ctrl+s\"]", Map.of("name", "main.s", "text", text));
+		return screen.trigger("[data-key=\"ctrl+s\"]",
+			Map.of("name", "main.s", "text", text, "project", source(screen).getString("project")));
+	}
+
+	/** What the page sends with the buffers it holds: the folder of the project they were typed in. */
+	static Map<String, String> owned(final WorkbenchRig rig, final Map<String, String> buffers) {
+		final Map<String, String> owned = new LinkedHashMap<>(buffers);
+
+		owned.put("project", rig.project().dir().toString());
+		return owned;
 	}
 
 	/** Leaves a note on the status bar, the one opening the project again leaves, whichever tool is shown. */

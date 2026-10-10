@@ -51,6 +51,7 @@ public abstract class BrowserTest {
 	private static Browser browser;
 
 	private final List<String> troubles = new CopyOnWriteArrayList<>();
+	private final List<String> forgiven = new CopyOnWriteArrayList<>();
 	private WorkbenchRig rig;
 	private BrowserContext context;
 	private Page page;
@@ -120,7 +121,13 @@ public abstract class BrowserTest {
 			}
 		}
 
-		assertEquals(List.of(), troubles);
+		assertEquals(List.of(), troubles.stream()
+			.filter(trouble -> forgiven.stream().noneMatch(trouble::contains)).toList());
+	}
+
+	/** For a test that makes the studio fail on purpose: a trouble holding this text is the one it asked for. */
+	protected void forgive(final String trouble) {
+		forgiven.add(trouble);
 	}
 
 	/**

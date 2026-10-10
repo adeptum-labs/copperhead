@@ -43,6 +43,11 @@ public class ActionHandlerTest extends ServedTest {
 			return new Status(form.get("disk"));
 		}
 
+		@Action("eject-disk")
+		public void onClickEjectDisk(final Form form) {
+			disks.remove(form.require("disk"));
+		}
+
 		@Action("break-machine")
 		public void onClickBreakMachine() {
 			throw new IllegalStateException("The machine said no");
@@ -107,6 +112,19 @@ public class ActionHandlerTest extends ServedTest {
 	@Example
 	public void shouldReportAFailedActionRatherThanPretendItWorked() throws Exception {
 		assertEquals(500, admitted().post("/action/break-machine").statusCode());
+	}
+
+	@Example
+	public void shouldRefuseAValueTheActionCannotDoWithoutAsABadRequest() throws Exception {
+		final HttpResponse<String> response = admitted().post("/action/eject-disk");
+
+		assertEquals(400, response.statusCode());
+		assertEquals("No disk came", response.body());
+	}
+
+	@Example
+	public void shouldTakeAnEmptyValueForAValue() throws Exception {
+		assertEquals(204, admitted().submit("/action/eject-disk", "disk=").statusCode());
 	}
 
 	@Example

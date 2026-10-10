@@ -200,12 +200,26 @@ public class StudioFlowTest {
 			assertEquals(500, screen.trigger(bad.getKey(), bad.getValue()).status(), bad.getKey());
 			assertEquals(before, rig.session().state(), bad.getKey());
 		}));
-		assertAll(Stream.of("tool", "target", "modal", "project-recent").map(action -> () -> {
+		assertAll(Stream.of("tool", "target", "modal").map(action -> () -> {
 			final StudioState before = rig.session().state();
 
 			assertEquals(500, screen.client().submit("/action/" + action, "").statusCode(), action);
 			assertEquals(before, rig.session().state(), action);
 		}));
+	}
+
+	/* A request that leaves out a value is the caller's mistake, which the studio answers as one. */
+	@Example
+	public void shouldRefuseARequestThatLeavesOutWhatTheActionNeedsAsABadRequest() throws Exception {
+		final Screen screen = Screen.open(rig);
+
+		assertAll(Stream.of("project-recent", "project-create", "project-settings", "file-open", "file-save",
+			"breakpoint", "cursor", "source-check").map(action -> () -> {
+				final StudioState before = rig.session().state();
+
+				assertEquals(400, screen.client().submit("/action/" + action, "").statusCode(), action);
+				assertEquals(before, rig.session().state(), action);
+			}));
 	}
 
 	@Example

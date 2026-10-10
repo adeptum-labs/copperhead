@@ -25,8 +25,10 @@ import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.Request;
 import org.eclipse.jetty.server.Response;
 import org.eclipse.jetty.util.Callback;
+import org.copperhead.web.action.ActionFailed;
 import org.copperhead.web.action.Actions;
 import org.copperhead.web.action.Form;
+import org.copperhead.web.action.MissingValue;
 import org.copperhead.web.action.View;
 
 public class ActionHandler extends Handler.Abstract {
@@ -54,7 +56,18 @@ public class ActionHandler extends Handler.Abstract {
 			return true;
 		}
 
-		final Optional<View> shown = actions.invoke(name, Form.parse(Content.Source.asString(request)));
+		final Optional<View> shown;
+
+		try {
+			shown = actions.invoke(name, Form.parse(Content.Source.asString(request)));
+		} catch (ActionFailed e) {
+			/* A request that left out what the action needs is the caller's mistake, not a failure here. */
+			if (e.getCause() instanceof MissingValue refusal) {
+				return refuse(response, callback, refusal);
+			}
+
+			throw e;
+		}
 
 		if (shown.isEmpty()) {
 			response.setStatus(HttpStatus.NO_CONTENT_204);
@@ -67,6 +80,17 @@ public class ActionHandler extends Handler.Abstract {
 		response.setStatus(HttpStatus.OK_200);
 		response.getHeaders().put(HttpHeader.CONTENT_TYPE, HTML);
 		response.write(true, ByteBuffer.wrap(body), callback);
+		return true;
+	}
+
+	private static boolean refuse(final Response response, final Callback callback,
+		final MissingValue refusal) {
+
+		final String reason = String.valueOf(refusal.getMessage());
+
+		response.setStatus(HttpStatus.BAD_REQUEST_400);
+		response.getHeaders().put(HttpHeader.CONTENT_TYPE, "text/plain;charset=utf-8");
+		response.write(true, ByteBuffer.wrap(reason.getBytes(StandardCharsets.UTF_8)), callback);
 		return true;
 	}
 }

@@ -48,7 +48,14 @@ const combo = (event) => {
    the preferences and the function keys. */
 const STUDIO_KEYS = /^(ctrl\+(shift\+)?[sb]|ctrl\+[1-5,]|(shift\+)?f\d{1,2})$/;
 
+/* The editor's own text fields, the search and go-to-line panels, are the editor's too. */
 const editing = (event) => event.target.closest(".cm-editor") !== null;
+
+/* The studio has no use for a reload, and the unsaved text lives in the page only. */
+const RELOAD_KEYS = /^(f5|ctrl\+(shift\+)?r)$/;
+
+const outsideStudio = (event, name) => editing(event) ? !STUDIO_KEYS.test(name)
+	: event.target.closest("input, textarea, dialog") !== null;
 
 /* An open dialog takes the keys, so nothing behind it acts, and Esc still reaches its close button. */
 const keyed = () => {
@@ -62,8 +69,13 @@ document.addEventListener("keydown", (event) => {
 
 	/* A key the editor acted on already, such as Ctrl+Z or Ctrl+F, is not acted on twice, and the question asked
 	   before the window closes keeps its keys to itself. */
-	if (!name || event.defaultPrevented || event.target.closest("input, textarea, dialog")
-		|| editing(event) && !STUDIO_KEYS.test(name)) {
+	const handled = event.defaultPrevented;
+
+	if (RELOAD_KEYS.test(name)) {
+		event.preventDefault();
+	}
+
+	if (!name || handled || outsideStudio(event, name)) {
 		return;
 	}
 

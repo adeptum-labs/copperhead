@@ -16,6 +16,8 @@
 package org.copperhead.ui;
 
 import jakarta.json.JsonObject;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
@@ -36,6 +38,7 @@ import org.copperhead.web.action.Form;
 import static org.copperhead.ui.Flows.GUTTER;
 import static org.copperhead.ui.Flows.lines;
 import static org.copperhead.ui.Flows.noted;
+import static org.copperhead.ui.Flows.owned;
 import static org.copperhead.ui.Flows.saved;
 import static org.copperhead.ui.Flows.source;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -83,7 +86,8 @@ public class EditorFlowTest {
 			assumeFalse(Files.isWritable(src), "a folder that cannot be written is writable to this user");
 
 			final ActionFailed failed = assertThrows(ActionFailed.class,
-				() -> rig.actions().invoke(action, Form.parse(body)));
+				() -> rig.actions().invoke(action, Form.parse(body + "&project="
+					+ URLEncoder.encode(rig.project().dir().toString(), StandardCharsets.UTF_8))));
 
 			assertEquals(before, rig.session().state());
 			return failed.getCause();
@@ -126,7 +130,7 @@ public class EditorFlowTest {
 		Files.writeString(file("tables.i"), "sine:\n");
 
 		final Screen screen = Screen.open(rig).trigger(SAVE_ALL,
-			Map.of("files", "main.s,tables.i", "main.s", "; main\n", "tables.i", "; tables\n"));
+			owned(rig, Map.of("files", "main.s,tables.i", "main.s", "; main\n", "tables.i", "; tables\n")));
 
 		assertEquals("; main\n", Files.readString(file("main.s")));
 		assertEquals("; tables\n", Files.readString(file("tables.i")));
@@ -138,13 +142,73 @@ public class EditorFlowTest {
 		final Screen screen = Screen.open(rig);
 		final String chp = Files.readString(rig.project().chp());
 
-		for (final String name : List.of("../demo.chp", "../../escaped.s", "/tmp/escaped.s", "missing.s")) {
-			assertEquals(500, screen.trigger(SAVE, Map.of("name", name, "text", "x")).status(), name);
+		for (final String name : List.of("../demo.chp", "../../escaped.s", "/tmp/escaped.s", "main.txt")) {
+			assertEquals(500, screen.trigger(SAVE, owned(rig, Map.of("name", name, "text", "x"))).status(),
+				name);
 		}
 
 		assertEquals(chp, Files.readString(rig.project().chp()));
-		assertFalse(Files.exists(file("missing.s")));
+		assertFalse(Files.exists(file("main.txt")));
 		assertFalse(Files.exists(rig.project().dir().resolve("escaped.s")));
+	}
+
+	@Example
+	public void shouldWriteASourceThatLeftTheProjectBackAsANewFile() throws Exception {
+		final Screen screen = Screen.open(rig);
+
+		Files.delete(file("main.s"));
+		screen.trigger(SAVE, owned(rig, Map.of("name", "main.s", "text", "; typed meanwhile\n")));
+
+		assertEquals("; typed meanwhile\n", Files.readString(file("main.s")));
+		assertEquals("main.s", screen.find("#status").attr("data-saved"));
+	}
+
+	@Example
+	public void shouldTellWhichSourcesItWroteAndNoneWhenItWroteNone() throws Exception {
+		final Screen screen = Screen.open(rig).trigger(SAVE_ALL, owned(rig, Map.of("files", "main.s",
+			"main.s", "; one\n")));
+
+		assertEquals("main.s", screen.find("#status").attr("data-saved"));
+		assertEquals("", screen.trigger(CHECK, Map.of("name", "main.s", "modified", "1")).find("#status")
+			.attr("data-saved"));
+	}
+
+	@Example
+	public void shouldNameTheFolderOfTheOpenProjectInTheStatusBar() throws Exception {
+		assertEquals(rig.project().dir().toString(), Screen.open(rig).find("#status").attr("data-project"));
+	}
+
+	@Example
+	public void shouldRefuseTextTypedInAnotherProject() throws Exception {
+		final Screen screen = Screen.open(rig);
+		final String before = Files.readString(file("main.s"));
+		final StudioState state = rig.session().state();
+
+		assertEquals(500, screen.trigger(SAVE, Map.of("name", "main.s", "text", "; stray\n", "project",
+			rig.home().resolve("other").toString())).status());
+		assertEquals(500, screen.trigger(SAVE_ALL, Map.of("files", "main.s", "main.s", "; stray\n")).status());
+		assertEquals(before, Files.readString(file("main.s")));
+		assertEquals(state, rig.session().state());
+	}
+
+	@Example
+	public void shouldRefuseASaveThatBringsNoNameOrNoText() throws Exception {
+		final Screen screen = Screen.open(rig);
+		final StudioState state = rig.session().state();
+
+		assertEquals(400, screen.trigger(SAVE, Map.of("text", "x")).status());
+		assertEquals(400, screen.trigger(SAVE, Map.of("name", "main.s")).status());
+		assertEquals(400, screen.trigger(GUTTER, Map.of()).status());
+		assertEquals(400, screen.trigger("#tool [data-editor-control=cursor]", Map.of()).status());
+		assertEquals(400, screen.trigger(CHECK, Map.of()).status());
+		assertEquals(state, rig.session().state());
+	}
+
+	@Example
+	public void shouldSaveAnEmptyText() throws Exception {
+		Screen.open(rig).trigger(SAVE, owned(rig, Map.of("name", "main.s", "text", "")));
+
+		assertEquals("", Files.readString(file("main.s")));
 	}
 
 	@Example
@@ -152,8 +216,8 @@ public class EditorFlowTest {
 		final String before = Files.readString(file("main.s"));
 		final Screen screen = Screen.open(rig);
 
-		assertEquals(500, screen.trigger(SAVE_ALL,
-			Map.of("files", "main.s,../demo.chp", "main.s", "; lost\n", "../demo.chp", "{}")).status());
+		assertEquals(500, screen.trigger(SAVE_ALL, owned(rig,
+			Map.of("files", "main.s,../demo.chp", "main.s", "; lost\n", "../demo.chp", "{}"))).status());
 		assertEquals(before, Files.readString(file("main.s")));
 	}
 
@@ -259,7 +323,7 @@ public class EditorFlowTest {
 		assertFalse(screen.document().html().contains("private key"));
 		assertEquals(500, screen.trigger("#tool [hx-post=\"/action/file-open\"]", Map.of("name", "tables.i"))
 			.status());
-		assertEquals(500, screen.trigger(SAVE, Map.of("name", "tables.i", "text", "x")).status());
+		assertEquals(500, screen.trigger(SAVE, owned(rig, Map.of("name", "tables.i", "text", "x"))).status());
 		assertEquals("private key", Files.readString(secret()));
 	}
 

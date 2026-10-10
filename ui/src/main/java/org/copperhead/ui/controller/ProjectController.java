@@ -84,7 +84,7 @@ public class ProjectController {
 			return Screens.dialog(state, ProjectDialogs.open(home, near(state), "", editing()));
 		}
 
-		final Path chp = inside(form.get(ProjectDialogs.PATH));
+		final Path chp = inside(form.require(ProjectDialogs.PATH));
 
 		return switchTo(form, "project-open", Map.of(ProjectDialogs.PATH, chp.toString()),
 			() -> ProjectSession.open(chp),
@@ -93,7 +93,7 @@ public class ProjectController {
 
 	@Action("project-recent")
 	public Regions onClickRecent(final Form form) {
-		final Path chp = Path.of(form.get(ProjectDialogs.PATH)).toAbsolutePath().normalize();
+		final Path chp = Path.of(form.require(ProjectDialogs.PATH)).toAbsolutePath().normalize();
 
 		if (!preferences.recent().contains(chp)) {
 			throw new IllegalArgumentException(chp + " is not a project opened lately");
@@ -106,9 +106,9 @@ public class ProjectController {
 
 	@Action("project-create")
 	public Regions onClickCreate(final Form form) {
-		final Draft draft = new Draft(form.get(ProjectDialogs.NAME).strip(),
-			ProjectKind.valueOf(form.get(ProjectDialogs.KIND)), Target.chipset(form.get(ProjectDialogs.TARGET)),
-			inside(form.get(ProjectDialogs.PARENT)));
+		final Draft draft = new Draft(form.require(ProjectDialogs.NAME).strip(),
+			ProjectKind.valueOf(form.require(ProjectDialogs.KIND)),
+			Target.chipset(form.require(ProjectDialogs.TARGET)), inside(form.require(ProjectDialogs.PARENT)));
 		final Function<String, ModalView> refused = error -> ProjectDialogs.create(home, draft, error, editing());
 
 		if (!ProjectLayout.validName(draft.name())) {
@@ -130,7 +130,7 @@ public class ProjectController {
 	/* Each listing is read from the disk as it is asked for; the folder is the one the request names. */
 	@Action("browse")
 	public Regions onBrowse(final Form form) {
-		final Path folder = inside(form.get(ProjectDialogs.PATH));
+		final Path folder = inside(form.require(ProjectDialogs.PATH));
 		final StudioState state = session.state();
 		final boolean editing = state.workspace().isPresent();
 
@@ -151,9 +151,9 @@ public class ProjectController {
 	public Regions onClickSaveSettings(final Form form) {
 		final StudioState state = session.state();
 		final ProjectDirectory directory = Workspaces.open(state);
-		final Map<String, String> values = Map.of(ProjectDialogs.NAME, form.get(ProjectDialogs.NAME).strip(),
-			ProjectDialogs.TARGET, form.get(ProjectDialogs.TARGET), ProjectDialogs.LOAD,
-			form.get(ProjectDialogs.LOAD).strip(), ProjectDialogs.ENTRY, form.get(ProjectDialogs.ENTRY));
+		final Map<String, String> values = Map.of(ProjectDialogs.NAME, form.require(ProjectDialogs.NAME).strip(),
+			ProjectDialogs.TARGET, form.require(ProjectDialogs.TARGET), ProjectDialogs.LOAD,
+			form.require(ProjectDialogs.LOAD).strip(), ProjectDialogs.ENTRY, form.require(ProjectDialogs.ENTRY));
 		final Optional<String> refused = state.run().running() ? Optional.of(BUILD_RUNNING)
 			: refused(directory, values);
 
@@ -195,8 +195,13 @@ public class ProjectController {
 		final Opening opening, final Function<String, ModalView> failed) {
 
 		final List<String> unsaved = Buffers.names(form);
+		List<String> saved = List.of();
 
 		idle(session.state());
+
+		if (!unsaved.isEmpty()) {
+			Buffers.owned(Workspaces.open(session.state()), form);
+		}
 
 		if (!unsaved.isEmpty() && !form.has(ProjectDialogs.SAVE) && !form.has(ProjectDialogs.DISCARD)) {
 			return Screens.dialog(session.change(state -> state.withModal(Modal.DISCARD)),
@@ -205,10 +210,12 @@ public class ProjectController {
 
 		if (form.has(ProjectDialogs.SAVE)) {
 			try {
-				Buffers.save(Workspaces.open(session.state()), form);
+				saved = Buffers.save(Workspaces.open(session.state()), form);
 			} catch (Buffers.Failed e) {
-				return Screens.dialog(session.change(state -> state.withModal(Modal.DISCARD)),
-					ProjectDialogs.discard(action, pending, unsaved, e.getMessage()));
+				final StudioState asking = session.change(state -> state.withModal(Modal.DISCARD));
+
+				return Screens.confirming(Screens.dialog(asking,
+					ProjectDialogs.discard(action, pending, unsaved, e.getMessage())), e.saved());
 			}
 		}
 
@@ -219,15 +226,16 @@ public class ProjectController {
 		} catch (IOException | IllegalArgumentException e) {
 			final ModalView dialog = failed.apply(Workspaces.reason(e));
 
-			return Screens.dialog(session.change(state -> state.withModal(dialog.kind())), dialog);
+			return Screens.confirming(Screens.dialog(session.change(state -> state.withModal(dialog.kind())),
+				dialog), saved);
 		}
 
 		preferences.used(opened.chp());
 
 		final List<Path> recent = preferences.recent();
 
-		return Screens.all(session.change(state -> idle(state).enter(opened).withModal(Modal.NONE)
-			.withEnvironment(state.environment().withRecent(recent))));
+		return Screens.confirming(Screens.all(session.change(state -> idle(state).enter(opened)
+			.withModal(Modal.NONE).withEnvironment(state.environment().withRecent(recent)))), saved);
 	}
 
 	/* Checked again inside the change: a build that starts in between must not find its project swapped away. */

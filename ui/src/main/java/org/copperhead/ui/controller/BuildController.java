@@ -17,6 +17,7 @@ package org.copperhead.ui.controller;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import java.util.List;
 import org.copperhead.core.build.BuildOption;
 import org.copperhead.ui.session.BuildRun.Phase;
 import org.copperhead.ui.session.BuildService;
@@ -60,27 +61,29 @@ public class BuildController {
 	/* What the editor has not saved yet goes to disk first, since the assembler reads the files. */
 	@Action("build")
 	public Regions onClickBuild(final Form form) {
-		saveBeforeBuilding(form);
+		final List<String> saved = saveBeforeBuilding(form);
+
 		builds.start(false);
-		return Screens.regions(session.state(), HELD_BACK);
+		return Screens.confirming(Screens.regions(session.state(), HELD_BACK), saved);
 	}
 
 	@Action("build-run")
 	public Regions onClickBuildAndRun(final Form form) {
-		saveBeforeBuilding(form);
+		final List<String> saved = saveBeforeBuilding(form);
+
 		builds.start(true);
-		return Screens.all(session.state());
+		return Screens.confirming(Screens.all(session.state()), saved);
 	}
 
 	/* A build that is refused writes nothing: the one running is reading these very files. */
-	private void saveBeforeBuilding(final Form form) {
+	private List<String> saveBeforeBuilding(final Form form) {
 		final StudioState state = session.state();
 
 		if (state.run().running()) {
 			throw new IllegalStateException("A build is already running");
 		}
 
-		Buffers.save(Workspaces.open(state), form);
+		return Buffers.save(Workspaces.open(state), form);
 	}
 
 	/*

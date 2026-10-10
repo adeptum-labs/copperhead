@@ -42,7 +42,8 @@ final class StatusViews {
 			!warnings.isEmpty(), "last build " + BuildViews.outcome(state), state.note(),
 			"Part %02d · %s".formatted(at + 1, part.name()), Clock.frames(state.position()),
 			state.target().label(), state.layout().theme(),
-			state.run().running() ? Vals.of("phase", state.run().phase()) : null);
+			state.run().running() ? Vals.of("phase", state.run().phase()) : null,
+			state.workspace().map(directory -> directory.dir().toString()).orElse(""), List.of());
 	}
 
 	private static String counted(final int count, final String what) {

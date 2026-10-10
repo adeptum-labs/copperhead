@@ -15,10 +15,16 @@
 
 /* A dialog with text boxes and choices is no form, so the browser sends nothing of its own accord: the fields live in
    a container marked data-form, and the button that submits them names their values as it is pressed. A box left
-   unticked and a choice not taken are left out, as a form leaves them out. */
-const chosen = (field) => !["checkbox", "radio"].includes(field.type) || field.checked;
+   unticked, a choice not taken and a field that is disabled are left out, as a form leaves them out. */
+const chosen = (field) => !field.disabled && (!["checkbox", "radio"].includes(field.type) || field.checked);
+
+const valuesIn = (form) => Object.fromEntries(Array.from(form.querySelectorAll("[data-field]"))
+	.filter(chosen).map((field) => [field.name, field.value]));
 
 Object.assign(window.copperhead, {
-	fields: (button) => Object.fromEntries(Array.from(button.closest("[data-form]").querySelectorAll("[data-field]"))
-		.filter(chosen).map((field) => [field.name, field.value]))
+	fields: (button) => {
+		const form = button.closest("[data-form]");
+
+		return form ? valuesIn(form) : {};
+	}
 });

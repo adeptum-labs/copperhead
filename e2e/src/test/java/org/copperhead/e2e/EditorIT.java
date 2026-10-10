@@ -16,72 +16,13 @@
 package org.copperhead.e2e;
 
 import com.microsoft.playwright.Locator;
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.attribute.FileTime;
-import java.util.regex.Pattern;
 import net.jqwik.api.Example;
-import org.copperhead.toolchain.ProjectDirectory;
 import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
 /** The Code tool's editor over the demo the studio opened, with the stand-in tools to build it. */
-public class EditorIT extends BrowserTest {
-	private static final String ENTRY = "main.s";
-	private static final String TEXT = "#tool [data-editor] .cm-content";
-	private static final String UNSAVED = "#tool .tool__tab--active .tool__mark";
-	private static final String BREAKPOINTS = "#tool .cm-breakpoint-gutter .code__dot--on";
-	private static final String CLOSING = "dialog.closing";
-	private static final String CLOSE = "close";
-	private static final Pattern ON = Pattern.compile("(^|\\s)tool__mark--on(\\s|$)");
-	private static final int THIRD_LINE = 2;
-	private static final long LATER_MILLIS = 5_000;
-
-	private Path entry() {
-		return rig().project().dir().resolve("src").resolve(ENTRY);
-	}
-
-	private String onDisk() {
-		try {
-			return Files.readString(entry());
-		} catch (final IOException e) {
-			throw new UncheckedIOException(e);
-		}
-	}
-
-	/* The project file as it is on disk, not as the session holds it. */
-	private boolean breakpointKept(final int line) {
-		try {
-			return ProjectDirectory.open(rig().project().dir()).file().breakpoints().stream()
-				.anyMatch(breakpoint -> breakpoint.line() == line);
-		} catch (final IOException e) {
-			throw new UncheckedIOException(e);
-		}
-	}
-
-	/* Another program writes the file; its time of change moves on clearly, as a later save's would. */
-	private void changeElsewhere(final String text) throws IOException {
-		final long before = Files.getLastModifiedTime(entry()).toMillis();
-
-		Files.writeString(entry(), text);
-		Files.setLastModifiedTime(entry(), FileTime.fromMillis(before + LATER_MILLIS));
-		page().evaluate("window.dispatchEvent(new Event('focus'))");
-	}
-
-	private String firstLine() {
-		return (String) page().evaluate("document.querySelector('#tool [data-editor] .cm-line').textContent");
-	}
-
-	/* The caret goes to the start of the text, so whatever is typed next begins the first line. */
-	private void typeAtTheTop(final String text) {
-		page().click(TEXT);
-		page().keyboard().press("Control+Home");
-		page().keyboard().type(text);
-	}
-
+public class EditorIT extends EditorTest {
 	@Example
 	public void shouldShowTheEntrySourceAsItIsOnDisk() {
 		assertThat(page().locator("#tool .tool__tab--active")).hasText(ENTRY);

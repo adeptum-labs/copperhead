@@ -15,15 +15,28 @@
 
 package org.copperhead.ui.view;
 
+import java.util.List;
+import lombok.With;
 import org.copperhead.web.action.View;
 
 /**
  * The status bar: what the last build said, what just happened, and where the run is. It comes with every answer,
- * so it also carries the theme for the page to wear and, while a build runs, the control that asks how it does.
+ * so it also carries the theme for the page to wear, the folder of the open project, which tells the page when the
+ * text it holds belongs to another one, the sources the request wrote to disk, which the page takes as saved and
+ * nothing else, and, while a build runs, the control that asks how it does.
  */
+@With
 public record StatusView(String tool, String errors, boolean failed, String warnings, boolean warns,
-	String lastBuild, String note, String part, long frame, String machine, String theme, String poll)
-	implements View {
+	String lastBuild, String note, String part, long frame, String machine, String theme, String poll,
+	String project, List<String> saved) implements View {
+
+	public StatusView {
+		saved = List.copyOf(saved);
+	}
+
+	public String savedList() {
+		return String.join(",", saved);
+	}
 
 	public boolean polling() {
 		return poll != null;

@@ -35,18 +35,32 @@ const askBeforeClosing = (unsaved) => {
 	const title = document.createElement("h2");
 	const line = document.createElement("p");
 	const buttons = document.createElement("div");
-	const saveAndClose = async () => {
-		const saved = await fetch("/action/file-save-all", { method: "POST", body: new URLSearchParams(unsaved) });
-
-		if (saved.ok) {
-			command("close");
-		} else {
+	const saveAndClose = async (event) => {
+		const button = event.currentTarget;
+		const refused = () => {
 			line.textContent = "The files could not be saved, so the window stays open.";
+			button.disabled = false;
+		};
+
+		button.disabled = true;
+
+		try {
+			const saved = await fetch("/action/file-save-all", { method: "POST", body: new URLSearchParams(unsaved) });
+
+			if (saved.ok) {
+				command("close");
+			} else {
+				refused();
+			}
+		} catch {
+			refused();
 		}
 	};
 
 	dialog.className = "closing";
+	dialog.setAttribute("aria-labelledby", "closing-title");
 	card.className = "modal__card";
+	title.id = "closing-title";
 	title.className = "modal__title";
 	title.textContent = "Unsaved changes";
 	line.className = "modal__line";

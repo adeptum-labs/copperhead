@@ -51,6 +51,17 @@ public final class Form {
 		return values.get(name);
 	}
 
+	/** A value the action cannot do without; an empty one is a value, as an empty file's text is. */
+	public String require(final String name) {
+		final String value = values.get(name);
+
+		if (value == null) {
+			throw new MissingValue(name);
+		}
+
+		return value;
+	}
+
 	public boolean has(final String name) {
 		final String value = values.get(name);
 

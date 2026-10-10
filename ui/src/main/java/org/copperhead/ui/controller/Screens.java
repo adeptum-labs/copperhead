@@ -25,6 +25,7 @@ import org.copperhead.ui.view.IndexView;
 import org.copperhead.ui.view.ModalView;
 import org.copperhead.ui.view.Region;
 import org.copperhead.ui.view.Regions;
+import org.copperhead.ui.view.StatusView;
 import org.copperhead.web.action.View;
 
 /** Draws the regions of the window from the state of the studio. */
@@ -46,6 +47,12 @@ public final class Screens {
 	public static Regions regions(final StudioState state, final Region... regions) {
 		return new Regions(Stream.concat(Arrays.stream(regions), Stream.of(Region.STATUS)).distinct()
 			.map(region -> render(state, region)).toList());
+	}
+
+	/** The answer, its status bar telling which sources the request wrote: the page marks those as saved, no others. */
+	public static Regions confirming(final Regions answer, final List<String> written) {
+		return new Regions(answer.views().stream()
+			.map(view -> view instanceof StatusView status ? status.withSaved(written) : view).toList());
 	}
 
 	public static Regions all(final StudioState state) {

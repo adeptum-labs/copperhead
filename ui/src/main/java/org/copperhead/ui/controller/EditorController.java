@@ -45,38 +45,44 @@ public class EditorController {
 
 	@Action("file-open")
 	public Regions onClickTab(final Form form) {
-		final String name = Workspaces.source(Workspaces.open(session.state()), form.get(NAME));
+		final String name = Workspaces.source(Workspaces.open(session.state()), form.require(NAME));
 
 		return Screens.regions(session.change(state -> state.openFile(name)), Region.TOOL);
 	}
 
 	@Action("file-save")
 	public Regions onSave(final Form form) {
-		final String name = form.get(NAME);
+		final ProjectDirectory directory = Workspaces.open(session.state());
+		final String name = form.require(NAME);
+		final String text = form.require("text");
 
-		Buffers.save(Workspaces.open(session.state()), List.of(name), buffer -> form.get("text"));
-		return Screens.regions(session.change(state -> state.withNote("Saved " + name)), Region.TOOL);
+		Buffers.owned(directory, form);
+
+		final List<String> saved = Buffers.save(directory, List.of(name), buffer -> text);
+
+		return Screens.confirming(Screens.regions(session.change(state -> state.withNote("Saved " + name)),
+			Region.TOOL), saved);
 	}
 
 	@Action("file-save-all")
 	public Regions onSaveAll(final Form form) {
 		final List<String> saved = Buffers.save(Workspaces.open(session.state()), form);
 
-		return Screens.regions(session.change(state -> state.withNote(saved.isEmpty() ? "Nothing to save"
-			: "Saved " + String.join(", ", saved))), Region.TOOL);
+		return Screens.confirming(Screens.regions(session.change(state -> state.withNote(saved.isEmpty()
+			? "Nothing to save" : "Saved " + String.join(", ", saved))), Region.TOOL), saved);
 	}
 
 	/* The editor moves its own cursor; the studio only remembers where, for F9 and for the next time it is drawn. */
 	@Action("cursor")
 	public void onMoveCursor(final Form form) {
-		final int line = Integer.parseInt(form.get(LINE));
+		final int line = Integer.parseInt(form.require(LINE));
 
 		session.change(state -> state.moveCursor(line));
 	}
 
 	@Action("breakpoint")
 	public Regions onClickGutter(final Form form) {
-		final int line = Integer.parseInt(form.get(LINE));
+		final int line = Integer.parseInt(form.require(LINE));
 
 		return Screens.regions(session.change(state -> Workspaces.saved(state.toggleBreakpoint(line))), Region.TOOL);
 	}
@@ -105,14 +111,14 @@ public class EditorController {
 	@Action("source-check")
 	public Regions onShowSource(final Form form) {
 		final ProjectDirectory directory = Workspaces.open(session.state());
-		final String name = form.get(NAME);
+		final String name = form.require(NAME);
 
 		if (!ProjectLayout.validSource(name)) {
 			throw new IllegalArgumentException("The project holds no source " + name);
 		}
 
 		if (Workspaces.sources(directory).contains(name)
-			&& Workspaces.read(() -> directory.modified(name)) == Long.parseLong(form.get("modified"))) {
+			&& Workspaces.read(() -> directory.modified(name)) == Long.parseLong(form.require("modified"))) {
 			return null;
 		}
 

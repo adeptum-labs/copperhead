@@ -32,6 +32,7 @@ import org.copperhead.toolchain.ProjectDirectory;
 import org.copperhead.ui.session.StudioState;
 import org.copperhead.ui.view.Modal;
 import org.jsoup.nodes.Element;
+import static org.copperhead.ui.Flows.owned;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -108,7 +109,7 @@ public class ProjectFlowTest {
 	/* Opens another project with the entry file unsaved, as the page sends it; the switch has to ask first. */
 	private Screen asked(final Path other) throws Exception {
 		return browsed(Screen.open(rig), "arcade").trigger(ENTRY + "--project",
-			Map.of("path", other.toString(), "files", "main.s", "main.s", UNSAVED));
+			owned(rig, Map.of("path", other.toString(), "files", "main.s", "main.s", UNSAVED)));
 	}
 
 	@Example
@@ -291,11 +292,28 @@ public class ProjectFlowTest {
 	@Example
 	public void shouldSaveTheChangesIntoTheProjectLeft() throws Exception {
 		final Path arcade = made("arcade");
-		final Screen screen = asked(arcade).trigger(CREATE, Map.of("path", arcade.toString(), "save", "true",
-			"files", "main.s", "main.s", UNSAVED));
+		final Screen screen = asked(arcade).trigger(CREATE, owned(rig, Map.of("path", arcade.toString(),
+			"save", "true", "files", "main.s", "main.s", UNSAVED)));
 
 		assertEquals(UNSAVED, Files.readString(projects().resolve("demo/src/main.s")));
 		assertEquals("arcade.chp", project(screen));
+		assertEquals("main.s", screen.find("#status").attr("data-saved"));
+		assertEquals(projects().resolve("arcade").toString(), screen.find("#status").attr("data-project"));
+	}
+
+	@Example
+	public void shouldRefuseToSwitchWithTextTypedInAnotherProject() throws Exception {
+		final Path arcade = made("arcade");
+		final String kept = Files.readString(projects().resolve("demo/src/main.s"));
+		final Screen screen = browsed(Screen.open(rig), "arcade");
+		final StudioState before = rig.session().state();
+
+		assertEquals(500, screen.trigger(ENTRY + "--project", Map.of("path", arcade.toString(), "files", "main.s",
+			"main.s", UNSAVED, "project", projects().resolve("elsewhere").toString())).status());
+		assertEquals(500, screen.trigger(ENTRY + "--project", Map.of("path", arcade.toString(), "files", "main.s",
+			"main.s", UNSAVED, "save", "true", "project", projects().resolve("elsewhere").toString())).status());
+		assertEquals(kept, Files.readString(projects().resolve("demo/src/main.s")));
+		assertEquals(before, rig.session().state());
 	}
 
 	@Example
@@ -481,9 +499,9 @@ public class ProjectFlowTest {
 		final Screen screen = asked(arcade);
 		final StudioState before = rig.session().state();
 
-		for (final String bad : List.of("nope.s", "../main.s", "sub/main.s")) {
-			assertEquals(500, screen.trigger(CREATE, Map.of("path", arcade.toString(), "save", "true",
-				"files", "main.s," + bad, "main.s", UNSAVED, bad, UNSAVED)).status(), bad);
+		for (final String bad : List.of("../main.s", "sub/main.s", "main.txt")) {
+			assertEquals(500, screen.trigger(CREATE, owned(rig, Map.of("path", arcade.toString(),
+				"save", "true", "files", "main.s," + bad, "main.s", UNSAVED, bad, UNSAVED))).status(), bad);
 			assertEquals(saved, Files.readString(projects().resolve("demo/src/main.s")), bad);
 			assertEquals(before, rig.session().state(), bad);
 		}
@@ -500,12 +518,13 @@ public class ProjectFlowTest {
 
 		try {
 			assumeFalse(Files.isWritable(src), "a folder that cannot be written is writable to this user");
-			screen.trigger(CREATE, Map.of("path", arcade.toString(), "save", "true", "files", "main.s",
-				"main.s", UNSAVED));
+			screen.trigger(CREATE, owned(rig, Map.of("path", arcade.toString(), "save", "true",
+				"files", "main.s", "main.s", UNSAVED)));
 			assertEquals("Unsaved changes", screen.find("#modal .modal__title").text());
 			assertTrue(screen.document().select("#modal .modal__line").first().text()
 				.startsWith("main.s could not be saved"));
 			assertEquals("demo.chp", project(screen));
+			assertEquals("", screen.find("#status").attr("data-saved"));
 			assertEquals(before.workspace(), rig.session().state().workspace());
 		} finally {
 			Files.setPosixFilePermissions(src, PosixFilePermissions.fromString("rwxr-xr-x"));
