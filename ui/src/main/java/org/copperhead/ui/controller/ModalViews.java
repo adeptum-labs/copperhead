@@ -17,7 +17,9 @@ package org.copperhead.ui.controller;
 
 import java.util.List;
 import org.copperhead.toolchain.PinnedSource;
+import org.copperhead.ui.session.BuildRun.TrustRequest;
 import org.copperhead.ui.session.StudioState;
+import org.copperhead.ui.view.ButtonView;
 import org.copperhead.ui.view.Modal;
 import org.copperhead.ui.view.ModalView;
 import org.copperhead.ui.view.PairView;
@@ -42,7 +44,7 @@ final class ModalViews {
 	/* The dialogs drawn from what their request brought close when drawn from the state alone, on a fresh page. */
 	static ModalView of(final StudioState state) {
 		return switch (state.modal()) {
-			case NONE, NEW_PROJECT, OPEN_PROJECT, PREFERENCES, DISCARD, TRUST -> CLOSED;
+			case NONE, NEW_PROJECT, OPEN_PROJECT, PREFERENCES, DISCARD -> CLOSED;
 			case SHORTCUTS -> new ModalView(Modal.SHORTCUTS, "Keyboard shortcuts", SHORTCUTS, List.of());
 			case ABOUT -> new ModalView(Modal.ABOUT, "About Copperhead", List.of(), List.of(
 				"Copperhead · Amiga demo & game studio",
@@ -52,7 +54,18 @@ final class ModalViews {
 				"Copyright © 2026 Adam Waldenberg and Adeptum AB · GNU General Public License, version 3"));
 			case SETTINGS -> state.workspace().map(directory -> ProjectDialogs.settings(state,
 				ProjectDialogs.settingsOf(directory.file()), "")).orElse(CLOSED);
+			case TRUST -> state.run().trust().map(ModalViews::trust).orElse(CLOSED);
 		};
+	}
+
+	private static ModalView trust(final TrustRequest request) {
+		return new ModalView(Modal.TRUST, "Unexpected " + request.tool() + " source", List.of(
+				new PairView("Version", request.version()), new PairView("SHA-256", request.sha256())),
+			List.of("The " + request.tool() + " download is not the one Copperhead pins. Build with it only "
+				+ "if you trust where it came from; Copperhead remembers the answer."),
+			List.of(), List.of(), List.of(
+				new ButtonView("Accept", "/action/trust-accept", null, true),
+				new ButtonView("Cancel", "/action/trust-refuse", null, false)));
 	}
 
 	private static String tool(final PinnedSource source) {

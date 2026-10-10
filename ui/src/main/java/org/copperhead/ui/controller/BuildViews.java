@@ -15,6 +15,7 @@
 
 package org.copperhead.ui.controller;
 
+import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
@@ -25,10 +26,12 @@ import org.copperhead.core.project.ProjectLayout;
 import org.copperhead.core.project.Target;
 import org.copperhead.ui.session.BuildRun;
 import org.copperhead.ui.session.StudioState;
+import org.copperhead.ui.session.ToolStatus;
 import org.copperhead.ui.view.BuildLineView;
 import org.copperhead.ui.view.BuildView;
 import org.copperhead.ui.view.OptionView;
 import org.copperhead.ui.view.TargetCardView;
+import org.copperhead.ui.view.ToolLineView;
 import org.copperhead.ui.view.ToolView;
 import org.copperhead.ui.view.Vals;
 
@@ -47,10 +50,16 @@ final class BuildViews {
 				target == state.target(), Vals.of("target", target.chipset()))).toList(),
 			Arrays.stream(BuildOption.values()).map(option -> new OptionView(label(option),
 				state.options().on(option), Vals.of("option", option))).toList(),
+			state.environment().tools().stream().map(BuildViews::tool).toList(),
 			log(state).stream().map(line -> new BuildLineView(line.text(),
 				line.tone().name().toLowerCase(Locale.ROOT))).toList(),
 			adf + " · " + outcome(state) + " · " + state.target().machine(), buildable(state),
 			state.run().running()));
+	}
+
+	private static ToolLineView tool(final ToolStatus status) {
+		return new ToolLineView(status.tool() + " " + status.version(), status.found().isPresent(),
+			status.found().map(Path::toString).orElse("fetched and compiled on first use"));
 	}
 
 	/** A build can start with a project open and no other run going. */

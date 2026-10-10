@@ -18,6 +18,8 @@ package org.copperhead.ui.session;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
 import java.util.concurrent.RejectedExecutionException;
@@ -33,6 +35,7 @@ import org.copperhead.core.project.Target;
 import org.copperhead.toolchain.BuildEvent;
 import org.copperhead.toolchain.BuildRequest;
 import org.copperhead.toolchain.ProjectDirectory;
+import org.copperhead.toolchain.XdgDirs;
 import org.copperhead.ui.TempDirectory;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -61,7 +64,8 @@ public class BuildServiceTest {
 	}
 
 	private BuildService serving(final BuildService.Jobs jobs, final Executor executor) {
-		return new BuildService(session, preferences, jobs, executor);
+		return new BuildService(session, preferences, BuildService.toolchain(XdgDirs.of(Map.of(), home.path()),
+			name -> Optional.empty(), home.path().resolve("os-release")), jobs, executor);
 	}
 
 	private static BuildService.Jobs finishing(final BuildReport report) {
@@ -131,6 +135,39 @@ public class BuildServiceTest {
 		assertTrue(session.state().run().running());
 		release.countDown();
 		service.shutDown();
+	}
+
+	/* A build cancelled while its question is up is answered no, or the job would wait forever for an answer. */
+	@Example
+	public void shouldAnswerNoToTheQuestionACancelledBuildWaitsOn() throws Exception {
+		final AtomicBoolean accepted = new AtomicBoolean(true);
+		final BuildService service = serving((request, trust, sink) -> new BuildService.Job() {
+			@Override
+			public void run() {
+				try {
+					accepted.set(trust.accept("vasm", "2.0g", "5f".repeat(32)));
+				} catch (InterruptedException e) {
+					Thread.currentThread().interrupt();
+				}
+				sink.accept(new BuildEvent.Finished(failed()));
+			}
+
+			@Override
+			public void cancel() {
+			}
+		}, command -> Thread.ofVirtual().start(command));
+
+		service.start(false);
+
+		for (int attempt = 0; attempt < 250 && session.state().run().trust().isEmpty(); attempt++) {
+			Thread.sleep(20);
+		}
+		assertTrue(session.state().run().trust().isPresent());
+		service.cancel();
+		service.shutDown();
+
+		assertFalse(accepted.get());
+		assertFalse(session.state().run().running());
 	}
 
 	@Example

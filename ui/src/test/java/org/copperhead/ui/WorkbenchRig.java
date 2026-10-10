@@ -25,9 +25,11 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
+import java.util.function.UnaryOperator;
 import org.copperhead.core.project.ProjectKind;
 import org.copperhead.core.project.Target;
 import org.copperhead.toolchain.ProjectDirectory;
+import org.copperhead.toolchain.Toolchain;
 import org.copperhead.toolchain.XdgDirs;
 import org.copperhead.ui.controller.BuildController;
 import org.copperhead.ui.controller.DebuggerController;
@@ -40,6 +42,7 @@ import org.copperhead.ui.controller.SpriteController;
 import org.copperhead.ui.controller.TimelineController;
 import org.copperhead.ui.controller.WorkbenchController;
 import org.copperhead.ui.session.BuildService;
+import org.copperhead.ui.session.BuildService.Jobs;
 import org.copperhead.ui.session.Preferences;
 import org.copperhead.ui.session.ProjectSession;
 import org.copperhead.web.RecordingWindow;
@@ -63,10 +66,10 @@ public class WorkbenchRig implements AutoCloseable {
 	/* No tool of the machine running the tests is ever found, so a missing one is always fetched, and refused. */
 	private static final Function<String, Optional<Path>> NOWHERE = name -> Optional.empty();
 
-	private final Thread.Builder builders = Thread.ofVirtual().name("build-test-", 0);
 	private final SessionToken token = SessionToken.random();
 	private final RecordingWindow window = new RecordingWindow();
 	private final Path home;
+	private final UnaryOperator<Jobs> around;
 	private final Preferences preferences;
 	private final ProjectSession session;
 	private final BuildService builds;
@@ -77,19 +80,22 @@ public class WorkbenchRig implements AutoCloseable {
 
 	/** The studio with its run timed by the clock given, a test's own or the real one for a browser. */
 	public WorkbenchRig(final InstantSource clock) throws Exception {
-		this(clock, prepared(Optional.of(ProjectKind.DEMO)));
+		this(clock, prepared(Optional.of(ProjectKind.DEMO)), UnaryOperator.identity());
 	}
 
-	private WorkbenchRig(final InstantSource clock, final Path home) throws Exception {
+	private WorkbenchRig(final InstantSource clock, final Path home, final UnaryOperator<Jobs> around)
+		throws Exception {
+
 		final XdgDirs dirs = XdgDirs.of(Map.of(), home);
+		final Toolchain toolchain = BuildService.toolchain(dirs, NOWHERE, home.resolve(OS_RELEASE));
 
 		this.home = home;
+		this.around = around;
 		preferences = new Preferences(dirs.config().resolve(PREFERENCES));
 		session = new ProjectSession(preferences, clock);
-		builds = new BuildService(session, preferences,
-			BuildService.jobs(BuildService.toolchain(dirs, NOWHERE, home.resolve(OS_RELEASE)), STEP),
-			builders::start);
-		actions = Actions.of(new WorkbenchController(session, preferences),
+		builds = new BuildService(session, preferences, toolchain,
+			around.apply(BuildService.jobs(toolchain, STEP)), command -> Thread.ofVirtual().start(command));
+		actions = Actions.of(new WorkbenchController(session, preferences, builds),
 			new ProjectController(session, preferences, home), new EditorController(session),
 			new SpriteController(session), new PaletteController(session), new DebuggerController(session),
 			new BuildController(session, builds), new EmulatorController(session),
@@ -102,12 +108,19 @@ public class WorkbenchRig implements AutoCloseable {
 
 	/** The studio with no project open, showing its welcome. */
 	public static WorkbenchRig empty(final InstantSource clock) throws Exception {
-		return new WorkbenchRig(clock, prepared(Optional.empty()));
+		return new WorkbenchRig(clock, prepared(Optional.empty()), UnaryOperator.identity());
 	}
 
 	/** The studio with a project of the kind given open, made from its template. */
 	public static WorkbenchRig with(final InstantSource clock, final ProjectKind kind) throws Exception {
-		return new WorkbenchRig(clock, prepared(Optional.of(kind)));
+		return new WorkbenchRig(clock, prepared(Optional.of(kind)), UnaryOperator.identity());
+	}
+
+	/** The studio on a demo whose builds are made around the toolchain's own, the way a test wants them to go. */
+	public static WorkbenchRig building(final InstantSource clock, final UnaryOperator<Jobs> around)
+		throws Exception {
+
+		return new WorkbenchRig(clock, prepared(Optional.of(ProjectKind.DEMO)), around);
 	}
 
 	/* A home as a first launch finds it: preferences naming the stand-in tools and the project opened last. */
@@ -132,7 +145,7 @@ public class WorkbenchRig implements AutoCloseable {
 	public WorkbenchRig restart(final InstantSource clock) throws Exception {
 		stop();
 		handedOver = true;
-		return new WorkbenchRig(clock, home);
+		return new WorkbenchRig(clock, home, around);
 	}
 
 	public URI base() {

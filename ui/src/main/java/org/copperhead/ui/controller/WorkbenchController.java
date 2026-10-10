@@ -19,10 +19,12 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import java.util.List;
 import org.copperhead.core.project.Target;
+import org.copperhead.ui.session.BuildService;
 import org.copperhead.ui.session.Layout;
 import org.copperhead.ui.session.Preferences;
 import org.copperhead.ui.session.ProjectSession;
 import org.copperhead.ui.session.StudioState;
+import org.copperhead.ui.session.ToolStatus;
 import org.copperhead.ui.view.Modal;
 import org.copperhead.ui.view.Region;
 import org.copperhead.ui.view.Regions;
@@ -43,19 +45,23 @@ public class WorkbenchController {
 
 	private final ProjectSession session;
 	private final Preferences preferences;
+	private final BuildService builds;
 
 	@Inject
-	public WorkbenchController(final ProjectSession session, final Preferences preferences) {
+	public WorkbenchController(final ProjectSession session, final Preferences preferences, final BuildService builds) {
 		this.session = session;
 		this.preferences = preferences;
+		this.builds = builds;
 	}
 
+	/* The toolchain card says where each tool is found, which only the disk knows, so it is looked at anew. */
 	@Action("tool")
 	public Regions onClickTool(final Form form) {
 		final Tool tool = Tool.valueOf(form.get("tool"));
+		final List<ToolStatus> found = tool == Tool.BUILD ? builds.tools() : session.state().environment().tools();
 
-		return Screens.regions(session.change(state -> state.withTool(tool)), Region.MENUS, Region.RAIL,
-			Region.TOOL);
+		return Screens.regions(session.change(state -> state.withTool(tool)
+			.withEnvironment(state.environment().withTools(found))), Region.MENUS, Region.RAIL, Region.TOOL);
 	}
 
 	@Action("target")
@@ -85,8 +91,13 @@ public class WorkbenchController {
 		return state.withModal(modal);
 	}
 
+	/* A question the build waits on is answered no when its dialog is closed, or the build would wait forever. */
 	@Action("modal-close")
 	public Regions onClickCloseModal() {
+		if (session.state().modal() == Modal.TRUST) {
+			builds.answer(false);
+		}
+
 		return Screens.regions(session.change(state -> state.withModal(Modal.NONE)), Region.MODAL);
 	}
 

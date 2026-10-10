@@ -35,6 +35,7 @@ import org.copperhead.web.action.Form;
 @ApplicationScoped
 public class BuildController {
 	private static final Region[] HELD_BACK = {Region.MENUS, Region.MACHINE, Region.TOOL};
+	private static final Region[] ASKED = {Region.MENUS, Region.MACHINE, Region.TOOL, Region.MODAL};
 	/* A build that ends may start the machine, so what shows it running is drawn again as well. */
 	private static final Region[] ENDED = {Region.MENUS, Region.MACHINE, Region.TOOL, Region.EMULATOR,
 		Region.TIMELINE};
@@ -83,8 +84,9 @@ public class BuildController {
 	}
 
 	/*
-	 * Asked every half second while a run goes on. The build tool shows the log as it grows; the regions the run
-	 * held back are drawn again once the phase the poll last saw has changed.
+	 * Asked every half second while a run goes on. The build tool shows the log as it grows; the other regions wait
+	 * for the phase the poll last saw to change, so a question is drawn once when it comes up and taken down once
+	 * when it is answered, and any other dialog the person has open stays.
 	 */
 	@Action("build-progress")
 	public Regions onPoll(final Form form) {
@@ -93,7 +95,7 @@ public class BuildController {
 		final Phase now = state.run().phase();
 
 		if (seen != now) {
-			return Screens.regions(state, ENDED);
+			return Screens.regions(state, seen == Phase.WAITING || now == Phase.WAITING ? ASKED : ENDED);
 		}
 
 		return state.tool() == Tool.BUILD ? Screens.regions(state, Region.TOOL) : Screens.regions(state);
@@ -102,6 +104,24 @@ public class BuildController {
 	@Action("build-cancel")
 	public Regions onClickCancel() {
 		builds.cancel();
+		return Screens.regions(session.state(), HELD_BACK);
+	}
+
+	@Action("trust-accept")
+	public Regions onClickAccept() {
+		builds.answer(true);
+		return Screens.regions(session.state(), Region.MODAL, Region.TOOL);
+	}
+
+	@Action("trust-refuse")
+	public Regions onClickRefuse() {
+		builds.answer(false);
+		return Screens.regions(session.state(), Region.MODAL, Region.TOOL);
+	}
+
+	@Action("toolchain-fetch")
+	public Regions onClickFetch() {
+		builds.fetch();
 		return Screens.regions(session.state(), HELD_BACK);
 	}
 }

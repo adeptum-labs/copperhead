@@ -1743,3 +1743,31 @@ html[data-theme="light"] [data-theme-toggle] .menu__check {
 	color: var(--err);
 	cursor: pointer;
 }
+
+.build__tool {
+	display: grid;
+	grid-template-columns: 9em 6em minmax(0, 1fr);
+	gap: 8px;
+	align-items: baseline;
+}
+
+.build__tool-state {
+	color: var(--warn);
+}
+
+.build__tool-state--found {
+	color: var(--ok);
+}
+
+.build__tool-where {
+	overflow: hidden;
+	color: var(--mute);
+	font: 11px var(--mono);
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.build__fetch {
+	align-self: flex-start;
+	margin-top: 4px;
+}

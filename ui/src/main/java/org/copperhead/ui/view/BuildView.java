@@ -18,13 +18,19 @@ package org.copperhead.ui.view;
 import java.util.List;
 import org.copperhead.web.action.View;
 
-public record BuildView(List<TargetCardView> targets, List<OptionView> options, List<BuildLineView> log,
-	String summary, boolean buildable, boolean running) implements View {
+public record BuildView(List<TargetCardView> targets, List<OptionView> options, List<ToolLineView> tools,
+	List<BuildLineView> log, String summary, boolean buildable, boolean running) implements View {
 
 	public BuildView {
 		targets = List.copyOf(targets);
 		options = List.copyOf(options);
+		tools = List.copyOf(tools);
 		log = List.copyOf(log);
+	}
+
+	/** Worth fetching while a tool is still missing and nothing else runs. */
+	public boolean fetchable() {
+		return !running && tools.stream().anyMatch(tool -> !tool.found());
 	}
 
 	@Override

@@ -19,6 +19,17 @@
 						<span th:text="${option.label()}">Shrinkler -9</span>
 					</button>
 				</section>
+				<section class="card card--roomy card--wide">
+					<h3 class="card__title">Toolchain</h3>
+					<div class="build__tool" th:each="tool : ${view.tools()}">
+						<span class="build__tool-name" th:text="${tool.name()}">vasm 2.0f</span>
+						<span class="build__tool-state" th:classappend="${tool.found()} ? 'build__tool-state--found'"
+							th:text="${tool.found()} ? 'found' : 'will fetch'">found</span>
+						<span class="build__tool-where" th:text="${tool.where()}">/usr/local/bin/vasmm68k_mot</span>
+					</div>
+					<button class="button button--small build__fetch" type="button" hx-post="/action/toolchain-fetch"
+						th:disabled="${!view.fetchable()}">Fetch now</button>
+				</section>
 			</div>
 			<pre class="build__log"><span class="build__line" th:each="line : ${view.log()}"
 				th:classappend="'build__line--' + ${line.tone()}" th:text="${line.text()}"></span></pre>
