@@ -79,8 +79,9 @@ public class BuildService {
 	private final Toolchain toolchain;
 	private final Jobs jobs;
 	private final Executor executor;
-	private Optional<Runnable> stop = Optional.empty();
-	private Optional<CompletableFuture<Boolean>> answer = Optional.empty();
+	private Optional<Run> active = Optional.empty();
+	private Optional<Pending> pending = Optional.empty();
+	private boolean refused;
 
 	@Inject
 	public BuildService(final ProjectSession session, final Preferences preferences) {
@@ -102,6 +103,15 @@ public class BuildService {
 		this.toolchain = toolchain;
 		this.jobs = jobs;
 		this.executor = executor;
+	}
+
+	/* One build or fetch; it is told apart from the next by identity, and what stops it is set once it exists. */
+	private static final class Run {
+		private Runnable stop = () -> { };
+	}
+
+	/* The question a run waits on, and the answer it is given once, by whoever takes the question first. */
+	private record Pending(Run run, TrustRequest request, CompletableFuture<Boolean> reply) {
 	}
 
 	/** A build as the service runs it, which it can stop. */
@@ -164,43 +174,53 @@ public class BuildService {
 	}
 
 	public synchronized void start(final boolean andRun) {
-		final ProjectDirectory project = begin(true).workspace().orElseThrow();
+		final Run run = new Run();
+		final ProjectDirectory project = begin(run, true).workspace().orElseThrow();
 
 		try {
 			final BuildRequest request = new BuildRequest(project, preferences.tool(PinnedSource.VASM.tool()),
 				preferences.tool(PinnedSource.SHRINKLER.tool()), preferences.trustedVasm());
-			final Job job = jobs.create(request, this::ask, event -> take(event, andRun));
+			final TrustPrompt trust = (tool, version, sha256) -> ask(run, tool, version, sha256);
+			final Job job = jobs.create(request, trust, event -> take(event, run, andRun));
 
-			stop = Optional.of(job::cancel);
+			run.stop = job::cancel;
 			executor.execute(job);
 		} catch (RuntimeException e) {
-			abandon("The build could not be started");
+			abandon(run, "The build could not be started");
 			throw e;
 		}
 	}
 
 	public synchronized void fetch() {
-		begin(false);
+		final Run run = new Run();
+
+		begin(run, false);
 
 		try {
-			stop = Optional.of(() -> { });
-			executor.execute(this::fetchAll);
+			executor.execute(() -> fetchAll(run));
 		} catch (RuntimeException e) {
-			abandon("The fetch could not be started");
+			abandon(run, "The fetch could not be started");
 			throw e;
 		}
 	}
 
-	/** Asks what runs to stop, and answers no to a question it waits on; it does not wait for the end. */
+	/**
+	 * Asks what runs to stop, and answers no to a question it waits on; it does not wait for the end. A cancel
+	 * that comes before the run has asked its question is remembered, so the question is refused when it comes.
+	 */
 	public void cancel() {
 		final Optional<Runnable> stopping;
+		final Optional<Pending> unanswered;
 
 		synchronized (this) {
-			stopping = stop;
+			refused = true;
+			stopping = active.map(run -> run.stop);
+			unanswered = pending;
+			pending = Optional.empty();
 		}
 
 		stopping.ifPresent(Runnable::run);
-		settle(false);
+		unanswered.ifPresent(question -> question.reply().complete(false));
 	}
 
 	/**
@@ -219,22 +239,49 @@ public class BuildService {
 		}
 	}
 
-	/** The person's answer to the question the run waits on; accepting remembers the source they accepted. */
-	public void answer(final boolean accepted) {
-		final TrustRequest request = session.state().run().trust()
-			.orElseThrow(() -> new IllegalStateException("Nothing waits for an answer"));
+	/**
+	 * The person's answer to the question shown, which carries the checksum it asks about so that a dialog left
+	 * over from an earlier question cannot answer a later one. Only the first answer to a question counts;
+	 * accepting remembers the source, and only a vasm source can be remembered.
+	 */
+	public synchronized void answer(final boolean accepted, final String sha256) {
+		final Pending question = pending.orElseThrow(() -> new IllegalStateException("Nothing waits for an answer"));
 
-		if (accepted) {
-			preferences.trustedVasm(request.sha256());
+		if (!question.request().sha256().equals(sha256)) {
+			session.change(state -> state.withNote("That question is no longer the one asked"));
+			return;
 		}
 
-		session.change(state -> state.withRun(state.run().resumed()).withModal(Modal.NONE));
-		settle(accepted);
+		resolve(question, accepted);
+	}
+
+	/** Answers no to the question shown, if one still is; the dialog that held it is closed either way. */
+	public synchronized void refuse() {
+		pending.ifPresent(question -> resolve(question, false));
+	}
+
+	/* The question is taken before anything else is done, so whoever takes it alone settles it, once. */
+	private void resolve(final Pending question, final boolean accepted) {
+		boolean granted = false;
+
+		pending = Optional.empty();
+
+		try {
+			if (accepted && PinnedSource.VASM.tool().equals(question.request().tool())) {
+				preferences.trustedVasm(question.request().sha256());
+				granted = true;
+			}
+
+			session.change(state -> Optional.of(question.request()).equals(state.run().trust())
+				? state.withRun(state.run().resumed()).withModal(Modal.NONE) : state);
+		} finally {
+			question.reply().complete(granted);
+		}
 	}
 
 	/* The project is read in the very change that starts the run, so a switch cannot land between the two. */
-	private StudioState begin(final boolean projectNeeded) {
-		return session.change(state -> {
+	private StudioState begin(final Run run, final boolean projectNeeded) {
+		final StudioState started = session.change(state -> {
 			if (state.run().running()) {
 				throw new IllegalStateException("A build is already running");
 			}
@@ -245,40 +292,38 @@ public class BuildService {
 
 			return state.withRun(BuildRun.started());
 		});
+
+		refused = false;
+		active = Optional.of(run);
+		return started;
 	}
 
-	private void settle(final boolean accepted) {
-		final Optional<CompletableFuture<Boolean>> waiting;
+	private boolean ask(final Run run, final String tool, final String version, final String sha256)
+		throws InterruptedException {
+
+		final CompletableFuture<Boolean> reply = new CompletableFuture<>();
+		final TrustRequest request = new TrustRequest(tool, version, sha256);
 
 		synchronized (this) {
-			waiting = answer;
-			answer = Optional.empty();
+			if (refused || active.filter(current -> current == run).isEmpty()) {
+				return false;
+			}
+
+			pending = Optional.of(new Pending(run, request, reply));
+			session.change(state -> state.withRun(state.run().waiting(request)).withModal(Modal.TRUST));
 		}
-
-		waiting.ifPresent(question -> question.complete(accepted));
-	}
-
-	private boolean ask(final String tool, final String version, final String sha256) throws InterruptedException {
-		final CompletableFuture<Boolean> question = new CompletableFuture<>();
-
-		synchronized (this) {
-			answer = Optional.of(question);
-		}
-
-		session.change(state -> state.withRun(state.run().waiting(new TrustRequest(tool, version, sha256)))
-			.withModal(Modal.TRUST));
 
 		try {
-			return question.get();
+			return reply.get();
 		} catch (ExecutionException e) {
 			return false;
 		}
 	}
 
-	private void take(final BuildEvent event, final boolean andRun) {
+	private void take(final BuildEvent event, final Run run, final boolean andRun) {
 		switch (event) {
 			case BuildEvent.Line(final BuildLine line) -> add(line);
-			case BuildEvent.Finished(final BuildReport report) -> finish(report, andRun);
+			case BuildEvent.Finished(final BuildReport report) -> finish(report, run, andRun);
 		}
 	}
 
@@ -287,31 +332,29 @@ public class BuildService {
 	}
 
 	/* A build that fails or is cancelled does not start the run it was asked to start once it was done. */
-	private void finish(final BuildReport report, final boolean andRun) {
-		final List<ToolStatus> found = tools();
-
-		done();
-
+	private void finish(final BuildReport report, final Run run, final boolean andRun) {
 		try {
+			final List<ToolStatus> found = tools();
+
 			session.change(state -> unasked(state).withBuild(Optional.of(report)).withRun(BuildRun.idle())
 				.withRunning(state.running() || andRun && report.ok())
 				.withEnvironment(state.environment().withTools(found)).withNote(note(report)));
 		} catch (RuntimeException e) {
 			LOG.error("The report of the build could not be shown", e);
-			abandon("The build ended but its report could not be shown");
+			abandon(run, "The build ended but its report could not be shown");
+		} finally {
+			release(run);
 		}
 	}
 
-	private void fetchAll() {
-		final Thread worker = Thread.currentThread();
-
-		synchronized (this) {
-			stop = Optional.of(worker::interrupt);
-		}
-
+	private void fetchAll(final Run run) {
 		try {
+			if (cancelledBeforeStart(run)) {
+				throw new InterruptedException();
+			}
+
 			for (final PinnedSource source : SOURCES) {
-				final Path tool = ensure(source);
+				final Path tool = ensure(run, source);
 
 				add(new BuildLine(source.tool() + " " + source.version() + " at " + tool, Tone.OK));
 			}
@@ -319,20 +362,35 @@ public class BuildService {
 			add(new BuildLine(e.getMessage(), Tone.ERR));
 		} catch (InterruptedException e) {
 			add(new BuildLine("fetch cancelled", Tone.ERR));
+		} catch (RuntimeException e) {
+			LOG.warn("The fetch of the toolchain failed", e);
 		} finally {
-			final List<ToolStatus> found = tools();
+			try {
+				final List<ToolStatus> found = tools();
 
-			done();
-			session.change(state -> unasked(state).withRun(state.run().ended())
-				.withEnvironment(state.environment().withTools(found)));
+				session.change(state -> unasked(state).withRun(state.run().ended())
+					.withEnvironment(state.environment().withTools(found)));
+			} finally {
+				release(run);
+			}
 		}
 	}
 
-	private Path ensure(final PinnedSource source) throws ToolchainException, IOException, InterruptedException {
+	/* The worker can be interrupted from here on; a cancel that came before it is told so it need not start. */
+	private synchronized boolean cancelledBeforeStart(final Run run) {
+		final Thread worker = Thread.currentThread();
+
+		run.stop = worker::interrupt;
+		return refused;
+	}
+
+	private Path ensure(final Run run, final PinnedSource source)
+		throws ToolchainException, IOException, InterruptedException {
+
 		try {
 			return toolchain.ensure(source, preferences.tool(source.tool()), trusted(source), this::plain);
 		} catch (HashMismatch mismatch) {
-			if (!ask(mismatch.tool(), mismatch.version(), mismatch.found())) {
+			if (!ask(run, mismatch.tool(), mismatch.version(), mismatch.found())) {
 				throw new ToolchainException("the " + mismatch.tool() + " source was refused");
 			}
 
@@ -345,9 +403,22 @@ public class BuildService {
 		add(new BuildLine(text, Tone.PLAIN));
 	}
 
-	private synchronized void done() {
-		stop = Optional.empty();
-		notifyAll();
+	/*
+	 * Only the run that holds the slot gives it up, and only once its state is written, so a wait for the end
+	 * returns to an idle studio and an end never frees the slot of a run that began since. A question the run
+	 * left unanswered goes with it.
+	 */
+	private void release(final Run run) {
+		final Optional<Pending> unanswered;
+
+		synchronized (this) {
+			active = active.filter(current -> current != run);
+			unanswered = pending.filter(question -> question.run() == run);
+			pending = pending.filter(question -> question.run() != run);
+			notifyAll();
+		}
+
+		unanswered.ifPresent(question -> question.reply().complete(false));
 	}
 
 	/* A run that ends while its question is still up, cancelled or refused, takes the question down with it. */
@@ -360,9 +431,12 @@ public class BuildService {
 	}
 
 	/* The studio never stays in a run that nothing is doing: it returns to idle however the build came to an end. */
-	private void abandon(final String note) {
-		done();
-		session.change(state -> unasked(state).withRun(BuildRun.idle()).withNote(note));
+	private void abandon(final Run run, final String note) {
+		try {
+			session.change(state -> unasked(state).withRun(BuildRun.idle()).withNote(note));
+		} finally {
+			release(run);
+		}
 	}
 
 	/* A cancelled tool that will not die is left behind once the wait is out, rather than holding the studio up. */
@@ -370,7 +444,7 @@ public class BuildService {
 		final long deadline = System.nanoTime() + SHUTDOWN.toNanos();
 
 		synchronized (this) {
-			while (stop.isPresent()) {
+			while (active.isPresent()) {
 				final long left = deadline - System.nanoTime();
 
 				if (left <= 0) {

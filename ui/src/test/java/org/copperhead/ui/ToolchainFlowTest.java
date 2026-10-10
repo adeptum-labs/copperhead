@@ -137,6 +137,8 @@ public class ToolchainFlowTest {
 
 		assertEquals("Unexpected vasm source", screen.find("#modal .modal__title").text());
 		assertEquals(List.of("2.0g", SHA256), screen.document().select("#modal dd").eachText());
+		assertTrue(screen.document().select("#modal .modal__buttons .button").stream()
+			.allMatch(button -> button.attr("hx-vals").contains(SHA256)));
 		screen.click("#modal .modal__buttons .button:containsOwn(Accept)");
 		assertTrue(screen.find("#modal").hasAttr("hidden"));
 		assertEquals(Optional.of(SHA256), rig.preferences().trustedVasm());

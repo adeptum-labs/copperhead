@@ -108,14 +108,14 @@ public class BuildController {
 	}
 
 	@Action("trust-accept")
-	public Regions onClickAccept() {
-		builds.answer(true);
+	public Regions onClickAccept(final Form form) {
+		builds.answer(true, form.get("sha256"));
 		return Screens.regions(session.state(), Region.MODAL, Region.TOOL);
 	}
 
 	@Action("trust-refuse")
-	public Regions onClickRefuse() {
-		builds.answer(false);
+	public Regions onClickRefuse(final Form form) {
+		builds.answer(false, form.get("sha256"));
 		return Screens.regions(session.state(), Region.MODAL, Region.TOOL);
 	}
 

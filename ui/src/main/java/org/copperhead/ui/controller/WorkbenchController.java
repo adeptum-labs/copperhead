@@ -95,7 +95,7 @@ public class WorkbenchController {
 	@Action("modal-close")
 	public Regions onClickCloseModal() {
 		if (session.state().modal() == Modal.TRUST) {
-			builds.answer(false);
+			builds.refuse();
 		}
 
 		return Screens.regions(session.change(state -> state.withModal(Modal.NONE)), Region.MODAL);

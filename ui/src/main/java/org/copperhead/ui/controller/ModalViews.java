@@ -23,6 +23,7 @@ import org.copperhead.ui.view.ButtonView;
 import org.copperhead.ui.view.Modal;
 import org.copperhead.ui.view.ModalView;
 import org.copperhead.ui.view.PairView;
+import org.copperhead.ui.view.Vals;
 
 final class ModalViews {
 	private static final ModalView CLOSED = new ModalView(Modal.NONE, "", List.of(), List.of());
@@ -59,13 +60,15 @@ final class ModalViews {
 	}
 
 	private static ModalView trust(final TrustRequest request) {
+		final String asked = Vals.of("sha256", request.sha256());
+
 		return new ModalView(Modal.TRUST, "Unexpected " + request.tool() + " source", List.of(
 				new PairView("Version", request.version()), new PairView("SHA-256", request.sha256())),
 			List.of("The " + request.tool() + " download is not the one Copperhead pins. Build with it only "
-				+ "if you trust where it came from; Copperhead remembers the answer."),
+				+ "if you trust where it came from; accepting remembers this checksum."),
 			List.of(), List.of(), List.of(
-				new ButtonView("Accept", "/action/trust-accept", null, true),
-				new ButtonView("Cancel", "/action/trust-refuse", null, false)));
+				new ButtonView("Accept", "/action/trust-accept", asked, true),
+				new ButtonView("Cancel", "/action/trust-refuse", asked, false)));
 	}
 
 	private static String tool(final PinnedSource source) {
