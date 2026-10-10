@@ -17,6 +17,7 @@ package org.copperhead.shell;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import org.copperhead.toolchain.XdgDirs;
 
 /**
  * Where the browser engine keeps the studio's cookies, storage and caches: a folder of Copperhead's own in the
@@ -24,23 +25,18 @@ import java.nio.file.Path;
  * keep either from starting while the other runs, and would hand one program's cookies to the other's pages.
  */
 public class CefProfile {
-	private static final String CACHE_HOME = "XDG_CACHE_HOME";
-	private static final String HOME_CACHE = ".cache";
-	private static final String FOLDER = "copperhead/cef";
+	private static final String FOLDER = "cef";
 	/* Chromium marks a profile in use with this link, naming the host and process that hold it. */
 	private static final String LOCK = "SingletonLock";
 
 	private final Path directory;
 
 	public CefProfile() {
-		this(System.getenv(CACHE_HOME), Path.of(System.getProperty("user.home")));
+		this(XdgDirs.system());
 	}
 
-	/* The XDG specification has a relative cache home ignored, the same as one left unset. */
-	CefProfile(final String cacheHome, final Path home) {
-		final boolean named = cacheHome != null && Path.of(cacheHome).isAbsolute();
-
-		directory = (named ? Path.of(cacheHome) : home.resolve(HOME_CACHE)).resolve(FOLDER);
+	CefProfile(final XdgDirs dirs) {
+		directory = dirs.cache().resolve(FOLDER);
 	}
 
 	public Path directory() {
