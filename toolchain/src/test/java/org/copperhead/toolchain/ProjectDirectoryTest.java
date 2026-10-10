@@ -17,6 +17,8 @@ package org.copperhead.toolchain;
 
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.nio.file.attribute.FileTime;
 import java.util.List;
 import net.jqwik.api.Example;
@@ -99,9 +101,47 @@ public class ProjectDirectoryTest extends ScratchTest {
 		final ProjectDirectory project = demo();
 		final String before = project.read("main.s");
 
-		Files.createDirectories(project.dir().resolve("src/.main.s.tmp"));
-		assertThrows(IOException.class, () -> project.write("main.s", "half"));
+		final Path src = project.dir().resolve("src");
+
+		Files.setPosixFilePermissions(src, PosixFilePermissions.fromString("r-xr-xr-x"));
+		try {
+			assertThrows(IOException.class, () -> project.write("main.s", "half"));
+		} finally {
+			Files.setPosixFilePermissions(src, PosixFilePermissions.fromString("rwxr-xr-x"));
+		}
 		assertEquals(before, project.read("main.s"));
+		assertEquals(List.of(src.resolve("main.s")), listed(src));
+	}
+
+	@Example
+	public void shouldNotWriteThroughALinkPlantedAtTheOldStagingName() throws IOException {
+		final ProjectDirectory project = demo();
+		final Path victim = Files.writeString(scratch().resolve("victim"), "victim");
+
+		Files.createSymbolicLink(project.dir().resolve("src/.main.s.tmp"), victim);
+		Files.createSymbolicLink(project.dir().resolve(".nightrun.chp.tmp"), victim);
+		project.write("main.s", "\trts\n");
+		project.save(project.file().withCrunch(false));
+
+		assertEquals("victim", Files.readString(victim));
+		assertEquals("\trts\n", project.read("main.s"));
+		assertFalse(ProjectDirectory.open(project.chp()).file().crunch());
+	}
+
+	@Example
+	public void shouldRefuseSourcesWhenTheSourceFolderIsALink() throws IOException {
+		final ProjectDirectory project = demo();
+		final String before = project.read("main.s");
+		final Path elsewhere = Files.move(project.dir().resolve("src"), scratch().resolve("elsewhere"));
+
+		Files.createSymbolicLink(project.dir().resolve("src"), elsewhere);
+		assertAll(List.of(() -> assertEquals("src is a link",
+				assertThrows(IOException.class, () -> project.read("main.s")).getMessage()),
+			() -> assertEquals("src is a link",
+				assertThrows(IOException.class, () -> project.write("main.s", "evil")).getMessage()),
+			() -> assertEquals("src is a link",
+				assertThrows(IOException.class, project::sources).getMessage())));
+		assertEquals(before, Files.readString(elsewhere.resolve("main.s")));
 	}
 
 	@Example

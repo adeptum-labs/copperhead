@@ -51,6 +51,16 @@ public final class StubTools {
 		return script(dir, "vasm", NOTE_CALL + "printf '%s\\n' '" + stderr + "' >&2\nexit 1\n");
 	}
 
+	/** An assembler that succeeds without writing anything. */
+	public static Path silentVasm(final Path dir) throws IOException {
+		return script(dir, "vasm", NOTE_CALL);
+	}
+
+	/** An assembler that reports {@code stderr} and then never finishes. */
+	public static Path failingThenSleeping(final Path dir, final String stderr) throws IOException {
+		return script(dir, "vasm", NOTE_CALL + "printf '%s\\n' '" + stderr + "' >&2\nsleep 60 &\nwait\n");
+	}
+
 	public static Path shrinkler(final Path dir, final int bytes) throws IOException {
 		return script(dir, "Shrinkler", NOTE_CALL + "for arg; do :; done\n"
 			+ "head -c " + bytes + " /dev/zero > \"$arg\"\n"

@@ -16,12 +16,16 @@
 package org.copperhead.toolchain;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Stream;
 import org.copperhead.core.project.ProjectFile;
 import org.copperhead.core.project.ProjectKind;
@@ -73,7 +77,7 @@ public record ProjectDirectory(Path dir, ProjectFile file) {
 		final String entry = Path.of(file.entry()).getFileName().toString();
 		final Comparator<String> entryFirst = Comparator.comparing(name -> !name.equals(entry));
 
-		return listed(dir.resolve(ProjectLayout.SRC)).stream().filter(Files::isRegularFile)
+		return listed(sourceFolder()).stream().filter(Files::isRegularFile)
 			.map(path -> path.getFileName().toString()).filter(ProjectLayout::validSource)
 			.sorted(entryFirst.thenComparing(Comparator.naturalOrder())).toList();
 	}
@@ -83,7 +87,7 @@ public record ProjectDirectory(Path dir, ProjectFile file) {
 	}
 
 	public void write(final String source, final String text) throws IOException {
-		replace(source(source), text);
+		replace(source(source), text.getBytes(StandardCharsets.UTF_8));
 	}
 
 	public long modified(final String source) throws IOException {
@@ -93,7 +97,7 @@ public record ProjectDirectory(Path dir, ProjectFile file) {
 	public ProjectDirectory save(final ProjectFile updated) throws IOException {
 		final ProjectDirectory saved = new ProjectDirectory(dir, updated);
 
-		replace(saved.chp(), updated.toJson());
+		replace(saved.chp(), updated.toJson().getBytes(StandardCharsets.UTF_8));
 		return saved;
 	}
 
@@ -101,15 +105,27 @@ public record ProjectDirectory(Path dir, ProjectFile file) {
 		if (!ProjectLayout.validSource(name)) {
 			throw new IOException("not a source: " + name);
 		}
-		return dir.resolve(ProjectLayout.SRC).resolve(name);
+		return sourceFolder().resolve(name);
 	}
 
-	/* Written beside the file and moved over it in one step, so a crash or a full disk leaves the old text whole. */
-	private static void replace(final Path file, final String text) throws IOException {
-		final Path staged = file.resolveSibling("." + file.getFileName() + STAGED);
+	/* A cloned project can plant a link here, and the sources would then be read and written elsewhere. */
+	private Path sourceFolder() throws IOException {
+		final Path folder = dir.resolve(ProjectLayout.SRC);
+
+		if (Files.isSymbolicLink(folder)) {
+			throw new IOException("src is a link");
+		}
+		return folder;
+	}
+
+	/* Written beside the file and moved over it in one step, so a crash or a full disk leaves the old content whole.
+	   The staging name is new every time and never reused, so a link planted under a guessed name is not followed. */
+	static void replace(final Path file, final byte[] content) throws IOException {
+		final Path staged = file.resolveSibling("." + file.getFileName() + "." + UUID.randomUUID() + STAGED);
 
 		try {
-			Files.writeString(staged, text);
+			Files.write(staged, content, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE,
+				LinkOption.NOFOLLOW_LINKS);
 			Files.move(staged, file, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
 		} finally {
 			Files.deleteIfExists(staged);

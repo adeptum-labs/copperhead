@@ -18,8 +18,8 @@ package org.copperhead.toolchain;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -56,6 +56,7 @@ public final class BuildJob implements Runnable {
 	private static final String LISTING = "build/main.lst";
 	private static final String LOADER = "build/boot.bin";
 	private static final String BOOT = "boot";
+	private static final String BOOT_FOLDER = ProjectLayout.BUILD + "/" + BOOT;
 	private static final String LOADER_SOURCE = "bootblock.s";
 	private static final List<String> LOADER_FILES = List.of(LOADER_SOURCE, "ShrinklerDecompress.S");
 	private static final Pattern FINAL_SIZE = Pattern.compile("Final file size: (\\d+)");
@@ -98,7 +99,7 @@ public final class BuildJob implements Runnable {
 			bytes = build(request.project());
 			adf = ProjectLayout.adf(request.project().file().name());
 		} catch (final InterruptedException e) {
-			fail(CANCELLED);
+			cancelled();
 		} catch (final IOException | ToolchainException | IllegalArgumentException e) {
 			fail(Objects.requireNonNullElse(e.getMessage(), e.toString()));
 		} catch (final RuntimeException e) {
@@ -107,7 +108,7 @@ public final class BuildJob implements Runnable {
 		} finally {
 			ended();
 		}
-		sink.accept(new BuildEvent.Finished(report(adf, bytes, Duration.ofNanos(System.nanoTime() - start))));
+		emit(new BuildEvent.Finished(report(adf, bytes, Duration.ofNanos(System.nanoTime() - start))));
 	}
 
 	/* The interrupt reaches whatever the build waits on: a download, make, the assembler or the trust prompt; a
@@ -125,6 +126,8 @@ public final class BuildJob implements Runnable {
 
 	private int build(final ProjectDirectory project) throws IOException, InterruptedException, ToolchainException {
 		final ProjectFile file = project.file();
+
+		requireOwnFolders(project);
 		final Path vasm = tool(PinnedSource.VASM, request.vasm(), request.trustedVasm());
 		final Optional<Path> shrinkler = file.crunch()
 			? Optional.of(tool(PinnedSource.SHRINKLER, request.shrinkler(), Optional.empty()))
@@ -141,7 +144,7 @@ public final class BuildJob implements Runnable {
 		final byte[] image = TrackDisk.image(loader(vasm, project, stage, payload.length), payload);
 
 		stopIfCancelled();
-		replace(project.adf(), image);
+		ProjectDirectory.replace(project.adf(), image);
 		line("adf " + ProjectLayout.adf(file.name()) + "  880K · " + payload.length
 			+ " bytes · bootblock checksum ok", Tone.OK);
 		return payload.length;
@@ -154,7 +157,10 @@ public final class BuildJob implements Runnable {
 			return toolchain.ensure(source, configured, trusted, this::plain);
 		} catch (final HashMismatch mismatch) {
 			line(mismatch.getMessage(), Tone.WARN);
-			if (!trust.accept(mismatch.tool(), mismatch.version(), mismatch.found())) {
+			final boolean answer = trust.accept(mismatch.tool(), mismatch.version(), mismatch.found());
+
+			stopIfCancelled();
+			if (!answer) {
 				throw new ToolchainException("refused " + mismatch.tool() + " " + mismatch.version()
 					+ " (sha-256 " + mismatch.found() + ")");
 			}
@@ -174,17 +180,21 @@ public final class BuildJob implements Runnable {
 			command.addAll(List.of("-L", LISTING));
 		}
 		command.addAll(List.of("-o", PROGRAM, file.entry()));
-		final int exit = run("vasm", command, project, this::assembler);
+		discard(project, PROGRAM, LISTING);
+		final int exit = run("vasm", command, project, text -> assembler(text, true));
 
 		if (exit != 0 || hasErrors()) {
 			throw new ToolchainException("vasm stopped with exit code " + exit);
 		}
+		written(project, PROGRAM);
 	}
 
 	private byte[] crunch(final Path shrinkler, final ProjectDirectory project)
 		throws IOException, InterruptedException, ToolchainException {
 
 		final List<String> output = new ArrayList<>();
+
+		discard(project, CRUNCHED);
 		final int exit = run("Shrinkler", List.of(shrinkler.toString(), "-d", "-9", "-p", PROGRAM, CRUNCHED),
 			project, output::add);
 
@@ -194,7 +204,7 @@ public final class BuildJob implements Runnable {
 		}
 		output.stream().map(FINAL_SIZE::matcher).filter(Matcher::matches)
 			.forEach(found -> plain("crunched " + found.group(1) + " bytes"));
-		return Files.readAllBytes(project.dir().resolve(CRUNCHED));
+		return Files.readAllBytes(written(project, CRUNCHED));
 	}
 
 	/* Uncrunched, the program is read straight to its load address. Crunched, it is read to the stage above itself
@@ -216,23 +226,54 @@ public final class BuildJob implements Runnable {
 		throws IOException, InterruptedException, ToolchainException {
 
 		final ProjectFile file = project.file();
-		final Path boot = Files.createDirectories(project.dir().resolve(ProjectLayout.BUILD).resolve(BOOT));
+		final Path boot = Files.createDirectories(project.dir().resolve(BOOT_FOLDER));
 
 		for (final String name : LOADER_FILES) {
+			discard(project, BOOT_FOLDER + "/" + name);
 			try (InputStream source = BuildJob.class.getResourceAsStream("/" + BOOT + "/" + name)) {
-				Files.copy(source, boot.resolve(name), StandardCopyOption.REPLACE_EXISTING);
+				Files.copy(source, boot.resolve(name));
 			}
 		}
+		discard(project, LOADER);
 		final int exit = run("vasm", List.of(vasm.toString(), "-quiet", "-m68000", "-Fbin",
 			"-DLOAD=" + LoadAddress.format(file.loadAddress()), "-DSTAGE=" + LoadAddress.format(stage),
 			"-DCRUNCHED=" + (file.crunch() ? 1 : 0), "-DPAYLOAD_LEN=" + TrackDisk.padded(payload), "-o", LOADER,
-			ProjectLayout.BUILD + "/" + BOOT + "/" + LOADER_SOURCE), project, this::plain);
+			BOOT_FOLDER + "/" + LOADER_SOURCE), project, text -> assembler(text, false));
 
 		if (exit != 0) {
 			throw new ToolchainException("the boot loader did not assemble: vasm stopped with exit code "
 				+ exit);
 		}
-		return Bootblock.seal(Files.readAllBytes(project.dir().resolve(LOADER)));
+		return Bootblock.seal(Files.readAllBytes(written(project, LOADER)));
+	}
+
+	/* A cloned project can plant links in its build folder, and the tools open their outputs through links. */
+	private static void requireOwnFolders(final ProjectDirectory project) throws IOException, ToolchainException {
+		final Path root = project.dir().toRealPath();
+
+		for (final String name : List.of(ProjectLayout.BUILD, BOOT_FOLDER)) {
+			final Path folder = project.dir().resolve(name);
+
+			if (Files.isSymbolicLink(folder) || Files.exists(folder) && !folder.toRealPath().startsWith(root)) {
+				throw new ToolchainException(name + " folder is a link");
+			}
+		}
+	}
+
+	/* Deleting removes a planted link itself, and keeps an output of an earlier build from passing as new. */
+	private static void discard(final ProjectDirectory project, final String... names) throws IOException {
+		for (final String name : names) {
+			Files.deleteIfExists(project.dir().resolve(name));
+		}
+	}
+
+	private static Path written(final ProjectDirectory project, final String name) throws ToolchainException {
+		final Path output = project.dir().resolve(name);
+
+		if (!Files.isRegularFile(output, LinkOption.NOFOLLOW_LINKS)) {
+			throw new ToolchainException(name + " was not written");
+		}
+		return output;
 	}
 
 	private int run(final String name, final List<String> command, final ProjectDirectory project,
@@ -244,7 +285,7 @@ public final class BuildJob implements Runnable {
 	}
 
 	/* Called on the thread that reads the assembler's output. */
-	private void assembler(final String output) {
+	private void assembler(final String output, final boolean located) {
 		final List<AssemblerMessage> messages = VasmLog.parse(List.of(output));
 
 		if (messages.isEmpty()) {
@@ -256,8 +297,11 @@ public final class BuildJob implements Runnable {
 		final AssemblerMessage message = messages.getFirst();
 		final boolean error = message.severity() == AssemblerMessage.Severity.ERROR;
 
-		synchronized (log) {
-			(error ? errors : warnings).add(new BuildWarning(message.file(), message.line(), message.text()));
+		if (located) {
+			synchronized (log) {
+				(error ? errors : warnings)
+					.add(new BuildWarning(message.file(), message.line(), message.text()));
+			}
 		}
 		line(output, error ? Tone.ERR : Tone.WARN);
 	}
@@ -273,7 +317,16 @@ public final class BuildJob implements Runnable {
 		synchronized (log) {
 			log.add(line);
 		}
-		sink.accept(new BuildEvent.Line(line));
+		emit(new BuildEvent.Line(line));
+	}
+
+	/* A watcher that fails must not stop the build or keep its report from being delivered. */
+	private void emit(final BuildEvent event) {
+		try {
+			sink.accept(event);
+		} catch (final RuntimeException e) {
+			LOG.warn("The watcher of the build of {} failed on {}", request.project().dir(), event, e);
+		}
 	}
 
 	/* The assembler's own errors already say why the build stopped, and they are what the editor marks. */
@@ -283,6 +336,13 @@ public final class BuildJob implements Runnable {
 			if (errors.isEmpty()) {
 				errors.add(new BuildWarning("", 0, message));
 			}
+		}
+	}
+
+	private void cancelled() {
+		line(CANCELLED, Tone.ERR);
+		synchronized (log) {
+			errors.add(new BuildWarning("", 0, CANCELLED));
 		}
 	}
 
@@ -318,16 +378,5 @@ public final class BuildJob implements Runnable {
 
 	private static String cpu(final Target target) {
 		return target == Target.A1200_AGA ? "-m68020" : "-m68000";
-	}
-
-	private static void replace(final Path file, final byte[] content) throws IOException {
-		final Path staged = file.resolveSibling(file.getFileName() + ".part");
-
-		try {
-			Files.write(staged, content);
-			Files.move(staged, file, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
-		} finally {
-			Files.deleteIfExists(staged);
-		}
 	}
 }

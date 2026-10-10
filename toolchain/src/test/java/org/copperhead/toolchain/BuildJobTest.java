@@ -16,15 +16,19 @@
 package org.copperhead.toolchain;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.net.http.HttpClient;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
 import net.jqwik.api.Example;
 import org.copperhead.core.build.Bootblock;
 import org.copperhead.core.build.BuildLine;
@@ -45,6 +49,8 @@ public class BuildJobTest extends ScratchTest {
 	private static final Duration SETTLE = Duration.ofSeconds(10);
 	private static final TrustPrompt REFUSE = (tool, version, sha256) -> false;
 	private static final String WARNING = "warning 1007 in line 3 of \"src/main.s\": unused label";
+	private static final List<BuildWarning> CANCELLED_ONLY = List.of(new BuildWarning("", 0, "build cancelled"));
+	private static final String SHORT_ERROR = "error 2 in line 4 of \"src/main.s\": unknown mnemonic <foo>";
 	private static final String ERROR = "error 2 in line 4 of \"src/main.s\": unknown mnemonic <foo>\n>\tfoo";
 
 	private final List<BuildEvent> events = new CopyOnWriteArrayList<>();
@@ -66,7 +72,7 @@ public class BuildJobTest extends ScratchTest {
 				+ "-o build/boot.bin build/boot/bootblock.s"), StubTools.calls(vasm));
 		assertEquals(List.of("-d -9 -p build/main.bin build/main.shr"), StubTools.calls(shrinkler));
 		assertTrue(report.log().contains(new BuildLine("crunched 700 bytes", Tone.PLAIN)));
-		assertTrue(report.log().contains(new BuildLine(WARNING, Tone.WARN)));
+		assertEquals(2, Collections.frequency(report.log(), new BuildLine(WARNING, Tone.WARN)));
 		assertEquals(new BuildLine("adf nightrun.adf  880K · 700 bytes · bootblock checksum ok", Tone.OK),
 			report.log().getLast());
 
@@ -154,7 +160,7 @@ public class BuildJobTest extends ScratchTest {
 	}
 
 	@Example
-	public void shouldRefuseABootLoaderThatOutgrowsItsBlock()throws Exception {
+	public void shouldRefuseABootLoaderThatOutgrowsItsBlock() throws Exception {
 		final BuildReport report = build(demo(), StubTools.vasm(scratch().resolve("bin"), 2048, 1100),
 			StubTools.shrinkler(scratch().resolve("bin"), 700));
 
@@ -175,7 +181,7 @@ public class BuildJobTest extends ScratchTest {
 		job.cancel();
 		thread.join(SETTLE);
 
-		assertEquals(List.of(new BuildWarning("", 0, "build cancelled")), finished().errors());
+		assertEquals(CANCELLED_ONLY, finished().errors());
 		for (final String pid : Files.readString(pids).trim().split(" ")) {
 			assertTrue(gone(Long.parseLong(pid)), pid);
 		}
@@ -236,6 +242,198 @@ public class BuildJobTest extends ScratchTest {
 				+ TarFixture.sha256(release) + ")")), finished().errors());
 			assertEquals(Optional.empty(), job.trustAccepted());
 			assertTrue(Files.notExists(scratch().resolve("tools/vasm")));
+		}
+	}
+
+	@Example
+	public void shouldDropBlankOutputOfTheAssemblers() throws Exception {
+		final BuildReport report = build(demo(), StubTools.vasm(scratch().resolve("bin"), 2048, 300, "\n"),
+			StubTools.shrinkler(scratch().resolve("bin"), 700));
+
+		assertTrue(report.ok(), report.log().toString());
+		assertFalse(report.log().contains(new BuildLine("", Tone.PLAIN)), report.log().toString());
+	}
+
+	@Example
+	public void shouldNotWriteThroughLinksPlantedInTheBuildFolder() throws Exception {
+		final ProjectDirectory created = demo();
+		final ProjectDirectory project = created.save(created.file().withSymbols(true));
+		final Path build = Files.createDirectories(project.dir().resolve("build/boot")).getParent();
+		final List<Path> planted = List.of(build.resolve("main.bin"), build.resolve("main.shr"),
+			build.resolve("main.lst"), build.resolve("boot.bin"), build.resolve("nightrun.adf.part"),
+			build.resolve("boot/bootblock.s"), build.resolve("boot/ShrinklerDecompress.S"));
+
+		final List<Path> victims = planted.stream().map(this::victimOf).toList();
+		final BuildReport report = build(project, StubTools.vasm(scratch().resolve("bin"), 2048, 300),
+			StubTools.shrinkler(scratch().resolve("bin"), 700));
+
+		assertTrue(report.ok(), report.log().toString());
+		for (final Path victim : victims) {
+			assertEquals("victim", Files.readString(victim), victim.toString());
+		}
+		for (final Path output : List.of(build.resolve("main.bin"), build.resolve("main.shr"),
+			build.resolve("boot.bin"), build.resolve("boot/bootblock.s"))) {
+
+			assertTrue(Files.isRegularFile(output, LinkOption.NOFOLLOW_LINKS), output.toString());
+		}
+		assertTrue(Files.isRegularFile(project.adf(), LinkOption.NOFOLLOW_LINKS));
+	}
+
+	@Example
+	public void shouldRefuseABuildFolderThatIsALink() throws Exception {
+		final ProjectDirectory project = demo();
+		final Path outside = Files.createDirectories(scratch().resolve("outside"));
+		final Path vasm = StubTools.vasm(scratch().resolve("bin"), 2048, 300);
+
+		Files.delete(project.dir().resolve("build"));
+		Files.createSymbolicLink(project.dir().resolve("build"), outside);
+		final BuildReport report = build(project, vasm, StubTools.shrinkler(scratch().resolve("bin"), 700));
+
+		assertEquals(List.of(new BuildWarning("", 0, "build folder is a link")), report.errors());
+		assertEquals(List.of(), StubTools.calls(vasm));
+		assertEquals(List.of(), listed(outside));
+	}
+
+	@Example
+	public void shouldRefuseABootFolderThatIsALink() throws Exception {
+		final ProjectDirectory project = demo();
+		final Path outside = Files.createDirectories(scratch().resolve("outside"));
+		final Path vasm = StubTools.vasm(scratch().resolve("bin"), 2048, 300);
+
+		Files.createSymbolicLink(project.dir().resolve("build/boot"), outside);
+		final BuildReport report = build(project, vasm, StubTools.shrinkler(scratch().resolve("bin"), 700));
+
+		assertEquals(List.of(new BuildWarning("", 0, "build/boot folder is a link")), report.errors());
+		assertEquals(List.of(), StubTools.calls(vasm));
+		assertEquals(List.of(), listed(outside));
+	}
+
+	@Example
+	public void shouldNotTakeAnEarlierProgramForTheOneJustAssembled() throws Exception {
+		final ProjectDirectory project = demo();
+
+		Files.write(project.dir().resolve("build/main.bin"), new byte[2048]);
+		final BuildReport report = build(project, StubTools.silentVasm(scratch().resolve("bin")),
+			StubTools.shrinkler(scratch().resolve("bin"), 700));
+
+		assertEquals(List.of(new BuildWarning("", 0, "build/main.bin was not written")), report.errors());
+		assertFalse(Files.exists(project.adf()));
+	}
+
+	@Example
+	public void shouldFinishOnceWhenTheWatcherFailsOnTheLines() throws Exception {
+		final List<BuildEvent> finished = new CopyOnWriteArrayList<>();
+		final BuildJob job = new BuildJob(toolchain(new Fetcher(HttpClient.newHttpClient(), PATIENT)),
+			new BuildRequest(demo(), Optional.of(StubTools.failingVasm(scratch().resolve("bin"), ERROR)),
+				Optional.of(StubTools.shrinkler(scratch().resolve("bin"), 700)), Optional.empty()),
+			PATIENT, REFUSE, event -> {
+				if (event instanceof BuildEvent.Finished) {
+					finished.add(event);
+				} else {
+					throw new IllegalStateException("watcher gone");
+				}
+			});
+
+		job.run();
+
+		assertEquals(1, finished.size());
+		assertFalse(((BuildEvent.Finished) finished.getFirst()).report().ok());
+	}
+
+	@Example
+	public void shouldNotThrowWhenTheWatcherAlwaysFails() throws Exception {
+		final List<BuildEvent> seen = new CopyOnWriteArrayList<>();
+		final BuildJob job = new BuildJob(toolchain(new Fetcher(HttpClient.newHttpClient(), PATIENT)),
+			new BuildRequest(demo(), Optional.of(StubTools.vasm(scratch().resolve("bin"), 2048, 300)),
+				Optional.of(StubTools.shrinkler(scratch().resolve("bin"), 700)), Optional.empty()),
+			PATIENT, REFUSE, event -> {
+				seen.add(event);
+				throw new IllegalStateException("watcher gone");
+			});
+
+		job.run();
+
+		assertEquals(1, seen.stream().filter(BuildEvent.Finished.class::isInstance).count());
+		assertInstanceOf(BuildEvent.Finished.class, seen.getLast());
+	}
+
+	@Example
+	public void shouldReportACancelAfterTheAssemblerFoundErrors() throws Exception {
+		final Path vasm = StubTools.failingThenSleeping(scratch().resolve("bin"), SHORT_ERROR);
+		final BuildJob job = job(demo(), vasm, StubTools.shrinkler(scratch().resolve("bin"), 700), REFUSE);
+		final Thread thread = Thread.ofVirtual().start(job);
+
+		while (events.stream().noneMatch(event -> event instanceof BuildEvent.Line(BuildLine line)
+			&& line.tone() == Tone.ERR)) {
+
+			Thread.sleep(BRIEF.dividedBy(20));
+		}
+		job.cancel();
+		thread.join(SETTLE);
+
+		assertEquals(List.of(new BuildWarning("src/main.s", 4, "unknown mnemonic <foo>"),
+			new BuildWarning("", 0, "build cancelled")), finished().errors());
+	}
+
+	@Example
+	public void shouldNotStartWhenCancelledBeforeItRuns() throws Exception {
+		final Path vasm = StubTools.vasm(scratch().resolve("bin"), 2048, 300);
+		final BuildJob job = job(demo(), vasm, StubTools.shrinkler(scratch().resolve("bin"), 700), REFUSE);
+
+		job.cancel();
+		job.run();
+
+		assertEquals(CANCELLED_ONLY, finished().errors());
+		assertEquals(List.of(), StubTools.calls(vasm));
+	}
+
+	@Example
+	public void shouldReportACancelWhileTheUserIsAskedAndRefuses() throws Exception {
+		try (LocalServer server = new LocalServer().serve("/vasm/release/vasm.tar.gz", vasmRelease())) {
+			assertEquals(CANCELLED_ONLY, cancelledDuringPrompt(server, false));
+		}
+	}
+
+	@Example
+	public void shouldNotBuildWhenCancelledWhileTheUserIsAskedAndAccepts() throws Exception {
+		try (LocalServer server = new LocalServer().serve("/vasm/release/vasm.tar.gz", vasmRelease())) {
+			assertEquals(CANCELLED_ONLY, cancelledDuringPrompt(server, true));
+			assertTrue(Files.notExists(scratch().resolve("tools/vasm")));
+		}
+	}
+
+	private List<BuildWarning> cancelledDuringPrompt(final LocalServer server, final boolean answer)
+		throws Exception {
+
+		final CountDownLatch asked = new CountDownLatch(1);
+		final TrustPrompt prompt = (tool, version, sha256) -> {
+			asked.countDown();
+			try {
+				Thread.sleep(SETTLE);
+			} catch (final InterruptedException e) {
+				return answer;
+			}
+			return answer;
+		};
+		final BuildJob job = new BuildJob(toolchain(new Fetcher(server.proxy(), PATIENT)),
+			new BuildRequest(demo(), Optional.empty(), Optional.empty(), Optional.empty()), PATIENT, prompt,
+			events::add);
+		final Thread thread = Thread.ofVirtual().start(job);
+
+		asked.await();
+		job.cancel();
+		thread.join(SETTLE);
+		return finished().errors();
+	}
+
+	private Path victimOf(final Path link) {
+		try {
+			final Path victim = Files.writeString(scratch().resolve("victim-" + link.getFileName()), "victim");
+
+			Files.createSymbolicLink(link, victim);
+			return victim;
+		} catch (final IOException e) {
+			throw new UncheckedIOException(e);
 		}
 	}
 

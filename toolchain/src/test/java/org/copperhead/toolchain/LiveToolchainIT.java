@@ -116,6 +116,8 @@ public class LiveToolchainIT {
 
 	private static void bootable(final ProjectDirectory project) throws IOException {
 		final BuildReport report = build(project);
+
+		assertTrue(report.ok(), report.log().toString());
 		final boolean crunch = project.file().crunch();
 		final byte[] image = Files.readAllBytes(project.adf());
 		final byte[] payload = Files.readAllBytes(project.dir().resolve(crunch ? "build/main.shr"
@@ -124,7 +126,7 @@ public class LiveToolchainIT {
 
 		System.out.printf("%s: program %d bytes, payload %d bytes, boot loader %d bytes%n", project.file().name(),
 			Files.size(project.dir().resolve("build/main.bin")), payload.length, loader);
-		assertTrue(report.ok(), report.log().toString());
+		assertEquals(payload.length, report.bytes());
 		assertEquals(TrackDisk.SIZE, image.length);
 		assertTrue(Bootblock.valid(Arrays.copyOf(image, Bootblock.SIZE)));
 		assertTrue(loader <= Bootblock.SIZE, loader + " bytes");
@@ -145,6 +147,7 @@ public class LiveToolchainIT {
 
 		new BuildJob(toolchain(), new BuildRequest(project, Optional.of(vasm), Optional.of(shrinkler),
 			Optional.empty()), STEP, REFUSE, events::add).run();
+		assertEquals(1, events.stream().filter(BuildEvent.Finished.class::isInstance).count());
 		return assertInstanceOf(BuildEvent.Finished.class, events.getLast()).report();
 	}
 
