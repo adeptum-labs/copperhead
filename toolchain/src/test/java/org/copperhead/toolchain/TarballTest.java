@@ -17,7 +17,10 @@ package org.copperhead.toolchain;
 
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import net.jqwik.api.Example;
 import org.apache.commons.compress.archivers.tar.TarConstants;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -141,9 +144,57 @@ public class TarballTest extends ScratchTest {
 	}
 
 	@Example
+	public void shouldRefuseAVeryLongName() throws Exception {
+		final String refusal = refusal(new TarFixture().directory("tool").file("tool/" + "n".repeat(595), "x"));
+
+		assertEquals("unsafe entry tool/" + "n".repeat(75), refusal);
+	}
+
+	@Example
+	public void shouldRefuseAVeryDeepPathBeforeMakingItsFolders() throws Exception {
+		final String deep = "tool/" + "d/".repeat(38) + "f";
+
+		assertTrue(refusal(new TarFixture().directory("tool").file(deep, "x")).startsWith("unsafe entry tool/d/d/"));
+		assertFalse(Files.exists(into().resolve("tool/d")));
+	}
+
+	@Example
+	public void shouldUnpackAPathOfReasonableDepth() throws Exception {
+		final String deep = "tool/" + "d/".repeat(18) + "f";
+		final Path top = Tarball.extract(archive(new TarFixture().directory("tool").file(deep, "x")), into());
+
+		assertEquals("x", Files.readString(top.resolve(deep.substring("tool/".length()))));
+	}
+
+	@Example
+	public void shouldCloseTheArchiveItCannotReadAsGzip() throws Exception {
+		final Path notGzip = Files.writeString(scratch().resolve("plain.tar.gz"), "not an archive at all");
+
+		assertThrows(IOException.class, () -> Tarball.extract(notGzip, into()));
+		assertFalse(openFiles().contains(notGzip.toRealPath()));
+	}
+
+	@Example
 	public void shouldRefuseAnArchiveWithoutASingleTopDirectory() throws Exception {
 		assertEquals("archive does not hold a single top directory",
 			refusal(new TarFixture().file("Makefile", "all:\n").file("other/README", "hi\n")));
+	}
+
+	/* Where the system offers a list of open files (Linux); elsewhere nothing is listed and the check passes. */
+	private static List<Path> openFiles() throws IOException {
+		final Path descriptors = Path.of("/proc/self/fd");
+		final List<Path> open = new ArrayList<>();
+
+		if (Files.isDirectory(descriptors)) {
+			for (final Path descriptor : listed(descriptors)) {
+				try {
+					open.add(Files.readSymbolicLink(descriptor));
+				} catch (final NoSuchFileException closedMeanwhile) {
+					continue;
+				}
+			}
+		}
+		return open;
 	}
 
 	private Path into() {

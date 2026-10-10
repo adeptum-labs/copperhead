@@ -45,6 +45,11 @@ public final class Tarball {
 	/* The tar reader keeps an entry's header records in memory, so what it may inflate between two entries is capped
 	   far below the size cap: the headers of a real archive are nowhere near it. */
 	private static final long HEADER_ALLOWANCE = 1024 * 1024;
+	/* Every folder on the way to an entry is made, refused entry or not, and neither cap counts folders: the length
+	   and depth of a name are bounded instead, far above any real tree (the tools' sources are 4 deep, 50 long). */
+	private static final int MAX_NAME_LENGTH = 512;
+	private static final int MAX_DEPTH = 32;
+	private static final int SHOWN_NAME_LENGTH = 80;
 	private static final int OWNER_EXECUTE = 0100;
 	private static final String PARENT = "..";
 	private static final String MALFORMED = "archive is malformed";
@@ -61,9 +66,17 @@ public final class Tarball {
 		throws IOException {
 
 		final Path root = Files.createDirectories(into).toRealPath();
+
+		try (InputStream file = Files.newInputStream(archive)) {
+			return unpack(file, root, maxEntries, maxBytes);
+		}
+	}
+
+	private static Path unpack(final InputStream file, final Path root, final int maxEntries, final long maxBytes)
+		throws IOException {
+
 		final Set<Path> tops = new TreeSet<>();
-		final Allowance inflated = new Allowance(new GzipCompressorInputStream(
-			new BufferedInputStream(Files.newInputStream(archive))));
+		final Allowance inflated = new Allowance(new GzipCompressorInputStream(new BufferedInputStream(file)));
 		int entries = 0;
 		long bytes = 0;
 
@@ -142,8 +155,14 @@ public final class Tarball {
 
 	/* Every folder on the way to an entry is made here and must be a real folder inside the root. */
 	private static Path place(final Path root, final String name) throws IOException {
+		if (name.length() > MAX_NAME_LENGTH) {
+			throw unsafe(name);
+		}
 		final Path relative = relative(name);
 
+		if (relative.getNameCount() > MAX_DEPTH) {
+			throw unsafe(name);
+		}
 		for (final Path part : relative) {
 			if (PARENT.equals(part.toString())) {
 				throw unsafe(name);
@@ -172,7 +191,7 @@ public final class Tarball {
 	}
 
 	private static IOException unsafe(final String name) {
-		return new IOException("unsafe entry " + name);
+		return new IOException("unsafe entry " + name.substring(0, Math.min(name.length(), SHOWN_NAME_LENGTH)));
 	}
 
 	/* Fails once more than the allowed bytes come out of the archive. It asks for one byte past the allowance so that
