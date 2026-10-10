@@ -17,10 +17,58 @@
    is to ask the host that opened it. */
 const command = (name) => fetch("/window/" + name, { method: "POST" });
 
+const choice = (label, kind, chosen) => {
+	const button = document.createElement("button");
+
+	button.type = "button";
+	button.className = `button ${kind}`;
+	button.textContent = label;
+	button.addEventListener("click", chosen);
+	return button;
+};
+
+/* Closing with text that is not saved asks first, as switching projects does. The text goes to the server the way
+   Save all sends it, and the window closes only once every file is written. */
+const askBeforeClosing = (unsaved) => {
+	const dialog = document.createElement("dialog");
+	const card = document.createElement("section");
+	const title = document.createElement("h2");
+	const line = document.createElement("p");
+	const buttons = document.createElement("div");
+	const saveAndClose = async () => {
+		const saved = await fetch("/action/file-save-all", { method: "POST", body: new URLSearchParams(unsaved) });
+
+		if (saved.ok) {
+			command("close");
+		} else {
+			line.textContent = "The files could not be saved, so the window stays open.";
+		}
+	};
+
+	dialog.className = "closing";
+	card.className = "modal__card";
+	title.className = "modal__title";
+	title.textContent = "Unsaved changes";
+	line.className = "modal__line";
+	line.textContent = `Changes to ${unsaved.files.split(",").join(", ")} are not saved.`;
+	buttons.className = "modal__buttons";
+	buttons.append(choice("Cancel", "", () => dialog.close()),
+		choice("Close without saving", "button--danger", () => command("close")),
+		choice("Save all and close", "button--accent button--strong", saveAndClose));
+	card.append(title, line, buttons);
+	dialog.append(card);
+	dialog.addEventListener("close", () => dialog.remove());
+	document.body.append(dialog);
+	dialog.showModal();
+};
+
 document.addEventListener("click", (event) => {
 	const button = event.target.closest("[data-window]");
+	const unsaved = button?.dataset.window === "close" && window.copperhead.editor?.buffers({});
 
-	if (button) {
+	if (unsaved?.files) {
+		askBeforeClosing(unsaved);
+	} else if (button) {
 		command(button.dataset.window);
 	}
 });

@@ -584,36 +584,173 @@ html[data-theme="light"] [data-theme-toggle] .menu__check {
 	background: var(--ed);
 }
 
-.code {
-	padding: 8px 0;
+/* The editor fills the tool body and scrolls by itself, so its gutters stay put while the text moves under them.
+   CodeMirror styles itself through class names of its own making; every rule below starts from the host's class and
+   attribute, which outweigh those, so the page's colours win in whatever order the style sheets arrive. */
+.code,
+.code__editor {
+	height: 100%;
+}
+
+.code__dot {
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+}
+
+.code__dot--on {
+	background: var(--err);
+}
+
+.code[data-editor-host] .cm-editor {
+	height: 100%;
+	background: var(--ed);
+	color: var(--fg);
 	font: var(--cfs)/var(--clh) var(--mono);
 }
 
-.code__text {
+.code[data-editor-host] .cm-editor.cm-focused {
+	outline: none;
+}
+
+.code[data-editor-host] .cm-scroller {
+	font: inherit;
+}
+
+.code[data-editor-host] .cm-content {
+	padding: 8px 0;
+	caret-color: var(--fg);
+}
+
+.code[data-editor-host] .cm-cursor {
+	border-left-color: var(--fg);
+}
+
+.code[data-editor-host] .cm-gutters {
+	border-right: 1px solid var(--line);
+	background: var(--ed);
+	color: var(--mute);
+}
+
+.code[data-editor-host] .cm-breakpoint-gutter .cm-gutterElement {
 	display: grid;
-	grid-template-columns: 108px 60px 200px minmax(0, 1fr);
-	column-gap: 12px;
+	place-items: center;
+	width: 24px;
+	cursor: pointer;
+}
+
+.code[data-editor-host] .cm-lineNumbers .cm-gutterElement {
+	min-width: 34px;
+	padding: 0 10px 0 4px;
+	cursor: pointer;
+}
+
+.code[data-editor-host] .cm-activeLine,
+.code[data-editor-host] .cm-activeLineGutter {
+	background: var(--panel2);
+}
+
+.code[data-editor-host] .cm-activeLineGutter {
+	color: var(--fg);
+}
+
+.code[data-editor-host] .cm-selectionBackground,
+.code[data-editor-host] .cm-editor.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground,
+.code[data-editor-host] .cm-content ::selection {
+	background: var(--hl);
+}
+
+.code[data-editor-host] .cm-selectionMatch,
+.code[data-editor-host] .cm-searchMatch {
+	background: var(--hl);
+}
+
+.code[data-editor-host] .cm-searchMatch {
+	outline: 1px solid var(--acct);
+}
+
+.code[data-editor-host] .cm-searchMatch.cm-searchMatch-selected {
+	outline-width: 2px;
+}
+
+.code[data-editor-host] .cm-lintRange {
+	padding-bottom: 0;
+	background-image: none;
+	text-decoration: underline wavy;
+	text-decoration-skip-ink: none;
+	text-underline-offset: 3px;
+}
+
+.code[data-editor-host] .cm-lintRange-error {
+	text-decoration-color: var(--err);
+}
+
+.code[data-editor-host] .cm-lintRange-warning {
+	text-decoration-color: var(--warn);
+}
+
+.code[data-editor-host] .cm-lintRange-info {
+	text-decoration-color: var(--acct);
+}
+
+.code[data-editor-host] .cm-tooltip {
+	border: 1px solid var(--line);
+	border-radius: 6px;
+	background: var(--panel);
+	color: var(--fg);
+	font: var(--fs)/1.35 var(--sans);
+}
+
+.code[data-editor-host] .cm-diagnostic-error {
+	border-left-color: var(--err);
+}
+
+.code[data-editor-host] .cm-diagnostic-warning {
+	border-left-color: var(--warn);
+}
+
+.code[data-editor-host] .cm-panels {
+	background: var(--panel);
+	color: var(--fg);
+	font: var(--fs)/1.35 var(--sans);
+}
+
+.code[data-editor-host] .cm-panels-top {
+	border-bottom: 1px solid var(--line);
+}
+
+.code[data-editor-host] .cm-panel .cm-textfield,
+.code[data-editor-host] .cm-panel .cm-button {
+	border: 1px solid var(--line);
+	border-radius: 5px;
+	background: var(--panel2);
+	background-image: none;
+	color: var(--fg);
+	font: inherit;
+}
+
+.code[data-editor-host] .cm-panel button[name="close"] {
+	color: var(--mute);
+}
+
+.code[data-editor-host] .cm-conflict {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 6px 14px;
+	color: var(--warn);
+}
+
+/* The question asked before the window closes on unsaved text, drawn as the studio's own dialogs are. */
+.closing {
 	padding: 0;
 	border: 0;
 	background: transparent;
-	font: inherit;
-	text-align: left;
-	white-space: pre;
-	cursor: text;
+	color: var(--fg);
 }
 
-.code__label {
-	color: var(--lbl);
-}
-
-.code__mnemonic {
-	color: var(--kw);
-}
-
-.code__comment {
-	overflow: hidden;
-	color: var(--cm);
-	text-overflow: ellipsis;
+.closing::backdrop {
+	background: rgba(0, 0, 0, .45);
 }
 
 .sprite {

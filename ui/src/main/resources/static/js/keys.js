@@ -44,6 +44,12 @@ const combo = (event) => {
 	].filter(Boolean).join("+");
 };
 
+/* Inside the editor the keys are the editor's, apart from the studio's own shortcuts: saving, building, the tools,
+   the preferences and the function keys. */
+const STUDIO_KEYS = /^(ctrl\+(shift\+)?[sb]|ctrl\+[1-5,]|(shift\+)?f\d{1,2})$/;
+
+const editing = (event) => event.target.closest(".cm-editor") !== null;
+
 /* An open dialog takes the keys, so nothing behind it acts, and Esc still reaches its close button. */
 const keyed = () => {
 	const modal = document.getElementById("modal");
@@ -54,7 +60,10 @@ const keyed = () => {
 document.addEventListener("keydown", (event) => {
 	const name = combo(event);
 
-	if (!name || event.target.closest("input, textarea")) {
+	/* A key the editor acted on already, such as Ctrl+Z or Ctrl+F, is not acted on twice, and the question asked
+	   before the window closes keeps its keys to itself. */
+	if (!name || event.defaultPrevented || event.target.closest("input, textarea, dialog")
+		|| editing(event) && !STUDIO_KEYS.test(name)) {
 		return;
 	}
 

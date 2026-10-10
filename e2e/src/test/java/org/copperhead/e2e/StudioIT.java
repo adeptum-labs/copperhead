@@ -21,6 +21,7 @@ import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import net.jqwik.api.Example;
+import org.copperhead.ui.session.Layout;
 import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -34,7 +35,7 @@ public class StudioIT extends BrowserTest {
 		TABS.put("Palette & copper", "palette.pal");
 		TABS.put("Debugger", "Debugger");
 		TABS.put("Build & export", "Build & export");
-		TABS.put("Code", "plasma.s");
+		TABS.put("Code", "main.s");
 	}
 
 	private static final double SETTLE_MILLIS = 600;
@@ -71,8 +72,7 @@ public class StudioIT extends BrowserTest {
 	public void shouldBuildWithCtrlB() {
 		page().keyboard().press("Control+b");
 
-		assertThat(page().locator("#status .status__note"))
-			.hasText("Nothing to build: open or create a project on disk first");
+		assertThat(page().locator("#status .status__note")).hasText("Built demo.adf · 7 bytes");
 	}
 
 	/* On a Swedish keyboard "/" is Shift+7, so Ctrl+/ arrives with Shift held. */
@@ -103,7 +103,7 @@ public class StudioIT extends BrowserTest {
 		page().keyboard().press("Escape");
 
 		assertThat(page().locator("#modal")).isHidden();
-		assertThat(page().locator("#tool .tool__tab--active")).hasText("plasma.s");
+		assertThat(page().locator("#tool .tool__tab--active")).hasText("main.s");
 	}
 
 	/* The server keeps the run's time, so the moment it pauses at can only be later than the one the page showed. */
@@ -159,8 +159,9 @@ public class StudioIT extends BrowserTest {
 			.plusMillis(Long.parseLong(fields[2]) * MILLIS_PER_CENTI).toMillis();
 	}
 
+	/* The server keeps the split in whole percent, which the dragged one rounds to. */
 	@Example
-	public void shouldKeepTheSplitItWasDraggedToAcrossAReload() {
+	public void shouldKeepTheSplitItWasDraggedToAcrossARestart() throws Exception {
 		final BoundingBox handle = page().locator("[data-splitter=vertical]").boundingBox();
 		final double x = handle.x + handle.width / 2;
 		final double y = handle.y + handle.height / 2;
@@ -170,13 +171,16 @@ public class StudioIT extends BrowserTest {
 		page().mouse().move(x - DRAG, y);
 		page().mouse().up();
 
-		final String split = (String) page().evaluate(
-			"getComputedStyle(document.querySelector('[data-workspace]')).getPropertyValue('--split')");
+		final double dragged = split();
 
-		page().reload();
-		assertEquals(split, page().evaluate(
-			"getComputedStyle(document.querySelector('[data-workspace]')).getPropertyValue('--split')"));
-		assertNotEquals("", split.trim());
+		awaitSaved(layout -> layout.split() != Layout.defaults().split());
+		restart();
+		assertEquals(dragged, split(), 1);
+	}
+
+	private double split() {
+		return ((Number) page().evaluate("parseFloat(getComputedStyle(document.querySelector('[data-workspace]'))"
+			+ ".getPropertyValue('--split'))")).doubleValue();
 	}
 
 	@Example
