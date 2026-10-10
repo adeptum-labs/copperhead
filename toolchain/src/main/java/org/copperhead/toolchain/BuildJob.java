@@ -23,6 +23,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Consumer;
@@ -51,10 +52,13 @@ import org.slf4j.LoggerFactory;
  */
 public final class BuildJob implements Runnable {
 	private static final Logger LOG = LoggerFactory.getLogger(BuildJob.class);
-	private static final String PROGRAM = "build/main.bin";
+	private static final String PROGRAM_FILE = "main.bin";
+	private static final String LISTING_FILE = "main.lst";
+	private static final String LOADER_FILE = "boot.bin";
+	private static final String PROGRAM = ProjectLayout.BUILD + "/" + PROGRAM_FILE;
 	private static final String CRUNCHED = "build/main.shr";
-	private static final String LISTING = "build/main.lst";
-	private static final String LOADER = "build/boot.bin";
+	private static final String LISTING = ProjectLayout.BUILD + "/" + LISTING_FILE;
+	private static final String LOADER = ProjectLayout.BUILD + "/" + LOADER_FILE;
 	private static final String BOOT = "boot";
 	private static final String BOOT_FOLDER = ProjectLayout.BUILD + "/" + BOOT;
 	private static final String LOADER_SOURCE = "bootblock.s";
@@ -133,15 +137,24 @@ public final class BuildJob implements Runnable {
 			? Optional.of(tool(PinnedSource.SHRINKLER, request.shrinkler(), Optional.empty()))
 			: Optional.empty();
 
-		Files.createDirectories(project.dir().resolve(ProjectLayout.BUILD));
-		assemble(vasm, project);
+		try (JobFolder job = JobFolder.create(project)) {
+			return build(project, vasm, shrinkler, job);
+		}
+	}
+
+	private int build(final ProjectDirectory project, final Path vasm, final Optional<Path> shrinkler,
+		final JobFolder job) throws IOException, InterruptedException, ToolchainException {
+
+		final ProjectFile file = project.file();
+
+		assemble(vasm, project, job);
 		final int size = Math.toIntExact(Files.size(project.dir().resolve(PROGRAM)));
 		final byte[] payload = shrinkler.isPresent() ? crunch(shrinkler.get(), project)
 			: Files.readAllBytes(project.dir().resolve(PROGRAM));
 		final int stage = (file.loadAddress() + size + LONG - 1) / LONG * LONG;
 
 		fits(file, stage, size, payload.length);
-		final byte[] image = TrackDisk.image(loader(vasm, project, stage, payload.length), payload);
+		final byte[] image = TrackDisk.image(loader(vasm, project, job, stage, payload.length), payload);
 
 		stopIfCancelled();
 		ProjectDirectory.replace(project.adf(), image);
@@ -169,7 +182,7 @@ public final class BuildJob implements Runnable {
 		}
 	}
 
-	private void assemble(final Path vasm, final ProjectDirectory project)
+	private void assemble(final Path vasm, final ProjectDirectory project, final JobFolder job)
 		throws IOException, InterruptedException, ToolchainException {
 
 		final ProjectFile file = project.file();
@@ -177,15 +190,16 @@ public final class BuildJob implements Runnable {
 			"-DLOAD=" + LoadAddress.format(file.loadAddress())));
 
 		if (file.symbols()) {
-			command.addAll(List.of("-L", LISTING));
+			command.addAll(List.of("-L", job.path(LISTING_FILE)));
 		}
-		command.addAll(List.of("-o", PROGRAM, file.entry()));
+		command.addAll(List.of("-o", job.path(PROGRAM_FILE), file.entry()));
 		discard(project, PROGRAM, LISTING);
 		final int exit = run("vasm", command, project, text -> assembler(text, true));
 
 		if (exit != 0 || hasErrors()) {
 			throw new ToolchainException("vasm stopped with exit code " + exit);
 		}
+		job.collect(project, Map.of(PROGRAM_FILE, PROGRAM, LISTING_FILE, LISTING));
 		written(project, PROGRAM);
 	}
 
@@ -222,8 +236,8 @@ public final class BuildJob implements Runnable {
 		}
 	}
 
-	private byte[] loader(final Path vasm, final ProjectDirectory project, final int stage, final int payload)
-		throws IOException, InterruptedException, ToolchainException {
+	private byte[] loader(final Path vasm, final ProjectDirectory project, final JobFolder job, final int stage,
+		final int payload) throws IOException, InterruptedException, ToolchainException {
 
 		final ProjectFile file = project.file();
 		final Path boot = Files.createDirectories(project.dir().resolve(BOOT_FOLDER));
@@ -237,13 +251,15 @@ public final class BuildJob implements Runnable {
 		discard(project, LOADER);
 		final int exit = run("vasm", List.of(vasm.toString(), "-quiet", "-m68000", "-Fbin",
 			"-DLOAD=" + LoadAddress.format(file.loadAddress()), "-DSTAGE=" + LoadAddress.format(stage),
-			"-DCRUNCHED=" + (file.crunch() ? 1 : 0), "-DPAYLOAD_LEN=" + TrackDisk.padded(payload), "-o", LOADER,
+			"-DCRUNCHED=" + (file.crunch() ? 1 : 0), "-DPAYLOAD_LEN=" + TrackDisk.padded(payload), "-o",
+			job.path(LOADER_FILE),
 			BOOT_FOLDER + "/" + LOADER_SOURCE), project, text -> assembler(text, false));
 
 		if (exit != 0) {
 			throw new ToolchainException("the boot loader did not assemble: vasm stopped with exit code "
 				+ exit);
 		}
+		job.collect(project, Map.of(LOADER_FILE, LOADER));
 		return Bootblock.seal(Files.readAllBytes(written(project, LOADER)));
 	}
 

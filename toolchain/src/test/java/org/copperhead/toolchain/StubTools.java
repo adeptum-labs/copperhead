@@ -61,6 +61,11 @@ public final class StubTools {
 		return script(dir, "vasm", NOTE_CALL + "printf '%s\\n' '" + stderr + "' >&2\nsleep 60 &\nwait\n");
 	}
 
+	/** An assembler that also writes a file of its own beside the output it was asked for. */
+	public static Path straying(final Path dir) throws IOException {
+		return script(dir, "vasm", vasmBody(2048, 300, "") + "touch \"$(dirname \"$out\")/stray\"\n");
+	}
+
 	public static Path shrinkler(final Path dir, final int bytes) throws IOException {
 		return script(dir, "Shrinkler", NOTE_CALL + "for arg; do :; done\n"
 			+ "head -c " + bytes + " /dev/zero > \"$arg\"\n"

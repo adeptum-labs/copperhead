@@ -67,9 +67,9 @@ public class BuildJobTest extends ScratchTest {
 		assertEquals("nightrun.adf", report.adf());
 		assertEquals(700, report.bytes());
 		assertEquals(List.of(new BuildWarning("src/main.s", 3, "unused label")), report.warnings());
-		assertEquals(List.of("-quiet -m68000 -Fbin -DLOAD=$20000 -o build/main.bin src/main.s",
+		assertEquals(List.of("-quiet -m68000 -Fbin -DLOAD=$20000 -o build/.job/main.bin src/main.s",
 			"-quiet -m68000 -Fbin -DLOAD=$20000 -DSTAGE=$20800 -DCRUNCHED=1 -DPAYLOAD_LEN=1024 "
-				+ "-o build/boot.bin build/boot/bootblock.s"), StubTools.calls(vasm));
+				+ "-o build/.job/boot.bin build/boot/bootblock.s"), jobCalls(vasm));
 		assertEquals(List.of("-d -9 -p build/main.bin build/main.shr"), StubTools.calls(shrinkler));
 		assertTrue(report.log().contains(new BuildLine("crunched 700 bytes", Tone.PLAIN)));
 		assertEquals(2, Collections.frequency(report.log(), new BuildLine(WARNING, Tone.WARN)));
@@ -98,9 +98,10 @@ public class BuildJobTest extends ScratchTest {
 
 		assertTrue(report.ok(), report.log().toString());
 		assertEquals(2000, report.bytes());
-		assertEquals(List.of("-quiet -m68020 -Fbin -DLOAD=$20000 -L build/main.lst -o build/main.bin src/main.s",
+		assertEquals(List.of("-quiet -m68020 -Fbin -DLOAD=$20000 -L build/.job/main.lst -o build/.job/main.bin "
+				+ "src/main.s",
 			"-quiet -m68000 -Fbin -DLOAD=$20000 -DSTAGE=$207D0 -DCRUNCHED=0 -DPAYLOAD_LEN=2048 "
-				+ "-o build/boot.bin build/boot/bootblock.s"), StubTools.calls(vasm));
+				+ "-o build/.job/boot.bin build/boot/bootblock.s"), jobCalls(vasm));
 		assertEquals(List.of(), StubTools.calls(shrinkler));
 	}
 
@@ -252,6 +253,68 @@ public class BuildJobTest extends ScratchTest {
 
 		assertTrue(report.ok(), report.log().toString());
 		assertFalse(report.log().contains(new BuildLine("", Tone.PLAIN)), report.log().toString());
+	}
+
+	@Example
+	public void shouldAssembleIntoAFolderOfItsOwnThatIsGoneAfterwards() throws Exception {
+		final ProjectDirectory project = demo();
+		final Path vasm = StubTools.vasm(scratch().resolve("bin"), 2048, 300);
+
+		assertTrue(build(project, vasm, StubTools.shrinkler(scratch().resolve("bin"), 700)).ok());
+		final List<Path> folders = StubTools.calls(vasm).stream()
+			.map(call -> Path.of(call.replaceAll("^.* -o (\\S+) .*$", "$1")).getParent()).distinct().toList();
+
+		assertEquals(1, folders.size(), folders.toString());
+		assertTrue(folders.getFirst().toString().matches("build/\\.job-\\w+"), folders.toString());
+		assertEquals(List.of(), jobFolders(project));
+	}
+
+	@Example
+	public void shouldRemoveItsFolderAfterAFailedBuild() throws Exception {
+		final ProjectDirectory project = demo();
+
+		build(project, StubTools.failingVasm(scratch().resolve("bin"), ERROR),
+			StubTools.shrinkler(scratch().resolve("bin"), 700));
+
+		assertEquals(List.of(), jobFolders(project));
+	}
+
+	@Example
+	public void shouldRemoveItsFolderAfterACancelledBuild() throws Exception {
+		final ProjectDirectory project = demo();
+		final Path vasm = StubTools.sleeping(scratch().resolve("bin"), "vasm");
+		final Path pids = vasm.resolveSibling("vasm.pid");
+		final BuildJob job = job(project, vasm, StubTools.shrinkler(scratch().resolve("bin"), 700), REFUSE);
+		final Thread thread = Thread.ofVirtual().start(job);
+
+		while (Files.notExists(pids) || Files.readString(pids).isBlank()) {
+			Thread.sleep(BRIEF.dividedBy(20));
+		}
+		job.cancel();
+		thread.join(SETTLE);
+
+		assertEquals(List.of(), jobFolders(project));
+	}
+
+	@Example
+	public void shouldRefuseWhatTheAssemblerLeavesInItsFolder() throws Exception {
+		final ProjectDirectory project = demo();
+		final BuildReport report = build(project, StubTools.straying(scratch().resolve("bin")),
+			StubTools.shrinkler(scratch().resolve("bin"), 700));
+
+		assertTrue(report.errors().getFirst().message().matches("the tool left build/\\.job-\\w+/stray"),
+			report.errors().toString());
+		assertEquals(List.of(), jobFolders(project));
+		assertFalse(Files.exists(project.adf()));
+	}
+
+	private List<Path> jobFolders(final ProjectDirectory project) throws IOException {
+		return listed(project.dir().resolve("build")).stream()
+			.filter(path -> path.getFileName().toString().startsWith(".job-")).toList();
+	}
+
+	private static List<String> jobCalls(final Path script) throws IOException {
+		return StubTools.calls(script).stream().map(call -> call.replaceAll("\\.job-\\w+", ".job")).toList();
 	}
 
 	@Example

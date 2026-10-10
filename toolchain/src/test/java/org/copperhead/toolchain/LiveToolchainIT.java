@@ -114,6 +114,21 @@ public class LiveToolchainIT {
 		assertEquals(List.of(new BuildWarning("src/main.s", 1, "unknown mnemonic <foo>")), report.errors());
 	}
 
+	@Example
+	public void shouldKeepAnOutputDirectiveInsideTheProject() throws IOException {
+		final ProjectDirectory project = project("hostile", ProjectKind.DEMO, Target.A500_OCS, false);
+
+		Files.createDirectories(project.dir().resolve("build/main.x"));
+		project.write("main.s", "\toutput .x/../../../escaped.bin\n\trts\n");
+		final BuildReport report = build(project);
+
+		try (Stream<Path> made = Files.walk(root)) {
+			assertEquals(List.of(), made.filter(path -> "escaped.bin".equals(path.getFileName().toString()))
+				.toList());
+		}
+		assertTrue(report.ok() || !report.errors().isEmpty(), report.log().toString());
+	}
+
 	private static void bootable(final ProjectDirectory project) throws IOException {
 		final BuildReport report = build(project);
 
