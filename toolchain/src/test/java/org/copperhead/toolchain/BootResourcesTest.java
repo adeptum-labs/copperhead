@@ -19,6 +19,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import net.jqwik.api.Example;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -51,7 +53,14 @@ public class BootResourcesTest {
 		assertAll(List.of("\tdc.b\t\"DOS\",0\n", "\tif\tCRUNCHED\n", "\tmove.l\t#PAYLOAD_LEN,IO_LENGTH(a2)\n",
 			"\tlea\tSTAGE,a0\n", "\tlea\tLOAD,a1\n", "\tjmp\tLOAD\n", "\tinclude\t\"ShrinklerDecompress.S\"\n")
 			.stream().map(line -> () -> assertTrue(loader.contains(line), line)));
-		assertTrue(loader.contains("DECRUNCH_STACK\t\t=\t4096\n"), "the build reserves 4096 bytes for it");
+		assertEquals(BuildJob.DECRUNCH_STACK, Integer.parseInt(stackReserve(loader)), "the build reserves the same");
+	}
+
+	private static String stackReserve(final String loader) {
+		final Matcher found = Pattern.compile("(?m)^DECRUNCH_STACK\\s*=\\s*(\\d+)$").matcher(loader);
+
+		assertTrue(found.find(), "bootblock.s defines DECRUNCH_STACK");
+		return found.group(1);
 	}
 
 	private static byte[] resource(final String name) throws IOException {
