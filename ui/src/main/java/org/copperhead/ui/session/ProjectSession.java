@@ -79,7 +79,8 @@ public class ProjectSession {
 
 	/**
 	 * Opens a project file. One called something other than the name it holds is refused: the studio saves a project
-	 * under its name, so that would write, and on a rename delete, another file than the one opened.
+	 * under its name, so that would write, and on a rename delete, another file than the one opened. So is one whose
+	 * sources cannot be listed, a src folder that is a link for one: the editor could never be drawn for it.
 	 */
 	public static ProjectDirectory open(final Path chp) throws IOException {
 		if (!Files.isRegularFile(chp)) {
@@ -94,6 +95,7 @@ public class ProjectSession {
 				+ ", so the file has to be called " + expected);
 		}
 
+		directory.sources();
 		return directory;
 	}
 

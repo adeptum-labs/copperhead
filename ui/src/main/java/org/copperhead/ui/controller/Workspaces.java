@@ -91,6 +91,15 @@ final class Workspaces {
 		return read(directory::sources);
 	}
 
+	/** The sources, or none while the folder cannot be read, for a dialog that has to be drawn all the same. */
+	static List<String> sourcesOrNone(final ProjectDirectory directory) {
+		try {
+			return sources(directory);
+		} catch (UncheckedIOException e) {
+			return List.of();
+		}
+	}
+
 	/** A source the page named: only a file of the project's src folder, never a path that leads out of it. */
 	static String source(final ProjectDirectory directory, final String name) {
 		if (!ProjectLayout.validSource(name) || !sources(directory).contains(name)) {

@@ -73,6 +73,14 @@ public class ProjectFlowTest {
 		return ProjectDirectory.create(projects(), name, ProjectKind.GAME, Target.A500_OCS).chp();
 	}
 
+	/* What a cloned project can hold: a src folder that is a link to somewhere else. */
+	private void linkSources(final Path chp) throws Exception {
+		final Path dir = chp.getParent();
+		final Path elsewhere = Files.move(dir.resolve("src"), rig.home().resolve("elsewhere-" + dir.getFileName()));
+
+		Files.createSymbolicLink(dir.resolve("src"), elsewhere);
+	}
+
 	private Map<String, String> draft(final String name, final Path parent) {
 		return Map.of("name", name, "kind", "GAME", "target", "AGA", "parent", parent.toString());
 	}
@@ -318,6 +326,50 @@ public class ProjectFlowTest {
 
 		assertTrue(screen.find("#modal .modal__line").text().contains("newer"));
 		assertEquals("demo.chp", project(screen));
+	}
+
+	@Example
+	public void shouldSayWhyAProjectWhoseSourceFolderIsALinkWillNotOpen() throws Exception {
+		final Path linked = made("arcade");
+
+		linkSources(linked);
+
+		final StudioState before = rig.session().state();
+		final Screen screen = browsed(Screen.open(rig), "arcade")
+			.trigger(ENTRY + "--project", Map.of("path", linked.toString()));
+
+		assertEquals("Open project", screen.find("#modal .modal__title").text());
+		assertTrue(screen.find("#modal .modal__line").text().contains("src is a link"));
+		assertEquals(before.workspace(), rig.session().state().workspace());
+		assertEquals(200, Screen.open(rig).status());
+	}
+
+	@Example
+	public void shouldSkipAProjectWhoseSourceFolderIsALinkWhenTheStudioStarts() throws Exception {
+		welcome();
+
+		final Path usable = made("nova");
+		final Path linked = made("arcade");
+
+		linkSources(linked);
+		rig.preferences().used(usable);
+		rig.preferences().used(linked);
+		rig = rig.restart(now::get);
+
+		assertEquals("nova.chp", project(Screen.open(rig)));
+	}
+
+	@Example
+	public void shouldStillDrawWhenTheSourceFolderBecomesALinkAfterTheProjectOpened() throws Exception {
+		linkSources(rig.project().chp());
+
+		final Screen screen = Screen.open(rig);
+
+		assertEquals(200, screen.status());
+		assertEquals(List.of(), screen.document().select("#tool .tool__tab").eachText());
+		assertEquals("sources unavailable: src is a link", screen.find("#tool .tool__meta").text());
+		assertEquals("Project settings",
+			screen.click("#menus [hx-vals*=SETTINGS]").find("#modal .modal__title").text());
 	}
 
 	@Example

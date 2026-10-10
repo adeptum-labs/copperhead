@@ -17,6 +17,7 @@ package org.copperhead.ui.controller;
 
 import jakarta.json.Json;
 import jakarta.json.JsonArrayBuilder;
+import java.io.UncheckedIOException;
 import java.util.List;
 import java.util.stream.Stream;
 import org.copperhead.core.build.BuildWarning;
@@ -46,14 +47,21 @@ final class CodeViews {
 		return state.workspace().map(directory -> editor(state, directory)).orElseGet(() -> welcome(state));
 	}
 
+	/* A folder that turned unreadable after the project was opened leaves an empty editor and says why, since
+	   a draw that fails would leave the studio in a state no page can show. */
 	private static ToolView editor(final StudioState state, final ProjectDirectory directory) {
-		final List<String> sources = Workspaces.sources(directory);
-		final int marks = state.breakpoints().size();
+		try {
+			final List<String> sources = Workspaces.sources(directory);
+			final int marks = state.breakpoints().size();
 
-		return new ToolView(sources.stream().map(name -> new TabView(name, "/action/file-open",
-				Vals.of("name", name), name.equals(state.file()), false)).toList(),
-			"68000 · UTF-8 · " + marks + (marks == 1 ? " breakpoint" : " breakpoints"),
-			new CodeView(source(state, directory, sources)));
+			return new ToolView(sources.stream().map(name -> new TabView(name, "/action/file-open",
+					Vals.of("name", name), name.equals(state.file()), false)).toList(),
+				"68000 · UTF-8 · " + marks + (marks == 1 ? " breakpoint" : " breakpoints"),
+				new CodeView(source(state, directory, sources)));
+		} catch (UncheckedIOException e) {
+			return new ToolView(List.of(), "sources unavailable: " + Workspaces.reason(e.getCause()),
+				new CodeView(source(state, directory, List.of())));
+		}
 	}
 
 	private static ToolView welcome(final StudioState state) {

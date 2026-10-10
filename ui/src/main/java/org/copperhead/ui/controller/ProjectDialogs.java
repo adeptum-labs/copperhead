@@ -143,8 +143,8 @@ final class ProjectDialogs {
 			List.of(FieldView.text(NAME, "Name", values.get(NAME)),
 				new FieldView(TARGET, "Machine", target, targets(Target.chipset(target))),
 				FieldView.text(LOAD, "Load address", values.get(LOAD)),
-				new FieldView(ENTRY, "Entry file", values.get(ENTRY), Workspaces.sources(directory).stream()
-					.filter(name -> name.endsWith(SOURCE))
+				new FieldView(ENTRY, "Entry file", values.get(ENTRY),
+					Workspaces.sourcesOrNone(directory).stream().filter(name -> name.endsWith(SOURCE))
 					.map(name -> choice(SRC + name, SRC + name, values.get(ENTRY))).toList())),
 			List.of(new ButtonView("Save", "/action/project-settings", Vals.spread(FIELDS), true), cancel()));
 	}
