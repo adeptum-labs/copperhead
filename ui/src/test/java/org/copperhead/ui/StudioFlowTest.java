@@ -41,8 +41,10 @@ import org.copperhead.ui.view.Region;
 import org.copperhead.ui.view.Tool;
 import org.jsoup.nodes.Element;
 import static org.copperhead.ui.Flows.GUTTER;
+import static org.copperhead.ui.Flows.build;
 import static org.copperhead.ui.Flows.lines;
 import static org.copperhead.ui.Flows.noted;
+import static org.copperhead.ui.Flows.saved;
 import static org.copperhead.ui.Flows.source;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -52,7 +54,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 public class StudioFlowTest {
 	private static final Pattern FONT = Pattern.compile("url\\(\"\\.\\./fonts/([^\"]+)\"\\)");
 	private static final String CELLS = "#tool .sprite__grid .sprite__cell";
-	private static final String NOTHING_TO_BUILD = "Nothing to build: open or create a project on disk first";
 
 	/* Still unless a test moves it, so every page shows exactly the same text. */
 	private final AtomicReference<Instant> now = new AtomicReference<>(Instant.EPOCH);
@@ -441,15 +442,6 @@ public class StudioFlowTest {
 	}
 
 	@Example
-	public void shouldSayASampleHasNothingToBuild() throws Exception {
-		final Screen screen = Screen.open(rig).press("ctrl+b");
-
-		assertEquals(NOTHING_TO_BUILD, screen.find("#status .status__note").text());
-		assertEquals("last build not built yet", screen.find("#status .status__build").text());
-		assertEquals("0 warnings", screen.find("#status .status__warnings").text());
-	}
-
-	@Example
 	public void shouldUncheckShrinklerInTheMenuOnceItIsOffInTheTool() throws Exception {
 		final Screen screen = Screen.open(rig).click(railTool(Tool.BUILD)).click("#tool [hx-vals*=SHRINKLER]");
 
@@ -738,5 +730,43 @@ public class StudioFlowTest {
 		assertAll(Arrays.stream(Region.values()).map(region -> () ->
 			assertEquals(1, screen.document().select("#" + region.id()).size(), region.id())));
 		assertEquals(Region.values().length, screen.document().select("[hx-swap-oob]").size());
+	}
+
+	@Example
+	public void shouldWarnOfTheLineTheAssemblerWarnsOf() throws Exception {
+		final Screen screen = build(saved(Screen.open(rig), "start:\n\t" + StubTools.WARNING + "\n"));
+
+		assertEquals("1 warning · main.s:2", screen.find("#status .status__warning").text());
+		assertEquals("Built demo.adf · 7 bytes", screen.find("#status .status__note").text());
+		assertTrue(screen.find("#status .status__build").text().startsWith("last build 7 bytes · "));
+	}
+
+	@Example
+	public void shouldBuildCleanForAga() throws Exception {
+		final Screen screen = build(Screen.open(rig).click("#machine [hx-vals*=AGA]"));
+
+		assertTrue(screen.document().select("#status .status__warning").isEmpty());
+		assertEquals("0 warnings", screen.find("#status .status__warnings").text());
+		assertEquals("0 errors", screen.find("#status .status__ok").text());
+	}
+
+	@Example
+	public void shouldShipUncrunchedOnceShrinklerIsOff() throws Exception {
+		final Screen screen = build(Screen.open(rig).click(railTool(Tool.BUILD))
+			.click("#tool [hx-vals*=SHRINKLER]"));
+
+		assertTrue(screen.document().select("#tool .build__line").eachText().stream()
+			.noneMatch(line -> line.startsWith("crunched")));
+		assertTrue(screen.find("#tool .build__summary").text().startsWith("demo.adf · 7 bytes · "));
+		assertFalse(screen.find("#menus [hx-vals*=SHRINKLER]").hasClass("menu__item--checked"));
+	}
+
+	@Example
+	public void shouldJumpToTheLineAWarningNames() throws Exception {
+		final Screen screen = build(saved(Screen.open(rig), "start:\n\tnop\n\t" + StubTools.WARNING + "\n")
+			.click(railTool(Tool.SPRITES))).click("#status .status__warning");
+
+		assertEquals("main.s", screen.find("#tool .tool__tab--active").text());
+		assertEquals(3, source(screen).getInt("cursor"));
 	}
 }

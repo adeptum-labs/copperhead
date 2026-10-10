@@ -19,10 +19,12 @@ import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.time.InstantSource;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
 import org.copperhead.core.project.ProjectKind;
 import org.copperhead.core.project.Target;
 import org.copperhead.toolchain.ProjectDirectory;
@@ -37,6 +39,7 @@ import org.copperhead.ui.controller.Screens;
 import org.copperhead.ui.controller.SpriteController;
 import org.copperhead.ui.controller.TimelineController;
 import org.copperhead.ui.controller.WorkbenchController;
+import org.copperhead.ui.session.BuildService;
 import org.copperhead.ui.session.Preferences;
 import org.copperhead.ui.session.ProjectSession;
 import org.copperhead.web.RecordingWindow;
@@ -48,18 +51,24 @@ import org.copperhead.web.action.Actions;
 
 /**
  * The studio served the way the shell serves it, with a window that only takes notes, in a home folder of its own
- * that goes when the rig closes. Unless asked otherwise a demo made from its template is open.
+ * that goes when the rig closes. Unless asked otherwise a demo made from its template is open, and builds run the
+ * stand-ins for vasm and Shrinkler, so no test reaches the network or a compiler.
  */
 public class WorkbenchRig implements AutoCloseable {
 	public static final String PROJECTS = "projects";
 
 	private static final String PREFERENCES = "preferences.json";
+	private static final String OS_RELEASE = "os-release";
+	private static final Duration STEP = Duration.ofSeconds(20);
+	/* No tool of the machine running the tests is ever found, so a missing one is always fetched, and refused. */
+	private static final Function<String, Optional<Path>> NOWHERE = name -> Optional.empty();
 
 	private final SessionToken token = SessionToken.random();
 	private final RecordingWindow window = new RecordingWindow();
 	private final Path home;
 	private final Preferences preferences;
 	private final ProjectSession session;
+	private final BuildService builds;
 	private final Actions actions;
 	private final UiServer server;
 	private final URI base;
@@ -71,13 +80,19 @@ public class WorkbenchRig implements AutoCloseable {
 	}
 
 	private WorkbenchRig(final InstantSource clock, final Path home) throws Exception {
+		final XdgDirs dirs = XdgDirs.of(Map.of(), home);
+
 		this.home = home;
-		preferences = new Preferences(XdgDirs.of(Map.of(), home).config().resolve(PREFERENCES));
+		preferences = new Preferences(dirs.config().resolve(PREFERENCES));
 		session = new ProjectSession(preferences, clock);
+		builds = new BuildService(session, preferences,
+			BuildService.jobs(BuildService.toolchain(dirs, NOWHERE, home.resolve(OS_RELEASE)), STEP),
+			command -> Thread.ofVirtual().start(command));
 		actions = Actions.of(new WorkbenchController(session, preferences),
 			new ProjectController(session, preferences, home), new EditorController(session),
 			new SpriteController(session), new PaletteController(session), new DebuggerController(session),
-			new BuildController(session), new EmulatorController(session), new TimelineController(session));
+			new BuildController(session, builds), new EmulatorController(session),
+			new TimelineController(session));
 		server = new UiServer(Routes.create(new Templates(false), token, window, actions,
 			() -> Screens.index(session.state())
 		));
@@ -94,10 +109,15 @@ public class WorkbenchRig implements AutoCloseable {
 		return new WorkbenchRig(clock, prepared(Optional.of(kind)));
 	}
 
-	/* A home as a first launch finds it, with the project made from its template that was opened last. */
+	/* A home as a first launch finds it: preferences naming the stand-in tools and the project opened last. */
 	private static Path prepared(final Optional<ProjectKind> kind) throws IOException {
 		final Path home = Files.createTempDirectory("copperhead-home");
 		final Preferences preferences = new Preferences(XdgDirs.of(Map.of(), home).config().resolve(PREFERENCES));
+		final StubTools tools = StubTools.write(home.resolve("tools"));
+
+		Files.writeString(home.resolve(OS_RELEASE), "ID=debian\n");
+		preferences.tool("vasm", Optional.of(tools.vasm()));
+		preferences.tool("shrinkler", Optional.of(tools.shrinkler()));
 
 		if (kind.isPresent()) {
 			preferences.used(ProjectDirectory.create(home.resolve(PROJECTS),
@@ -148,6 +168,7 @@ public class WorkbenchRig implements AutoCloseable {
 	}
 
 	private void stop() throws Exception {
+		builds.cancel();
 		server.stop();
 	}
 

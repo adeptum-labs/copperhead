@@ -58,7 +58,6 @@ public record StudioState(Project project, Target target, Tool tool, Modal modal
 	private static final int FIRST_PICK = 4;
 	private static final Duration FIRST_POSITION = Duration.ofMillis(23_400);
 	private static final char SEPARATOR = '/';
-	private static final String NOTHING_TO_BUILD = "Nothing to build: open or create a project on disk first";
 
 	public StudioState {
 		breakpoints = List.copyOf(breakpoints);
@@ -146,10 +145,12 @@ public record StudioState(Project project, Target target, Tool tool, Modal modal
 		return withBreakpoints(List.of());
 	}
 
-	/** Shows the line the first warning of the last build points at. */
+	/** Shows where the last build went wrong: its first error with a place in a source, else its first warning. */
 	public StudioState showWarning() {
-		return build.stream().flatMap(report -> report.warnings().stream()).findFirst()
-			.map(warning -> withTool(Tool.CODE).withFile(warning.file()).withCursor(warning.line()))
+		return build.stream().flatMap(report -> Stream.concat(report.errors().stream(), report.warnings().stream()))
+			.filter(message -> message.line() >= TOP && ProjectLayout.validSource(sourceName(message.file())))
+			.findFirst()
+			.map(message -> withTool(Tool.CODE).withFile(sourceName(message.file())).withCursor(message.line()))
 			.orElse(this);
 	}
 
@@ -191,10 +192,6 @@ public record StudioState(Project project, Target target, Tool tool, Modal modal
 
 	public StudioState reset() {
 		return withRunning(false).withPosition(Duration.ZERO).withPc(project.trace().first()).withD0(0);
-	}
-
-	public StudioState build(final boolean andRun) {
-		return withRunning(running || andRun).withNote(NOTHING_TO_BUILD);
 	}
 
 	public StudioState toggleOption(final BuildOption option) {

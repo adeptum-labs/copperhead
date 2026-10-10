@@ -15,7 +15,9 @@
 
 package org.copperhead.ui;
 
+import java.net.ConnectException;
 import java.net.URI;
+import java.util.Map;
 import net.jqwik.api.Example;
 import org.copperhead.web.Client;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -80,5 +82,27 @@ public class ScreenTest {
 
 		assertThrows(UnsupportedOperationException.class, () -> dropping.click("button"));
 		assertThrows(UnsupportedOperationException.class, () -> elsewhere.click("button"));
+	}
+
+	@Example
+	public void shouldRefuseATriggerThatIsNoPoll() {
+		final Screen screen = over("<button hx-post=\"/action/x\" hx-trigger=\"load\">Send</button>");
+
+		assertThrows(UnsupportedOperationException.class, () -> screen.click("button"));
+	}
+
+	@Example
+	public void shouldRefuseAPollInheritedFromAnAncestor() {
+		final Screen screen = over("<div hx-trigger=\"every 500ms\">" + SEND + "</div>");
+
+		assertThrows(UnsupportedOperationException.class, () -> screen.click("button"));
+	}
+
+	/* Nothing listens on the port, so a control that passed every check fails only once it is sent. */
+	@Example
+	public void shouldSendAPollOnlyWhenTriggered() {
+		final Screen screen = over("<span hx-post=\"/action/x\" hx-trigger=\"every 500ms\"></span>");
+
+		assertThrows(ConnectException.class, () -> screen.trigger("span", Map.of()));
 	}
 }

@@ -26,7 +26,7 @@ final class ChromeViews {
 	}
 
 	static MachineView machine(final StudioState state) {
-		return new MachineView(state.target() == Target.A1200_AGA, state.running());
+		return new MachineView(state.target() == Target.A1200_AGA, state.running(), BuildViews.buildable(state));
 	}
 
 	static RailView rail(final StudioState state) {

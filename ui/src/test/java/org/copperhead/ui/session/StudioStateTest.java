@@ -180,4 +180,32 @@ public class StudioStateTest {
 		assertFalse(file.crunch());
 		assertEquals(List.of(new Breakpoint("main.s", 7, 0), new Breakpoint("main.s", 3, 0)), file.breakpoints());
 	}
+
+	@Example
+	public void shouldShowTheFirstErrorOfTheBuildInTheCode() {
+		final StudioState shown = game.withTool(Tool.SPRITES).withBuild(Optional.of(report(
+			List.of(new BuildWarning("src/main.s", 9, "odd")),
+			List.of(new BuildWarning("src/sprite.i", 4, "unknown mnemonic"))))).showWarning();
+
+		assertEquals(Tool.CODE, shown.tool());
+		assertEquals("sprite.i", shown.file());
+		assertEquals(4, shown.cursor());
+	}
+
+	@Example
+	public void shouldShowTheFirstWarningWhenTheBuildHadNoErrors() {
+		final StudioState shown = game.withBuild(Optional.of(report(
+			List.of(new BuildWarning("src/main.s", 9, "odd")), List.of()))).showWarning();
+
+		assertEquals("main.s", shown.file());
+		assertEquals(9, shown.cursor());
+	}
+
+	@Example
+	public void shouldStayWhereItIsWhenNoMessageNamesALine() {
+		final StudioState failed = game.withBuild(Optional.of(report(List.of(),
+			List.of(new BuildWarning("", 0, "bootblock too large")))));
+
+		assertSame(failed, failed.showWarning());
+	}
 }

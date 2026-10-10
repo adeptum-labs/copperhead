@@ -24,9 +24,13 @@
 				th:classappend="'build__line--' + ${line.tone()}" th:text="${line.text()}"></span></pre>
 			<div class="build__bar">
 				<button class="button button--accent button--strong button--large" type="button"
-					hx-post="/action/build">Build ADF</button>
-				<button class="button button--large" type="button" hx-post="/action/build-run">Build &amp; run</button>
-				<span class="build__summary" th:text="${view.summary()}">nightfall.adf · 2,911 bytes · 0.9s · A500</span>
+					hx-post="/action/build" hx-vals="js:{...copperhead.editor.buffers({})}"
+					th:disabled="${!view.buildable()}">Build ADF</button>
+				<button class="button button--large" type="button" hx-post="/action/build-run"
+					hx-vals="js:{...copperhead.editor.buffers({})}" th:disabled="${!view.buildable()}">Build &amp; run</button>
+				<button class="button button--large button--danger" type="button" hx-post="/action/build-cancel"
+					th:if="${view.running()}">Cancel</button>
+				<span class="build__summary" th:text="${view.summary()}">demo.adf · 1,031 bytes · 0.9s · A500</span>
 			</div>
 		</div>
 	</body>

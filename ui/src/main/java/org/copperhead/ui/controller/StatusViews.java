@@ -19,8 +19,10 @@ import java.util.List;
 import org.copperhead.core.build.BuildReport;
 import org.copperhead.core.build.BuildWarning;
 import org.copperhead.core.project.Part;
+import org.copperhead.toolchain.PinnedSource;
 import org.copperhead.ui.session.StudioState;
 import org.copperhead.ui.view.StatusView;
+import org.copperhead.ui.view.Vals;
 
 final class StatusViews {
 	private StatusViews() {
@@ -28,13 +30,22 @@ final class StatusViews {
 
 	static StatusView of(final StudioState state) {
 		final List<BuildWarning> warnings = state.build().map(BuildReport::warnings).orElse(List.of());
+		final int errors = state.build().map(report -> report.errors().size()).orElse(0);
+		final boolean failed = state.build().filter(report -> !report.ok()).isPresent();
 		final int at = state.project().partAt(state.position());
 		final Part part = state.project().parts().get(at);
 
-		return new StatusView(warnings.isEmpty() ? "0 warnings" : warnings.size()
-				+ (warnings.size() == 1 ? " warning · " : " warnings · ") + warnings.getFirst().location(),
+		return new StatusView("vasm " + PinnedSource.VASM.version(),
+			failed ? "build failed · " + counted(errors, "error") : "0 errors", failed,
+			warnings.isEmpty() ? "0 warnings" : counted(warnings.size(), "warning") + " · "
+				+ StudioState.sourceName(warnings.getFirst().file()) + ":" + warnings.getFirst().line(),
 			!warnings.isEmpty(), "last build " + BuildViews.outcome(state), state.note(),
 			"Part %02d · %s".formatted(at + 1, part.name()), Clock.frames(state.position()),
-			state.target().label(), state.layout().theme());
+			state.target().label(), state.layout().theme(),
+			state.run().running() ? Vals.of("phase", state.run().phase()) : null);
+	}
+
+	private static String counted(final int count, final String what) {
+		return count + " " + what + (count == 1 ? "" : "s");
 	}
 }

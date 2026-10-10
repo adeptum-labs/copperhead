@@ -19,10 +19,16 @@ import org.copperhead.web.action.View;
 
 /**
  * The status bar: what the last build said, what just happened, and where the run is. It comes with every answer,
- * so it also carries the theme for the page to wear.
+ * so it also carries the theme for the page to wear and, while a build runs, the control that asks how it does.
  */
-public record StatusView(String warnings, boolean warns, String lastBuild, String note, String part, long frame,
-	String machine, String theme) implements View {
+public record StatusView(String tool, String errors, boolean failed, String warnings, boolean warns,
+	String lastBuild, String note, String part, long frame, String machine, String theme, String poll)
+	implements View {
+
+	public boolean polling() {
+		return poll != null;
+	}
+
 	@Override
 	public String template() {
 		return "fragments/status :: status";

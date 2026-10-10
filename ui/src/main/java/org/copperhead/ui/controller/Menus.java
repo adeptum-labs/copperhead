@@ -73,7 +73,7 @@ final class Menus {
 					.withSeparated(true),
 				project(state, action("Save all", "Ctrl+Shift+S", "file-save-all", BUFFERS)),
 				later("Import asset…", "Ctrl+I").withSeparated(true),
-				action("Export ADF…", "Ctrl+Shift+E", "build", NO_VALS),
+				building(state, action("Export ADF…", "Ctrl+Shift+E", "build", BUFFERS)),
 				project(state, action("Project settings…", NO_KEYS, MODAL, Vals.of(KIND, Modal.SETTINGS)))
 					.withSeparated(true)))
 			.flatMap(items -> items).toList());
@@ -106,8 +106,9 @@ final class Menus {
 
 	private static MenuView build(final StudioState state) {
 		return new MenuView("Build", List.of(
-			action("Build ADF", "Ctrl+B", "build", NO_VALS),
-			action("Build & run", "Ctrl+Shift+B", "build-run", NO_VALS),
+			building(state, action("Build ADF", "Ctrl+B", "build", BUFFERS)),
+			building(state, action("Build & run", "Ctrl+Shift+B", "build-run", BUFFERS)),
+			when(state.run().running(), action("Cancel build", NO_KEYS, "build-cancel", NO_VALS)),
 			later("Clean", NO_KEYS),
 			target(state, Target.A500_OCS).withSeparated(true),
 			target(state, Target.A1200_AGA),
@@ -160,6 +161,10 @@ final class Menus {
 
 	private static MenuItemView project(final StudioState state, final MenuItemView item) {
 		return when(state.workspace().isPresent(), item);
+	}
+
+	private static MenuItemView building(final StudioState state, final MenuItemView item) {
+		return when(BuildViews.buildable(state), item);
 	}
 
 	private static MenuItemView when(final boolean available, final MenuItemView item) {

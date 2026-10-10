@@ -1735,3 +1735,11 @@ html[data-theme="light"] [data-theme-toggle] .menu__check {
 	justify-content: flex-end;
 	gap: 8px;
 }
+
+.status__error {
+	padding: 0;
+	border: 0;
+	background: transparent;
+	color: var(--err);
+	cursor: pointer;
+}

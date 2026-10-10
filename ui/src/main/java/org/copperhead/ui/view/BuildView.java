@@ -19,7 +19,7 @@ import java.util.List;
 import org.copperhead.web.action.View;
 
 public record BuildView(List<TargetCardView> targets, List<OptionView> options, List<BuildLineView> log,
-	String summary) implements View {
+	String summary, boolean buildable, boolean running) implements View {
 
 	public BuildView {
 		targets = List.copyOf(targets);

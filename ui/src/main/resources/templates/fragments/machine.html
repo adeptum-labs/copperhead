@@ -11,7 +11,8 @@
 			<button class="button button--accent button--strong machine__run" type="button" hx-post="/action/run"><span
 				th:text="${view.running()} ? '❚❚' : '▶'">▶</span> <span
 				th:text="${view.running()} ? 'Pause' : 'Run'">Run</span></button>
-			<button class="button button--strong" type="button" hx-post="/action/build">Build ADF</button>
+			<button class="button button--strong" type="button" hx-post="/action/build"
+				hx-vals="js:{...copperhead.editor.buffers({})}" th:disabled="${!view.buildable()}">Build ADF</button>
 		</div>
 	</body>
 </html>

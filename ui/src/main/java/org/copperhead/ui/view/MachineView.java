@@ -17,7 +17,7 @@ package org.copperhead.ui.view;
 
 import org.copperhead.web.action.View;
 
-public record MachineView(boolean aga, boolean running) implements View {
+public record MachineView(boolean aga, boolean running, boolean buildable) implements View {
 	@Override
 	public String template() {
 		return "fragments/machine :: machine";

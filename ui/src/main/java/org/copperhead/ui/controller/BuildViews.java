@@ -18,8 +18,10 @@ package org.copperhead.ui.controller;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
+import org.copperhead.core.build.BuildLine;
 import org.copperhead.core.build.BuildOption;
 import org.copperhead.core.build.BuildReport;
+import org.copperhead.core.project.ProjectLayout;
 import org.copperhead.core.project.Target;
 import org.copperhead.ui.session.StudioState;
 import org.copperhead.ui.view.BuildLineView;
@@ -36,23 +38,38 @@ final class BuildViews {
 	}
 
 	static ToolView tool(final StudioState state) {
-		final String adf = state.project().adf();
+		final String adf = state.workspace().map(directory -> ProjectLayout.adf(directory.file().name()))
+			.orElse("no project open");
 
 		return new ToolView(List.of(ToolViews.title("Build & export")), adf, new BuildView(
 			Arrays.stream(Target.values()).map(target -> new TargetCardView(target.label(), target.memory(),
 				target == state.target(), Vals.of("target", target.chipset()))).toList(),
 			Arrays.stream(BuildOption.values()).map(option -> new OptionView(label(option),
 				state.options().on(option), Vals.of("option", option))).toList(),
-			state.build().map(BuildReport::log).orElse(List.of()).stream()
-				.map(line -> new BuildLineView(line.text(), line.tone().name().toLowerCase(Locale.ROOT)))
-				.toList(),
-			adf + " · " + outcome(state) + " · " + state.target().machine()));
+			log(state).stream().map(line -> new BuildLineView(line.text(),
+				line.tone().name().toLowerCase(Locale.ROOT))).toList(),
+			adf + " · " + outcome(state) + " · " + state.target().machine(), buildable(state),
+			state.run().running()));
+	}
+
+	/** A build can start with a project open and no other run going. */
+	static boolean buildable(final StudioState state) {
+		return state.workspace().isPresent() && !state.run().running();
 	}
 
 	/** What the last build came to, as the build tool and the status bar both put it. */
 	static String outcome(final StudioState state) {
-		return state.build().map(report -> String.format(Locale.ROOT, "%,d bytes · %.1fs", report.bytes(),
-			report.took().toMillis() / MILLIS_PER_SECOND)).orElse("not built yet");
+		if (state.run().running()) {
+			return "building";
+		}
+
+		return state.build().map(report -> report.ok()
+			? String.format(Locale.ROOT, "%,d bytes · %.1fs", report.bytes(), seconds(report))
+			: String.format(Locale.ROOT, "failed · %.1fs", seconds(report))).orElse("not built yet");
+	}
+
+	private static double seconds(final BuildReport report) {
+		return report.took().toMillis() / MILLIS_PER_SECOND;
 	}
 
 	static String label(final BuildOption option) {
@@ -68,5 +85,11 @@ final class BuildViews {
 			case SHRINKLER -> "Crunch with " + label(option);
 			case SYMBOLS -> label(option);
 		};
+	}
+
+	/* While a run goes on it shows what it wrote so far; after a build, the report's log; after a fetch, its own. */
+	private static List<BuildLine> log(final StudioState state) {
+		return state.run().running() || !state.run().log().isEmpty() ? state.run().log()
+			: state.build().map(BuildReport::log).orElse(List.of());
 	}
 }

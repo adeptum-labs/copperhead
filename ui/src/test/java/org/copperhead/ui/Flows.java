@@ -18,16 +18,22 @@ package org.copperhead.ui;
 import jakarta.json.Json;
 import jakarta.json.JsonObject;
 import java.io.StringReader;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Predicate;
 import org.copperhead.ui.view.Tool;
 
 /**
- * What the page's scripts would do, done by hand: the editor's text and marks read from the JSON it is sent, and
- * its controls sent with the values it would work out.
+ * What the page's scripts would do, done by hand: the editor's text and marks read from the JSON it is sent, its
+ * saves and builds sent with the values it would work out, and the build polled until it ends.
  */
 final class Flows {
 	static final String GUTTER = "#tool [data-editor-control=breakpoint]";
+	static final String POLL = "#status [data-poll]";
+
+	private static final Duration LONGEST_BUILD = Duration.ofSeconds(20);
+	private static final long BETWEEN_POLLS = 20;
 
 	private Flows() {
 	}
@@ -54,5 +60,30 @@ final class Flows {
 	static Screen noted(final Screen screen, final WorkbenchRig rig) throws Exception {
 		return screen.trigger("#menus [hx-post=\"/action/project-recent\"]",
 			Map.of("path", rig.project().chp().toString()));
+	}
+
+	/** Builds as Ctrl+B does with nothing unsaved, then polls as the page does until the build is over. */
+	static Screen build(final Screen screen) throws Exception {
+		return finished(screen.trigger("[data-key=\"ctrl+b\"]", Map.of()));
+	}
+
+	static Screen finished(final Screen screen) throws Exception {
+		return polledUntil(screen, done -> done.document().select(POLL).isEmpty());
+	}
+
+	/** Polls as the page does while a build runs, until what the test waits for shows. */
+	static Screen polledUntil(final Screen screen, final Predicate<Screen> shown) throws Exception {
+		final long deadline = System.nanoTime() + LONGEST_BUILD.toNanos();
+
+		while (!shown.test(screen)) {
+			if (System.nanoTime() > deadline) {
+				throw new AssertionError("The build never got there");
+			}
+
+			Thread.sleep(BETWEEN_POLLS);
+			screen.trigger(POLL, Map.of());
+		}
+
+		return screen;
 	}
 }

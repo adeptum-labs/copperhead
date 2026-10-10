@@ -24,6 +24,7 @@ import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.copperhead.web.Client;
 import org.jsoup.Jsoup;
@@ -34,7 +35,8 @@ import org.jsoup.nodes.Element;
 /**
  * The page as the window holds it, changed the way htmx changes it. No control in the studio swaps anything
  * itself: the answer names the regions it replaces. Only that much of htmx is played out, and a control asking
- * for more is refused, so a test can never pass on behaviour the real page would not have.
+ * for more is refused, so a test can never pass on behaviour the real page would not have. A control that polls
+ * is taken as it is but never fires on its own: a test triggers it when it wants the next answer.
  */
 public final class Screen {
 	private static final Set<String> UNDERSTOOD = Set.of("hx-post", "hx-swap", "hx-vals", "hx-swap-oob");
@@ -47,6 +49,8 @@ public final class Screen {
 	private static final String HTMX = "hx-";
 	private static final Set<String> FIELDS = Set.of("input", "select", "textarea");
 	private static final String CODE = "script:not([type=application/json])";
+	private static final String TRIGGER = "hx-trigger";
+	private static final Pattern POLL = Pattern.compile("every \\d+m?s");
 	private static final int FIRST_SUCCESS = 200;
 	private static final int FIRST_REDIRECT = 300;
 	private static final Jsonb JSON = JsonbBuilder.create();
@@ -193,7 +197,7 @@ public final class Screen {
 
 		for (Element holder = element; holder != null; holder = holder.parent()) {
 			for (final Attribute attribute : holder.attributes()) {
-				if (!queuedOnTheBody(holder, attribute)) {
+				if (!queuedOnTheBody(holder, attribute) && !polling(element, holder, attribute)) {
 					refuseWhatIsNotUnderstood(element, holder, withoutData(attribute.getKey()));
 				}
 			}
@@ -204,6 +208,12 @@ public final class Screen {
 	private static boolean queuedOnTheBody(final Element holder, final Attribute attribute) {
 		return "body".equals(holder.normalName()) && SYNC.equals(attribute.getKey())
 			&& QUEUED.equals(attribute.getValue());
+	}
+
+	/* A poll is the control's own timer: one inherited from an ancestor, or any other trigger, is not played out. */
+	private static boolean polling(final Element element, final Element holder, final Attribute attribute) {
+		return holder == element && TRIGGER.equals(withoutData(attribute.getKey()))
+			&& POLL.matcher(attribute.getValue()).matches();
 	}
 
 	/* htmx sends the enclosing form's fields and the control's own value along with the action, and this screen
