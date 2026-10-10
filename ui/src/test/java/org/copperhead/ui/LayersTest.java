@@ -47,4 +47,26 @@ public class LayersTest {
 			.should().dependOnClassesThat().resideInAnyPackage("..copperhead.web..", "..copperhead.ui..")
 			.check(CLASSES);
 	}
+
+	@Example
+	public void shouldKeepTheModelOffTheDiskTheNetworkAndOtherProcesses() {
+		noClasses().that().resideInAPackage("..copperhead.core..")
+			.should().dependOnClassesThat().resideInAnyPackage("java.nio.file..", "java.net..")
+			.orShould().dependOnClassesThat().belongToAnyOf(ProcessBuilder.class)
+			.check(CLASSES);
+	}
+
+	@Example
+	public void shouldKeepViewsOffTheToolchain() {
+		noClasses().that().resideInAPackage("..copperhead.ui.view..")
+			.should().dependOnClassesThat().resideInAPackage("..copperhead.toolchain..")
+			.check(CLASSES);
+	}
+
+	@Example
+	public void shouldKeepTheToolchainUnawareOfTheInterfaceAndTheServer() {
+		noClasses().that().resideInAPackage("..copperhead.toolchain..")
+			.should().dependOnClassesThat().resideInAnyPackage("..copperhead.ui..", "..copperhead.web..")
+			.check(CLASSES);
+	}
 }

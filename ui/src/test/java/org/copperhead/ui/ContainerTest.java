@@ -17,8 +17,10 @@ package org.copperhead.ui;
 
 import jakarta.enterprise.inject.se.SeContainer;
 import jakarta.enterprise.inject.se.SeContainerInitializer;
+import java.util.stream.Stream;
 import net.jqwik.api.Example;
 import org.copperhead.ui.session.ProjectSession;
+import org.copperhead.ui.view.Modal;
 import org.copperhead.ui.view.Regions;
 import org.copperhead.ui.view.Tool;
 import org.copperhead.web.action.ActionExtension;
@@ -26,6 +28,7 @@ import org.copperhead.web.action.Actions;
 import org.copperhead.web.action.Form;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class ContainerTest {
 	@Example
@@ -37,6 +40,24 @@ public class ContainerTest {
 
 			assertInstanceOf(Regions.class, actions.invoke("tool", Form.parse("tool=SPRITES")).orElseThrow());
 			assertEquals(Tool.SPRITES, container.select(ProjectSession.class).get().state().tool());
+		}
+	}
+
+	/* The container builds the session from the preferences, which the build keeps inside its target folder. */
+	@Example
+	public void shouldWireProjectsEditingAndBuildsIntoTheSameSession() {
+		try (SeContainer container = SeContainerInitializer.newInstance().initialize()) {
+			final Actions actions = Actions.discovered(
+				container.getBeanManager().getExtension(ActionExtension.class)
+			);
+
+			assertTrue(Stream.of("project-new", "project-open", "project-recent", "project-create", "browse",
+				"file-open", "file-save", "file-save-all", "source-check", "build", "build-run",
+				"build-progress", "build-cancel", "trust-accept", "trust-refuse", "toolchain-fetch",
+				"preferences-save", "layout", "theme").allMatch(actions::knows));
+			assertInstanceOf(Regions.class,
+				actions.invoke("modal", Form.parse("kind=PREFERENCES")).orElseThrow());
+			assertEquals(Modal.PREFERENCES, container.select(ProjectSession.class).get().state().modal());
 		}
 	}
 }
