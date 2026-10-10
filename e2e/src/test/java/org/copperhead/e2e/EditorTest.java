@@ -77,4 +77,10 @@ public abstract class EditorTest extends BrowserTest {
 		page().keyboard().press("Control+Home");
 		page().keyboard().type(text);
 	}
+
+	/* The editor tells the server where the caret rests a moment after it stops, and that clears the note of whatever
+	   the studio did in between, so a build started before it would race with its own note. */
+	protected void awaitCaretHeard(final int line) {
+		await("the server told of the caret", () -> rig().session().state().cursor() == line);
+	}
 }

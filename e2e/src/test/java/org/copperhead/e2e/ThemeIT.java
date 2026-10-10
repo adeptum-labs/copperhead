@@ -15,12 +15,12 @@
 
 package org.copperhead.e2e;
 
-import com.microsoft.playwright.Locator;
 import net.jqwik.api.Example;
 import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
 
 public class ThemeIT extends BrowserTest {
 	private static final String THEME = "data-theme";
+	private static final String LIGHT = "light";
 
 	@Example
 	public void shouldStartDark() {
@@ -28,31 +28,20 @@ public class ThemeIT extends BrowserTest {
 	}
 
 	@Example
-	public void shouldKeepTheChosenThemeOnceThePageIsLoadedAgain() {
-		final Locator html = page().locator("html");
-
-		page().click(".titlebar__theme");
-		assertThat(html).hasAttribute(THEME, "light");
-
-		page().reload();
-		assertThat(html).hasAttribute(THEME, "light");
-	}
-
-	/* A new launch is another site to the browser, so only what the studio wrote to the home folder carries over. */
-	@Example
 	public void shouldKeepTheChosenThemeAcrossARestart() throws Exception {
 		page().click(".titlebar__theme");
-		awaitSaved(layout -> "light".equals(layout.theme()));
-		restart();
+		assertThat(page().locator("html")).hasAttribute(THEME, LIGHT);
 
-		assertThat(page().locator("html")).hasAttribute(THEME, "light");
+		awaitSaved(layout -> LIGHT.equals(layout.theme()));
+		restart();
+		assertThat(page().locator("html")).hasAttribute(THEME, LIGHT);
 	}
 
 	@Example
 	public void shouldSwitchTheThemeWithCtrlShiftL() {
 		page().keyboard().press("Control+Shift+L");
 
-		assertThat(page().locator("html")).hasAttribute(THEME, "light");
+		assertThat(page().locator("html")).hasAttribute(THEME, LIGHT);
 	}
 
 	@Example
@@ -60,6 +49,6 @@ public class ThemeIT extends BrowserTest {
 		page().click(".menu__button:text-is('View')");
 		page().click(".menu__item:has-text('Light mode')");
 
-		assertThat(page().locator("html")).hasAttribute(THEME, "light");
+		assertThat(page().locator("html")).hasAttribute(THEME, LIGHT);
 	}
 }

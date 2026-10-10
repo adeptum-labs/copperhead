@@ -20,6 +20,7 @@
 (() => {
 	const kit = CopperheadEditor;
 	const SAVE = "/action/file-save";
+	const SHOW_MESSAGE = "/action/goto-warning";
 	const REPORT_MILLIS = 400;
 
 	const buffers = new Map();
@@ -34,6 +35,7 @@
 	let caretAt = 1;
 	/* Where the server holds the cursor: where it last drew it, or heard it was. */
 	let reported = { name: null, line: 0 };
+	let revealing = false;
 	let reporting = 0;
 
 	const host = () => document.querySelector("#tool [data-editor-host]");
@@ -135,10 +137,10 @@
 		return fresh;
 	};
 
-	/* The caret goes where the server puts it on a source shown for the first time; otherwise it stays where it was,
-	   and the server hears of that instead. */
+	/* The caret goes where the server puts it to show a message, and on a source shown for the first time; otherwise
+	   it stays where it was, and the server hears of that instead. */
 	const place = (sent, buffer, first) => {
-		if (first) {
+		if (revealing || first) {
 			kit.reveal(shown.view, sent.cursor);
 		}
 
@@ -188,12 +190,13 @@
 				noteMissing(root, buffer);
 			}
 
-			if (buffer.focused) {
+			if (buffer.focused || revealing) {
 				shown.view.focus();
 			}
 		}
 
 		root.dataset.mounted = "true";
+		revealing = false;
 		paintTabs();
 	};
 
@@ -281,6 +284,7 @@
 			}
 		}
 
+		revealing = requestConfig.path === SHOW_MESSAGE;
 		paintTabs();
 	});
 

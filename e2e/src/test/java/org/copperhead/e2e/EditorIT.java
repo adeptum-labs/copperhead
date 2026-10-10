@@ -17,6 +17,7 @@ package org.copperhead.e2e;
 
 import com.microsoft.playwright.Locator;
 import net.jqwik.api.Example;
+import org.copperhead.ui.StubTools;
 import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -148,5 +149,30 @@ public class EditorIT extends EditorTest {
 
 		await("the window closed", () -> rig().window().commands().contains(CLOSE));
 		assertEquals("; saved on the way out", onDisk().lines().findFirst().orElseThrow());
+	}
+
+	@Example
+	public void shouldUnderlineABuildErrorAndShowItFromTheStatusBar() {
+		typeAtTheTop("\t" + StubTools.ERROR + " d0\n");
+		awaitCaretHeard(2);
+		page().keyboard().press("Control+b");
+
+		assertThat(page().locator("#tool .cm-lintRange-error")).isVisible();
+
+		page().locator("#status .status__error").click();
+
+		assertThat(page().locator("#tool .cm-activeLine")).containsText(StubTools.ERROR + " d0");
+		assertThat(page().locator(TEXT)).isFocused();
+	}
+
+	@Example
+	public void shouldSaveUnsavedTextBeforeBuilding() {
+		typeAtTheTop("; built as typed\n");
+		awaitCaretHeard(2);
+		page().keyboard().press("Control+b");
+
+		await("the unsaved text written", () -> onDisk().startsWith("; built as typed\n"));
+		assertThat(page().locator("#status .status__note")).hasText("Built demo.adf · 7 bytes");
+		assertThat(page().locator(UNSAVED)).not().hasClass(ON);
 	}
 }
