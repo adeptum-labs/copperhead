@@ -91,6 +91,14 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-surefire-plugin</artifactId>
+				<configuration>
+					<!-- A test that reaches the studio's own folders must never touch the real ones. -->
+					<environmentVariables>
+						<XDG_CONFIG_HOME>${project.build.directory}/xdg/config</XDG_CONFIG_HOME>
+						<XDG_DATA_HOME>${project.build.directory}/xdg/data</XDG_DATA_HOME>
+						<XDG_CACHE_HOME>${project.build.directory}/xdg/cache</XDG_CACHE_HOME>
+					</environmentVariables>
+				</configuration>
 			</plugin>
 			<plugin>
 				<groupId>org.jacoco</groupId>
