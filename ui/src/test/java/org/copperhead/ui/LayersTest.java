@@ -63,6 +63,7 @@ public class LayersTest {
 			.check(CLASSES);
 	}
 
+	/* The Maven dependencies already stop the toolchain reaching the interface; this keeps the server edge shut too. */
 	@Example
 	public void shouldKeepTheToolchainUnawareOfTheInterfaceAndTheServer() {
 		noClasses().that().resideInAPackage("..copperhead.toolchain..")

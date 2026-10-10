@@ -27,6 +27,7 @@ import org.copperhead.web.action.ActionExtension;
 import org.copperhead.web.action.Actions;
 import org.copperhead.web.action.Form;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -34,22 +35,22 @@ public class ContainerTest {
 	@Example
 	public void shouldFindTheControllersAndShareOneSessionBetweenThem() {
 		try (SeContainer container = SeContainerInitializer.newInstance().initialize()) {
-			final Actions actions = Actions.discovered(
-				container.getBeanManager().getExtension(ActionExtension.class)
-			);
+			final Actions actions = discovered(container);
 
 			assertInstanceOf(Regions.class, actions.invoke("tool", Form.parse("tool=SPRITES")).orElseThrow());
 			assertEquals(Tool.SPRITES, container.select(ProjectSession.class).get().state().tool());
 		}
 	}
 
-	/* The container builds the session from the preferences, which the build keeps inside its target folder. */
+	/**
+	 * The session is built from the preferences, which the Maven build keeps inside its target folder. The build
+	 * service is created only when first used, so the tool card is opened to run its production constructor; what
+	 * its shutdown does on close leaves nothing to observe while no build runs.
+	 */
 	@Example
 	public void shouldWireProjectsEditingAndBuildsIntoTheSameSession() {
 		try (SeContainer container = SeContainerInitializer.newInstance().initialize()) {
-			final Actions actions = Actions.discovered(
-				container.getBeanManager().getExtension(ActionExtension.class)
-			);
+			final Actions actions = discovered(container);
 
 			assertTrue(Stream.of("project-new", "project-open", "project-recent", "project-create", "browse",
 				"file-open", "file-save", "file-save-all", "source-check", "build", "build-run",
@@ -58,6 +59,12 @@ public class ContainerTest {
 			assertInstanceOf(Regions.class,
 				actions.invoke("modal", Form.parse("kind=PREFERENCES")).orElseThrow());
 			assertEquals(Modal.PREFERENCES, container.select(ProjectSession.class).get().state().modal());
+			assertInstanceOf(Regions.class, actions.invoke("tool", Form.parse("tool=BUILD")).orElseThrow());
+			assertFalse(container.select(ProjectSession.class).get().state().environment().tools().isEmpty());
 		}
+	}
+
+	private static Actions discovered(final SeContainer container) {
+		return Actions.discovered(container.getBeanManager().getExtension(ActionExtension.class));
 	}
 }
