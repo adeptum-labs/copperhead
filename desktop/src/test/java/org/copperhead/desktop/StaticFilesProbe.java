@@ -37,7 +37,8 @@ import org.copperhead.web.action.View;
  */
 public final class StaticFilesProbe {
 	static final List<String> ASSETS = List.of(
-		"/static/css/copperhead.css", "/static/js/htmx.min.js", "/static/fonts/ibm-plex-sans-latin.woff2"
+		"/static/css/copperhead.css", "/static/js/htmx.min.js", "/static/js/editor.bundle.js",
+		"/static/fonts/ibm-plex-sans-latin.woff2"
 	);
 
 	private StaticFilesProbe() {

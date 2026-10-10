@@ -1,0 +1,84 @@
+name: Installers
+
+on:
+  push:
+    branches: [master]
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: installers-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+      - name: Install the packaging tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq fakeroot rpm
+      - name: Build the packages
+        run: mvn -B install -Pinstaller -DskipTests
+      - name: Check that the packaged runtime serves the studio's files
+        run: mvn -B -Pinstaller -pl desktop failsafe:integration-test failsafe:verify
+      - name: Pack the portable folder, keeping its file modes
+        run: tar -C desktop/target/dist -czf desktop/target/dist/Copperhead-portable.tar.gz Copperhead
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: packages
+          path: |
+            desktop/target/dist/*.deb
+            desktop/target/dist/*.rpm
+            desktop/target/dist/Copperhead-portable.tar.gz
+          if-no-files-found: error
+
+  install:
+    needs: package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { image: 'debian:12', kind: deb, package: 'packages/copperhead_*.deb', desktop: x11 }
+          - { image: 'debian:13', kind: deb, package: 'packages/copperhead_*.deb', desktop: x11 }
+          - { image: 'ubuntu:22.04', kind: deb, package: 'packages/copperhead_*.deb', desktop: x11 }
+          - { image: 'ubuntu:24.04', kind: deb, package: 'packages/copperhead_*.deb', desktop: x11 }
+          - { image: 'fedora:42', kind: rpm, package: 'packages/copperhead-*.rpm', desktop: x11 }
+          - { image: 'ubuntu:24.04', kind: deb, package: 'packages/copperhead_*.deb', desktop: wayland }
+          - { image: 'fedora:42', kind: rpm, package: 'packages/copperhead-*.rpm', desktop: wayland }
+          - { image: 'debian:12', kind: portable, package: 'packages/Copperhead-portable.tar.gz', desktop: x11 }
+    name: install (${{ matrix.image }}, ${{ matrix.kind }}, ${{ matrix.desktop }})
+    # Chromium keeps its renderers' memory in /dev/shm, and Docker's default 64 MB makes them crash now and then. A
+    # Copperhead started in the background ends up a child of the container's first process, which has to be an init
+    # that reaps it, or it lingers as a zombie that still looks like it is running.
+    container:
+      image: ${{ matrix.image }}
+      options: --shm-size=512m --init
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: packages
+          path: packages
+      - name: Install Copperhead and run it
+        shell: bash
+        env:
+          PACKAGE: ${{ matrix.package }}
+          DESKTOP: ${{ matrix.desktop }}
+        # PACKAGE is left unquoted on purpose: the shell expands the file name pattern.
+        run: bash desktop/src/test/ci/installed-check.sh $PACKAGE "$DESKTOP"
