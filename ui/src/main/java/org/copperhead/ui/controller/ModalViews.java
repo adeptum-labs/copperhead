@@ -16,14 +16,14 @@
 package org.copperhead.ui.controller;
 
 import java.util.List;
-import java.util.Locale;
-import org.copperhead.core.project.Project;
+import org.copperhead.toolchain.PinnedSource;
 import org.copperhead.ui.session.StudioState;
 import org.copperhead.ui.view.Modal;
 import org.copperhead.ui.view.ModalView;
 import org.copperhead.ui.view.PairView;
 
 final class ModalViews {
+	private static final ModalView CLOSED = new ModalView(Modal.NONE, "", List.of(), List.of());
 	private static final List<PairView> SHORTCUTS = List.of(
 		new PairView("Play / pause", "F5"),
 		new PairView("Step / step over", "F8 · F10"),
@@ -38,25 +38,23 @@ final class ModalViews {
 	private ModalViews() {
 	}
 
+	/* The dialogs drawn from what their request brought close when drawn from the state alone, on a fresh page. */
 	static ModalView of(final StudioState state) {
-		final Project project = state.project();
-		final String kind = project.kind().name().toLowerCase(Locale.ROOT);
-
 		return switch (state.modal()) {
-			case NONE -> new ModalView(Modal.NONE, "", List.of(), List.of());
+			case NONE, NEW_PROJECT, OPEN_PROJECT, PREFERENCES, DISCARD, TRUST -> CLOSED;
 			case SHORTCUTS -> new ModalView(Modal.SHORTCUTS, "Keyboard shortcuts", SHORTCUTS, List.of());
 			case ABOUT -> new ModalView(Modal.ABOUT, "About Copperhead", List.of(), List.of(
 				"Copperhead · Amiga demo & game studio",
-				"vasm 1.9h · Shrinkler 4.7 · FS-UAE 3.1 core · OCS/ECS/AGA",
-				"Project: " + project.file() + " · " + project.parts().size() + " parts · "
-					+ project.sources().size() + " sources",
+				String.join(" · ", tool(PinnedSource.VASM), tool(PinnedSource.SHRINKLER), "FS-UAE 3.1 core",
+					"OCS/ECS/AGA"),
+				state.workspace().map(directory -> "Project: " + directory.chp()).orElse("No project open"),
 				"Copyright © 2026 Adam Waldenberg and Adeptum AB · GNU General Public License, version 3"));
-			case SETTINGS -> new ModalView(Modal.SETTINGS, "Project settings", List.of(
-				new PairView("Project", project.file() + " (" + kind + ")"),
-				new PairView("Target", state.target().label()),
-				new PairView("Video", "PAL · 50 Hz · 320×256"),
-				new PairView("Music", project.module()),
-				new PairView("Output", project.adf() + " · 880K DD")), List.of());
+			case SETTINGS -> ProjectDialogs.settings(state,
+				ProjectDialogs.settingsOf(Workspaces.open(state).file()), "");
 		};
+	}
+
+	private static String tool(final PinnedSource source) {
+		return source.tool() + " " + source.version();
 	}
 }

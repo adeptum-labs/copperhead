@@ -4,7 +4,8 @@
 		<div th:fragment="modal" id="modal" class="modal" hx-swap-oob="true" th:hidden="${!view.open()}">
 			<th:block th:if="${view.open()}">
 				<div class="modal__backdrop" hx-post="/action/modal-close"></div>
-				<section class="modal__card" role="dialog" aria-modal="true" th:aria-label="${view.title()}">
+				<!-- The card is the form its buttons send: copperhead.fields reads every data-field inside it. -->
+				<section class="modal__card" role="dialog" aria-modal="true" th:aria-label="${view.title()}" data-form>
 					<header class="modal__header">
 						<h2 class="modal__title" th:text="${view.title()}">Keyboard shortcuts</h2>
 						<button class="modal__close" type="button" hx-post="/action/modal-close"
@@ -16,8 +17,30 @@
 							<dd th:text="${row.value()}">F5</dd>
 						</th:block>
 					</dl>
+					<div class="modal__fields" th:unless="${view.fields().isEmpty()}">
+						<label class="field" th:each="field : ${view.fields()}">
+							<span class="field__label" th:text="${field.label()}">Name</span>
+							<input class="field__input" type="text" spellcheck="false" data-field
+								th:if="${field.choices().isEmpty()}" th:name="${field.name()}" th:value="${field.value()}">
+							<select class="field__input" data-field th:unless="${field.choices().isEmpty()}"
+								th:name="${field.name()}">
+								<option th:each="choice : ${field.choices()}" th:value="${choice.value()}"
+									th:selected="${choice.selected()}" th:text="${choice.label()}">Demo</option>
+							</select>
+						</label>
+					</div>
+					<div class="modal__entries" th:unless="${view.entries().isEmpty()}">
+						<button class="modal__entry" type="button" th:each="entry : ${view.entries()}"
+							th:classappend="${entry.modifier()}" th:attr="hx-post=${entry.post()}, hx-vals=${entry.vals()}"
+							th:text="${entry.label()}">projects/</button>
+					</div>
 					<div class="modal__lines" th:unless="${view.lines().isEmpty()}">
 						<p class="modal__line" th:each="line : ${view.lines()}" th:text="${line}"></p>
+					</div>
+					<div class="modal__buttons" th:unless="${view.buttons().isEmpty()}">
+						<button class="button" type="button" th:each="button : ${view.buttons()}"
+							th:classappend="${button.accent()} ? 'button--accent button--strong'"
+							th:attr="hx-post=${button.post()}, hx-vals=${button.vals()}" th:text="${button.label()}">Save</button>
 					</div>
 				</section>
 			</th:block>

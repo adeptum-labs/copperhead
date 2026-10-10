@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+	<body>
+		<div th:fragment="welcome" class="welcome">
+			<h2 class="welcome__title">Start a demo or a game</h2>
+			<p class="welcome__lead">A new project assembles and boots from its first build.</p>
+			<div class="welcome__actions">
+				<button class="button button--accent button--strong button--large" type="button"
+					hx-post="/action/project-new">New project…</button>
+				<button class="button button--large" type="button" hx-post="/action/project-open">Open project…</button>
+			</div>
+			<section class="welcome__recent" th:unless="${view.recent().isEmpty()}">
+				<h3 class="card__title">Recent</h3>
+				<button class="welcome__project" type="button" th:each="project : ${view.recent()}"
+					hx-post="/action/project-recent" th:hx-vals="${project.vals()}">
+					<span class="welcome__name" th:text="${project.name()}">demo.chp</span>
+					<span class="welcome__folder" th:text="${project.folder()}">/home/you/demo</span>
+				</button>
+			</section>
+		</div>
+	</body>
+</html>

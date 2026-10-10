@@ -15,15 +15,20 @@
 
 package org.copperhead.ui.session;
 
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import net.jqwik.api.Example;
+import org.copperhead.core.build.BuildOptions;
 import org.copperhead.core.build.BuildReport;
 import org.copperhead.core.build.BuildWarning;
 import org.copperhead.core.debug.Breakpoint;
+import org.copperhead.core.project.ProjectFile;
+import org.copperhead.core.project.ProjectKind;
 import org.copperhead.core.project.Target;
 import org.copperhead.core.sample.SampleProjects;
+import org.copperhead.toolchain.ProjectDirectory;
 import org.copperhead.ui.view.Modal;
 import org.copperhead.ui.view.Tool;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -33,17 +38,24 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class StudioStateTest {
-	private static final BuildReport WARNED = new BuildReport("nightfall.adf", List.of(),
-		List.of(new BuildWarning("plasma.s", 24, "scaled index needs 68020")), List.of(), 2911, Duration.ZERO);
+	private static final ProjectDirectory BLITZ = new ProjectDirectory(Path.of("/projects/blitz"),
+		ProjectFile.create("blitz", ProjectKind.GAME, Target.A1200_AGA)
+			.withBreakpoints(List.of(new Breakpoint("main.s", 7, 0))));
 
 	private final StudioState opened = StudioState.open(SampleProjects.nightfall(), Target.A500_OCS);
+	private final StudioState game = opened.enter(BLITZ);
+
+	private static BuildReport report(final List<BuildWarning> warnings, final List<BuildWarning> errors) {
+		return new BuildReport(errors.isEmpty() ? "blitz.adf" : "", List.of(), warnings, errors, 0, Duration.ZERO);
+	}
 
 	@Example
-	public void shouldOpenAtTheBreakpointInTheTracedFile() {
-		assertEquals("plasma.s", opened.file());
-		assertEquals(13, opened.cursor());
-		assertEquals(13, opened.pc());
-		assertEquals(List.of(new Breakpoint("plasma.s", 13, 1170)), opened.breakpoints());
+	public void shouldOpenWithNoProjectAndNothingBuilt() {
+		assertEquals(Optional.empty(), opened.workspace());
+		assertEquals(List.of(), opened.breakpoints());
+		assertEquals(Optional.empty(), opened.build());
+		assertEquals(BuildRun.idle(), opened.run());
+		assertEquals(Layout.defaults(), opened.layout());
 	}
 
 	@Example
@@ -54,74 +66,80 @@ public class StudioStateTest {
 	}
 
 	@Example
-	public void shouldOpenOnTheCodeWithNothingBuilt() {
+	public void shouldOpenOnTheCode() {
 		assertEquals(Tool.CODE, opened.tool());
 		assertEquals(Modal.NONE, opened.modal());
-		assertTrue(opened.build().isEmpty());
 	}
 
 	@Example
-	public void shouldBuildNothingOfASampleButStillRunIt() {
-		final StudioState built = opened.withRunning(false).build(true);
-
-		assertTrue(built.build().isEmpty());
-		assertTrue(built.running());
-		assertEquals("Nothing to build: open or create a project on disk first", built.note());
-	}
-
-	@Example
-	public void shouldSwitchToAnotherProjectInTheSameLayoutWithNothingBuilt() {
-		final StudioState game = opened.withTarget(Target.A1200_AGA).withTool(Tool.SPRITES).withTimelineShown(false)
-			.switchTo(SampleProjects.blitzball());
-
-		assertEquals("blitzball.chp", game.project().file());
+	public void shouldEnterAProjectAtItsEntryWithItsMachineOptionsAndBreakpoints() {
+		assertEquals(Optional.of(BLITZ), game.workspace());
+		assertEquals("main.s", game.file());
+		assertEquals(1, game.cursor());
 		assertEquals(Target.A1200_AGA, game.target());
-		assertEquals(Tool.SPRITES, game.tool());
-		assertFalse(game.timelineShown());
-		assertTrue(game.build().isEmpty());
-		assertEquals("Opened blitzball.chp (game)", game.note());
+		assertEquals(new BuildOptions(true, false), game.options());
+		assertEquals(List.of(new Breakpoint("main.s", 7, 0)), game.breakpoints());
+		assertEquals("Opened blitz.chp (game)", game.note());
+	}
+
+	@Example
+	public void shouldLetTheSampleOfItsKindStandInForTheRun() {
+		assertEquals(SampleProjects.blitzball(), game.project());
+	}
+
+	@Example
+	public void shouldEnterAnotherProjectInTheSameLayoutWithNothingBuilt() {
+		final StudioState entered = game.withTool(Tool.SPRITES).withTimelineShown(false)
+			.withLayout(new Layout("light", 40, 300)).withBuild(Optional.of(report(List.of(), List.of())))
+			.enter(BLITZ);
+
+		assertEquals(Tool.SPRITES, entered.tool());
+		assertFalse(entered.timelineShown());
+		assertEquals(new Layout("light", 40, 300), entered.layout());
+		assertEquals(Optional.empty(), entered.build());
 	}
 
 	@Example
 	public void shouldSetABreakpointThatHasNotBeenHitYet() {
-		assertTrue(opened.toggleBreakpoint(20).breakpoints().contains(new Breakpoint("plasma.s", 20, 0)));
+		assertTrue(game.toggleBreakpoint(20).breakpoints().contains(new Breakpoint("main.s", 20, 0)));
 	}
 
 	@Example
 	public void shouldTakeAwayTheBreakpointOnALineThatHasOne() {
-		assertFalse(opened.toggleBreakpoint(13).breakpointAt("plasma.s", 13));
+		assertFalse(game.toggleBreakpoint(7).breakpointAt("main.s", 7));
 	}
 
 	@Example
-	public void shouldRefuseALineTheOpenFileDoesNotHave() {
-		assertThrows(IllegalArgumentException.class, () -> opened.toggleBreakpoint(34));
-		assertThrows(IllegalArgumentException.class, () -> opened.moveCursor(0));
+	public void shouldRefuseALineBeforeTheFirst() {
+		assertThrows(IllegalArgumentException.class, () -> game.toggleBreakpoint(0));
+		assertThrows(IllegalArgumentException.class, () -> game.moveCursor(0));
+	}
+
+	@Example
+	public void shouldRefuseTheEditorWithNoProjectOpen() {
+		assertThrows(IllegalStateException.class, () -> opened.toggleBreakpoint(3));
+		assertThrows(IllegalStateException.class, () -> opened.openFile("main.s"));
 	}
 
 	@Example
 	public void shouldOpenAnotherFileAtItsFirstLine() {
-		final StudioState intro = opened.openFile("intro.s");
+		final StudioState sprite = game.moveCursor(9).openFile("sprite.i");
 
-		assertEquals("intro.s", intro.file());
-		assertEquals(1, intro.cursor());
-		assertThrows(IllegalArgumentException.class, () -> opened.openFile("nowhere.s"));
-	}
-
-	@Example
-	public void shouldShowTheFirstWarningOfTheBuildInTheCode() {
-		final StudioState shown = opened.withBuild(Optional.of(WARNED)).withTool(Tool.SPRITES).openFile("intro.s")
-			.showWarning();
-
-		assertEquals(Tool.CODE, shown.tool());
-		assertEquals("plasma.s", shown.file());
-		assertEquals(24, shown.cursor());
+		assertEquals("sprite.i", sprite.file());
+		assertEquals(1, sprite.cursor());
 	}
 
 	@Example
 	public void shouldStayWhereItIsWhenTheBuildWarnedOfNothing() {
-		final StudioState game = StudioState.open(SampleProjects.blitzball(), Target.A500_OCS);
+		final StudioState built = game.withBuild(Optional.of(report(List.of(), List.of())));
 
-		assertSame(game, game.showWarning());
+		assertSame(built, built.showWarning());
+	}
+
+	@Example
+	public void shouldNameASourceByTheLastPartOfItsPath() {
+		assertEquals("main.s", StudioState.sourceName("src/main.s"));
+		assertEquals("main.s", StudioState.sourceName("main.s"));
 	}
 
 	@Example
@@ -140,30 +158,15 @@ public class StudioStateTest {
 
 	@Example
 	public void shouldLeaveEveryHitCountAloneWhenAStepReachesNoBreakpoint() {
-		assertEquals(opened.breakpoints(), opened.step().breakpoints());
+		assertEquals(game.breakpoints(), game.step().breakpoints());
 	}
 
 	@Example
-	public void shouldNotCountAHitForALineOfAnotherFile() {
-		final StudioState marked = opened.openFile("intro.s").toggleBreakpoint(14);
-
-		assertEquals(0, marked.step().breakpoints().stream().filter(mark -> mark.file().equals("intro.s"))
-			.findFirst().orElseThrow().hits());
-	}
-
-	@Example
-	public void shouldCountAHitWhenAStepReachesABreakpoint() {
-		final StudioState round = opened.step().step().step().step();
+	public void shouldCountAHitWhenAStepReachesABreakpointOfTheTrace() {
+		final StudioState round = opened.withBreakpoints(List.of(new Breakpoint("plasma.s", 13, 0)))
+			.step().step().step().step();
 
 		assertEquals(13, round.pc());
-		assertEquals(1171, round.breakpoints().getFirst().hits());
-	}
-
-	@Example
-	public void shouldOpenWithNoProjectInTheDefaultLayoutWithNothingRunning() {
-		assertTrue(opened.workspace().isEmpty());
-		assertEquals(Layout.defaults(), opened.layout());
-		assertEquals(BuildRun.idle(), opened.run());
-		assertEquals(List.of(), opened.environment().recent());
+		assertEquals(1, round.breakpoints().getFirst().hits());
 	}
 }

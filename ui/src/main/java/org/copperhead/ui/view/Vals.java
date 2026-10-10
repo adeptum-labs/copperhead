@@ -15,16 +15,33 @@
 
 package org.copperhead.ui.view;
 
+import java.util.Map;
+import java.util.stream.Collectors;
+
 /** The value a control sends with its action, written as the JSON htmx reads from {@code hx-vals}. */
 public final class Vals {
 	private Vals() {
 	}
 
 	public static String of(final String name, final Object value) {
-		return "{\"" + name + "\":\"" + escape(String.valueOf(value)) + "\"}";
+		return of(Map.of(name, value));
 	}
 
-	private static String escape(final String value) {
-		return value.replace("\\", "\\\\").replace("\"", "\\\"");
+	/**
+	 * Values a script of the page works out as the control is sent. htmx reads an {@code hx-vals} of {@code js:}
+	 * as an object literal, so the script's object is spread into one.
+	 */
+	public static String spread(final String expression) {
+		return "js:{..." + expression + "}";
+	}
+
+	public static String of(final Map<String, ?> values) {
+		return values.entrySet().stream()
+			.map(entry -> quoted(entry.getKey()) + ":" + quoted(String.valueOf(entry.getValue())))
+			.collect(Collectors.joining(",", "{", "}"));
+	}
+
+	private static String quoted(final String value) {
+		return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
 	}
 }

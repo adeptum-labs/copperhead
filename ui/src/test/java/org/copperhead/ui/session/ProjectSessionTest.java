@@ -19,11 +19,15 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.UnaryOperator;
 import net.jqwik.api.Example;
 import net.jqwik.api.lifecycle.AfterTry;
 import net.jqwik.api.lifecycle.BeforeTry;
+import org.copperhead.core.project.ProjectKind;
+import org.copperhead.core.project.Target;
+import org.copperhead.toolchain.ProjectDirectory;
 import org.copperhead.ui.TempDirectory;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -45,6 +49,10 @@ public class ProjectSessionTest {
 	@AfterTry
 	public void remove() throws Exception {
 		home.close();
+	}
+
+	private Path made(final String name) throws Exception {
+		return ProjectDirectory.create(home.path(), name, ProjectKind.DEMO, Target.A500_OCS).chp();
 	}
 
 	@Example
@@ -84,6 +92,28 @@ public class ProjectSessionTest {
 		now.set(Instant.EPOCH.plusSeconds(90));
 
 		assertEquals(Duration.ofMillis(5_400), session.state().position());
+	}
+
+	@Example
+	public void shouldLaunchOnTheWelcomeWhenNoProjectWasOpenedBefore() {
+		assertEquals(Optional.empty(), session.state().workspace());
+		assertEquals("", session.state().note());
+	}
+
+	@Example
+	public void shouldLaunchOnTheMostRecentProjectThatStillOpens() throws Exception {
+		final Path older = made("older");
+		final Path newer = made("newer");
+
+		preferences.used(older);
+		preferences.used(newer);
+		Files.writeString(newer, "{\"format\": 99, \"name\": \"newer\", \"kind\": \"DEMO\"}");
+
+		final StudioState launched = new ProjectSession(preferences, now::get).state();
+
+		assertEquals(older.getParent(), launched.workspace().orElseThrow().dir());
+		assertEquals("main.s", launched.file());
+		assertEquals("", launched.note());
 	}
 
 	@Example

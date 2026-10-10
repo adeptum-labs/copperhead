@@ -15,9 +15,14 @@
 
 package org.copperhead.ui.view;
 
-/** What choosing a menu item does: carry out an action, switch the theme, or nothing yet. */
+/**
+ * What choosing a menu item does: carry out an action, switch the theme, run a command of the editor in the page,
+ * nothing yet, or nothing for now, such as saving while no project is open or building while a build runs.
+ */
 public enum ItemKind {
 	ACTION,
 	THEME,
-	LATER
+	EDITOR,
+	LATER,
+	OFF
 }

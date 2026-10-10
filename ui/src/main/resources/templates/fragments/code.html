@@ -1,19 +1,14 @@
 <!DOCTYPE html>
 <html lang="en" xmlns:th="http://www.thymeleaf.org">
 	<body>
-		<div th:fragment="code" class="code">
-			<div class="code__line" th:each="line : ${view.lines()}" th:classappend="${line.modifier()}">
-				<button class="code__gutter" type="button" hx-post="/action/breakpoint" th:hx-vals="${line.vals()}"
-					th:title="${line.breakpoint()} ? 'Remove breakpoint' : 'Set breakpoint'">
-					<span class="code__dot" th:classappend="${line.breakpoint()} ? 'code__dot--on'"></span>
-					<span class="code__number" th:text="${line.number()}">1</span>
-				</button>
-				<button class="code__text" type="button" hx-post="/action/cursor" th:hx-vals="${line.vals()}">
-					<span class="code__label" th:text="${line.label()}"></span>
-					<span class="code__mnemonic" th:text="${line.mnemonic()}"></span>
-					<span class="code__operands" th:text="${line.operands()}"></span>
-					<span class="code__comment" th:text="${line.comment()}"></span>
-				</button>
+		<div th:fragment="code" class="code" data-editor-host>
+			<div class="code__editor" data-editor></div>
+			<script type="application/json" data-source th:utext="${view.source()}">{}</script>
+			<div class="code__controls" hidden>
+				<button type="button" data-editor-control="breakpoint" hx-post="/action/breakpoint"
+					hx-vals="js:{...copperhead.editor.line()}"></button>
+				<button type="button" data-editor-control="cursor" hx-post="/action/cursor"
+					hx-vals="js:{...copperhead.editor.cursor()}"></button>
 			</div>
 		</div>
 	</body>

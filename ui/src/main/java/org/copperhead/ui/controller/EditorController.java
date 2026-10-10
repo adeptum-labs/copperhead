@@ -24,37 +24,51 @@ import org.copperhead.ui.view.Regions;
 import org.copperhead.web.action.Action;
 import org.copperhead.web.action.Form;
 
+/**
+ * The editor's side on the server: which source is open, where its cursor is, and the breakpoints. The page keeps
+ * the text being edited; what it is sent is what is on disk.
+ */
 @ApplicationScoped
-public class CodeController {
+public class EditorController {
+	private static final String NAME = "name";
+	private static final String LINE = "line";
+
 	private final ProjectSession session;
 
 	@Inject
-	public CodeController(final ProjectSession session) {
+	public EditorController(final ProjectSession session) {
 		this.session = session;
 	}
 
-	@Action("file")
-	public Regions onClickFile(final Form form) {
-		return Screens.regions(session.change(state -> state.openFile(form.get("name"))), Region.TOOL);
+	@Action("file-open")
+	public Regions onClickTab(final Form form) {
+		final String name = Workspaces.source(Workspaces.open(session.state()), form.get(NAME));
+
+		return Screens.regions(session.change(state -> state.openFile(name)), Region.TOOL);
 	}
 
+	/* The editor moves its own cursor; the studio only remembers where, for F9 and for the next time it is drawn. */
 	@Action("cursor")
-	public Regions onClickLine(final Form form) {
-		final int line = Integer.parseInt(form.get("line"));
+	public void onMoveCursor(final Form form) {
+		final int line = Integer.parseInt(form.get(LINE));
 
-		return Screens.regions(session.change(state -> state.moveCursor(line)), Region.TOOL);
+		session.change(state -> state.moveCursor(line));
 	}
 
 	@Action("breakpoint")
-	public Regions onClickLineNumber(final Form form) {
-		final int line = Integer.parseInt(form.get("line"));
+	public Regions onClickGutter(final Form form) {
+		final int line = Integer.parseInt(form.get(LINE));
 
 		return Screens.regions(session.change(state -> state.toggleBreakpoint(line)), Region.TOOL);
 	}
 
 	@Action("breakpoint-cursor")
-	public Regions onToggleBreakpoint() {
-		return Screens.regions(session.change(state -> state.toggleBreakpoint(state.cursor())), Region.TOOL);
+	public Regions onToggleBreakpoint(final Form form) {
+		final StudioState state = session.state();
+		final int line = form.has(LINE) ? Integer.parseInt(form.get(LINE)) : state.cursor();
+
+		return Screens.regions(session.change(changed -> changed.moveCursor(line).toggleBreakpoint(line)),
+			Region.TOOL);
 	}
 
 	@Action("breakpoints-clear")

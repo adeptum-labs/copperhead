@@ -35,8 +35,17 @@ public record MenuItemView(String label, String keys, String action, String vals
 		return keys.isEmpty() ? null : keys.toLowerCase(Locale.ROOT);
 	}
 
+	/** The editor command the item runs in the page, without asking the server. */
+	public String editor() {
+		return kind == ItemKind.EDITOR ? action : null;
+	}
+
 	public boolean later() {
 		return kind == ItemKind.LATER;
+	}
+
+	public boolean disabled() {
+		return kind == ItemKind.LATER || kind == ItemKind.OFF;
 	}
 
 	public boolean theme() {

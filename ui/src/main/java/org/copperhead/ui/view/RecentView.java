@@ -15,20 +15,5 @@
 
 package org.copperhead.ui.view;
 
-/** A line of source as the editor shows it, with where the run and the cursor are. */
-public record CodeLineView(int number, String label, String mnemonic, String operands, String comment,
-	boolean breakpoint, boolean pc, boolean cursor) {
-
-	public String vals() {
-		return Vals.of("line", number);
-	}
-
-	/* The program counter outranks the cursor: where the run stopped matters more than where the eye is. */
-	public String modifier() {
-		if (pc) {
-			return "code__line--pc";
-		}
-
-		return cursor ? "code__line--cursor" : "";
-	}
+public record RecentView(String name, String folder, String vals) {
 }

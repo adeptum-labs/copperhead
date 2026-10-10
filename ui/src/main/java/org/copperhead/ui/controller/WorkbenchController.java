@@ -17,9 +17,8 @@ package org.copperhead.ui.controller;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import org.copperhead.core.project.Project;
+import java.util.List;
 import org.copperhead.core.project.Target;
-import org.copperhead.core.sample.SampleProjects;
 import org.copperhead.ui.session.Layout;
 import org.copperhead.ui.session.Preferences;
 import org.copperhead.ui.session.ProjectSession;
@@ -31,11 +30,12 @@ import org.copperhead.web.action.Action;
 import org.copperhead.web.action.Form;
 
 /**
- * The commands of the window itself: which tool is shown, which project and machine, the dialogs, and how the
- * person likes the window, which is kept with their preferences so the next launch opens it the same way.
+ * The commands of the window itself: which tool is shown, which machine, the dialogs, and how the person likes
+ * the window, which is kept with their preferences so the next launch opens it the same way.
  */
 @ApplicationScoped
 public class WorkbenchController {
+	private static final List<Modal> TOLD = List.of(Modal.SHORTCUTS, Modal.ABOUT, Modal.SETTINGS);
 	private static final String THEME = "theme";
 	private static final String SPLIT = "split";
 	private static final String BOTTOM = "bottom";
@@ -57,13 +57,6 @@ public class WorkbenchController {
 			Region.TOOL);
 	}
 
-	@Action("project")
-	public Regions onClickProject(final Form form) {
-		final Project project = SampleProjects.named(form.get("name"));
-
-		return Screens.all(session.change(state -> state.switchTo(project)));
-	}
-
 	@Action("target")
 	public Regions onClickTarget(final Form form) {
 		final Target target = Target.chipset(form.get("target"));
@@ -74,6 +67,10 @@ public class WorkbenchController {
 	@Action("modal")
 	public Regions onClickModal(final Form form) {
 		final Modal modal = Modal.valueOf(form.get("kind"));
+
+		if (!TOLD.contains(modal)) {
+			throw new IllegalArgumentException("The dialog " + modal + " opens from its own action");
+		}
 
 		return Screens.regions(session.change(state -> state.withModal(modal)), Region.MODAL);
 	}

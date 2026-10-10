@@ -1652,3 +1652,125 @@ html[data-theme="light"] [data-theme-toggle] .menu__check {
 .modal__line:first-of-type {
 	color: var(--fg);
 }
+
+.welcome {
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+	max-width: 560px;
+	padding: 32px 28px;
+}
+
+.welcome__title {
+	margin: 0;
+	font-size: 18px;
+	font-weight: 600;
+}
+
+.welcome__lead {
+	margin: 0;
+	color: var(--mute);
+}
+
+.welcome__actions {
+	display: flex;
+	gap: 8px;
+}
+
+.welcome__recent {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	margin-top: 10px;
+}
+
+.welcome__project {
+	display: flex;
+	gap: 12px;
+	align-items: baseline;
+	padding: 6px 8px;
+	border: 0;
+	border-radius: 6px;
+	background: transparent;
+	text-align: left;
+	cursor: pointer;
+}
+
+.welcome__project:hover {
+	background: var(--hl);
+}
+
+.welcome__folder {
+	overflow: hidden;
+	color: var(--mute);
+	font: 11px var(--mono);
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.modal__fields {
+	display: grid;
+	gap: 10px;
+}
+
+.field {
+	display: grid;
+	grid-template-columns: 7em minmax(0, 1fr);
+	gap: 12px;
+	align-items: center;
+}
+
+.field__label {
+	color: var(--mute);
+}
+
+.field__input {
+	min-width: 0;
+	padding: 5px 8px;
+	border: 1px solid var(--line);
+	border-radius: 6px;
+	background: var(--ed);
+	color: var(--fg);
+	font: inherit;
+	user-select: text;
+}
+
+.field__input:focus {
+	outline: 1px solid var(--acc);
+	border-color: var(--acc);
+}
+
+.modal__entries {
+	display: flex;
+	flex-direction: column;
+	max-height: 220px;
+	overflow: auto;
+	padding: 4px;
+	border: 1px solid var(--line);
+	border-radius: 6px;
+	background: var(--ed);
+}
+
+.modal__entry {
+	padding: 4px 8px;
+	border: 0;
+	border-radius: 4px;
+	background: transparent;
+	font: 12px var(--mono);
+	text-align: left;
+	cursor: pointer;
+}
+
+.modal__entry:hover {
+	background: var(--hl);
+}
+
+.modal__entry--project {
+	color: var(--lbl);
+}
+
+.modal__buttons {
+	display: flex;
+	justify-content: flex-end;
+	gap: 8px;
+}

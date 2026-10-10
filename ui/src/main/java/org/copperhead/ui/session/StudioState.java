@@ -27,8 +27,12 @@ import org.copperhead.core.build.BuildReport;
 import org.copperhead.core.debug.Breakpoint;
 import org.copperhead.core.graphics.Sprite;
 import org.copperhead.core.project.Project;
+import org.copperhead.core.project.ProjectFile;
+import org.copperhead.core.project.ProjectKind;
+import org.copperhead.core.project.ProjectLayout;
 import org.copperhead.core.project.Target;
 import org.copperhead.core.sample.SampleMachine;
+import org.copperhead.core.sample.SampleProjects;
 import org.copperhead.toolchain.ProjectDirectory;
 import org.copperhead.ui.view.Modal;
 import org.copperhead.ui.view.Tool;
@@ -36,6 +40,9 @@ import org.copperhead.ui.view.Tool;
 /**
  * Everything the studio shows, in one value. A change makes a new one, so what a region draws can never be
  * half of one action and half of another.
+ *
+ * <p>The project on disk is the workspace; the file, cursor, breakpoints, options and build are its. The sample
+ * project stands in for what is not real yet: the machine's run, the debugger's trace, the timeline and the screen.
  */
 @With
 public record StudioState(Project project, Target target, Tool tool, Modal modal, boolean running,
@@ -45,35 +52,45 @@ public record StudioState(Project project, Target target, Tool tool, Modal modal
 
 	private static final int BYTE = 0xFF;
 	private static final int FIRST_D0 = 0x17;
-	private static final int FIRST_HITS = 1170;
+	private static final int TOP = 1;
 	private static final int BASE_COLOUR = 1;
 	private static final int FIRST_PICK = 4;
 	private static final Duration FIRST_POSITION = Duration.ofMillis(23_400);
+	private static final char SEPARATOR = '/';
 	private static final String NOTHING_TO_BUILD = "Nothing to build: open or create a project on disk first";
 
 	public StudioState {
 		breakpoints = List.copyOf(breakpoints);
 	}
 
-	/** A project as it opens: stopped at its breakpoint, playing from inside its third part, not built yet. */
+	/** The studio with no project open, the sample running from inside its third part, nothing built. */
 	public static StudioState open(final Project project, final Target target) {
-		final String traced = project.trace().file();
-
-		return new StudioState(project, target, Tool.CODE, Modal.NONE, true, true, "", traced, project.breakpoint(),
-			List.of(new Breakpoint(traced, project.breakpoint(), FIRST_HITS)), project.breakpoint(), FIRST_D0,
-			SampleMachine.ball(), BASE_COLOUR, FIRST_PICK, BuildOptions.defaults(), Optional.empty(),
-			FIRST_POSITION,
-			Optional.empty(), Layout.defaults(), BuildRun.idle(), Environment.of(List.of()));
+		return new StudioState(project, target, Tool.CODE, Modal.NONE, true, true, "", "", TOP, List.of(),
+			project.breakpoint(), FIRST_D0, SampleMachine.ball(), BASE_COLOUR, FIRST_PICK,
+			BuildOptions.defaults(), Optional.empty(), FIRST_POSITION, Optional.empty(), Layout.defaults(),
+			BuildRun.idle(), Environment.of(List.of()));
 	}
 
 	/**
-	 * Another project, opened as it was saved and not built yet. Nothing of the one before carries over but the
-	 * machine and how the window is laid out, which belong to the person rather than to a project.
+	 * The project in a directory, opened at its entry file and not built yet, with the sample of its kind standing
+	 * in for its run. The layout, the tool shown and what was found around the studio stay: they are the person's.
 	 */
-	public StudioState switchTo(final Project other) {
-		return open(other, target).withTool(tool).withTimelineShown(timelineShown).withLayout(layout)
-			.withEnvironment(environment).withNote("Opened %s (%s)".formatted(other.file(),
-				other.kind().name().toLowerCase(Locale.ROOT)));
+	public StudioState enter(final ProjectDirectory directory) {
+		final ProjectFile opened = directory.file();
+		final Project standIn = opened.kind() == ProjectKind.GAME ? SampleProjects.blitzball()
+			: SampleProjects.nightfall();
+
+		return open(standIn, opened.target()).withTool(tool).withTimelineShown(timelineShown).withLayout(layout)
+			.withEnvironment(environment).withWorkspace(Optional.of(directory))
+			.withFile(sourceName(opened.entry())).withBreakpoints(opened.breakpoints())
+			.withOptions(opened.options())
+			.withNote("Opened %s (%s)".formatted(ProjectLayout.chp(opened.name()),
+				opened.kind().name().toLowerCase(Locale.ROOT)));
+	}
+
+	/** The name the editor knows a source by, from the path a project file or the assembler gives it. */
+	public static String sourceName(final String path) {
+		return path.substring(path.lastIndexOf(SEPARATOR) + 1);
 	}
 
 	public boolean breakpointAt(final String in, final int line) {
@@ -93,10 +110,10 @@ public record StudioState(Project project, Target target, Tool tool, Modal modal
 			.toList());
 	}
 
-	/** Opens a source; the traced one opens where the run stopped, any other at its top. */
+	/** Opens a source of the project at its top; the caller has made sure the project holds it. */
 	public StudioState openFile(final String name) {
-		project.source(name);
-		return withFile(name).withCursor(name.equals(project.trace().file()) ? pc : 1);
+		requireProject();
+		return withFile(name).withCursor(TOP);
 	}
 
 	public StudioState moveCursor(final int line) {
@@ -180,7 +197,18 @@ public record StudioState(Project project, Target target, Tool tool, Modal modal
 		return withPaletteIndex(index);
 	}
 
+	/* The editor holds more lines than were last saved, so a line is refused only when no file could have it. */
 	private void requireLine(final int line) {
-		project.source(file).line(line);
+		requireProject();
+
+		if (line < TOP) {
+			throw new IllegalArgumentException(file + " has no line " + line);
+		}
+	}
+
+	private void requireProject() {
+		if (workspace.isEmpty()) {
+			throw new IllegalStateException("No project is open");
+		}
 	}
 }

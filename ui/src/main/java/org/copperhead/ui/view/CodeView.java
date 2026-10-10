@@ -15,14 +15,14 @@
 
 package org.copperhead.ui.view;
 
-import java.util.List;
 import org.copperhead.web.action.View;
 
-public record CodeView(List<CodeLineView> lines) implements View {
-	public CodeView {
-		lines = List.copyOf(lines);
-	}
-
+/**
+ * The editor of the open project. The page edits in its own editor and keeps the unsaved text; what comes from here
+ * is what is on disk, as the JSON the page reads: every source with its time of change, the breakpoints and what
+ * the last build said of each line.
+ */
+public record CodeView(String source) implements View {
 	@Override
 	public String template() {
 		return "fragments/code :: code";

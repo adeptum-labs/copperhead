@@ -15,8 +15,10 @@
 
 package org.copperhead.ui;
 
+import jakarta.json.JsonObject;
 import java.net.http.HttpResponse;
-import java.time.Duration;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -25,19 +27,23 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 import net.jqwik.api.Example;
 import net.jqwik.api.lifecycle.AfterTry;
 import net.jqwik.api.lifecycle.BeforeTry;
-import org.copperhead.core.build.BuildReport;
-import org.copperhead.core.build.BuildWarning;
+import org.copperhead.core.project.ProjectKind;
+import org.copperhead.core.project.Target;
+import org.copperhead.toolchain.ProjectDirectory;
 import org.copperhead.ui.session.StudioState;
 import org.copperhead.ui.view.Region;
 import org.copperhead.ui.view.Tool;
 import org.jsoup.nodes.Element;
+import static org.copperhead.ui.Flows.GUTTER;
+import static org.copperhead.ui.Flows.lines;
+import static org.copperhead.ui.Flows.noted;
+import static org.copperhead.ui.Flows.source;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -95,6 +101,24 @@ public class StudioFlowTest {
 		return "#rail [hx-vals*=" + tool.name() + "]";
 	}
 
+	/* Another project beside the one open, made from its template and remembered as opened lately. */
+	private Path made(final ProjectKind kind, final String name) throws Exception {
+		final Path chp = ProjectDirectory.create(rig.home().resolve(WorkbenchRig.PROJECTS), name, kind,
+			Target.A500_OCS).chp();
+
+		rig.preferences().used(chp);
+		return chp;
+	}
+
+	/* Opens a project the way the File menu's recent list does; nothing is unsaved, so nothing is asked. */
+	private static Screen open(final Path chp, final Screen screen) throws Exception {
+		return screen.trigger("#menus [hx-post=\"/action/project-recent\"]", Map.of("path", chp.toString()));
+	}
+
+	private Screen open(final Path chp) throws Exception {
+		return open(chp, Screen.open(rig));
+	}
+
 	@Example
 	public void shouldSwitchToolsFromTheRail() throws Exception {
 		final Screen screen = Screen.open(rig).click(railTool(Tool.SPRITES));
@@ -122,29 +146,26 @@ public class StudioFlowTest {
 
 	@Example
 	public void shouldOpenTheOtherProjectAfresh() throws Exception {
-		final Screen screen = Screen.open(rig);
+		final Screen screen = open(made(ProjectKind.GAME, "arcade"));
 
-		rig.session().change(state -> state.withFile("intro.s").withCursor(5));
-		screen.click("#menus [hx-vals*=blitzball]");
-
-		assertEquals("blitzball.chp", screen.find("#menus .menus__project").text());
+		assertEquals("arcade.chp", screen.find("#menus .menus__project").text());
 		assertEquals("main.s", rig.session().state().file());
-		assertEquals(11, rig.session().state().cursor());
-		assertEquals("main.s:11", rig.session().state().breakpoints().getFirst().location());
+		assertEquals(1, rig.session().state().cursor());
+		assertEquals(List.of(), rig.session().state().breakpoints());
 	}
 
 	@Example
 	public void shouldOpenTheOtherProjectInTheSameLayoutWithNothingBuilt() throws Exception {
-		final Screen screen = Screen.open(rig).click(railTool(Tool.SPRITES)).press("ctrl+j")
-			.click("#menus [hx-vals*=blitzball]");
+		final Path arcade = made(ProjectKind.GAME, "arcade");
+		final Screen screen = Screen.open(rig).click(railTool(Tool.SPRITES)).press("ctrl+j");
+
+		screen.trigger("#menus [hx-post=\"/action/project-recent\"]", Map.of("path", arcade.toString()));
 
 		assertEquals("Sprites", screen.find("#rail .rail__tool--on").attr("title"));
 		assertTrue(screen.find("#timeline").hasAttr("hidden"));
 		assertEquals("0 warnings", screen.find("#status .status__warnings").text());
 		assertEquals("last build not built yet", screen.find("#status .status__build").text());
-		assertEquals("Opened blitzball.chp (game)", screen.find("#status .status__note").text());
-		assertEquals("blitzball.adf · not built yet · A500",
-			screen.click(railTool(Tool.BUILD)).find("#tool .build__summary").text());
+		assertEquals("Opened arcade.chp (game)", screen.find("#status .status__note").text());
 	}
 
 	@Example
@@ -168,8 +189,9 @@ public class StudioFlowTest {
 		final Map<String, Map<String, String>> unknown = Map.of(
 			"#rail [hx-vals*=SPRITES]", Map.of("tool", "NOPE"),
 			"#machine [hx-vals*=AGA]", Map.of("target", "ECS"),
-			"#menus [hx-post=/action/modal]", Map.of("kind", "NOPE"),
-			"#menus [hx-vals*=blitzball]", Map.of("name", "nowhere"));
+			"#menus [hx-post=\"/action/modal\"]", Map.of("kind", "NOPE"),
+			"#menus [hx-post=\"/action/project-recent\"]",
+			Map.of("path", rig.home().resolve("nowhere.chp").toString()));
 
 		assertAll(unknown.entrySet().stream().map(bad -> () -> {
 			final StudioState before = rig.session().state();
@@ -177,7 +199,7 @@ public class StudioFlowTest {
 			assertEquals(500, screen.trigger(bad.getKey(), bad.getValue()).status(), bad.getKey());
 			assertEquals(before, rig.session().state(), bad.getKey());
 		}));
-		assertAll(Stream.of("tool", "target", "modal", "project").map(action -> () -> {
+		assertAll(Stream.of("tool", "target", "modal", "project-recent").map(action -> () -> {
 			final StudioState before = rig.session().state();
 
 			assertEquals(500, screen.client().submit("/action/" + action, "").statusCode(), action);
@@ -203,11 +225,12 @@ public class StudioFlowTest {
 
 	@Example
 	public void shouldOfferWhatIsNotBuiltYetDisabled() throws Exception {
-		final Element save = Screen.open(rig).document().select("#menus .menu__item").stream()
-			.filter(item -> item.select(".menu__label").text().equals("Save")).findFirst().orElseThrow();
+		final Element importing = Screen.open(rig).document().select("#menus .menu__item").stream()
+			.filter(item -> item.select(".menu__label").text().equals("Import asset…")).findFirst()
+			.orElseThrow();
 
-		assertTrue(save.hasAttr("disabled"));
-		assertEquals("Coming in a later release", save.attr("title"));
+		assertTrue(importing.hasAttr("disabled"));
+		assertEquals("Coming in a later release", importing.attr("title"));
 	}
 
 	private static String line(final int number) {
@@ -215,56 +238,61 @@ public class StudioFlowTest {
 	}
 
 	@Example
-	public void shouldOpenTheTracedFileStoppedAtItsBreakpoint() throws Exception {
+	public void shouldOpenTheProjectAtItsEntryFile() throws Exception {
 		final Screen screen = Screen.open(rig);
+		final JsonObject source = source(screen);
 
-		assertEquals("plasma.s", screen.find("#tool .tool__tab--active").text());
-		screen.find("#tool .tool__tab--active .tool__mark--on");
-		assertTrue(screen.find(line(13)).hasClass("code__line--pc"));
-		assertTrue(screen.find(line(13) + " .code__dot").hasClass("code__dot--on"));
-		assertEquals("68000 · UTF-8 · ln 13 · 1 breakpoint", screen.find("#tool .tool__meta").text());
+		assertEquals("main.s", screen.find("#tool .tool__tab--active").text());
+		assertEquals("main.s", source.getString("active"));
+		assertEquals(Files.readString(rig.project().dir().resolve("src/main.s")),
+			source.getJsonArray("files").getJsonObject(0).getString("text"));
+		assertEquals("68000 · UTF-8 · 0 breakpoints", screen.find("#tool .tool__meta").text());
 	}
 
 	@Example
 	public void shouldToggleABreakpointOnTheLineNumber() throws Exception {
-		final Screen screen = Screen.open(rig).click(line(20) + " .code__gutter");
+		final Screen screen = Screen.open(rig).trigger(GUTTER, Map.of("line", "3"));
 
-		assertTrue(screen.find(line(20) + " .code__dot").hasClass("code__dot--on"));
-		screen.click(line(20) + " .code__gutter");
-		assertFalse(screen.find(line(20) + " .code__dot").hasClass("code__dot--on"));
+		assertEquals(List.of(3), lines(source(screen)));
+		screen.trigger(GUTTER, Map.of("line", "3"));
+		assertEquals(List.of(), lines(source(screen)));
 	}
 
 	@Example
 	public void shouldSetABreakpointWhereTheCursorIsWithF9() throws Exception {
-		final Screen screen = Screen.open(rig).click(line(5) + " .code__text").press("f9");
+		final Screen screen = Screen.open(rig).trigger(GUTTER, Map.of("line", "2"))
+			.trigger("[data-key=f9]", Map.of("line", "5"));
 
-		assertTrue(screen.find(line(5)).hasClass("code__line--cursor"));
-		assertTrue(screen.find(line(5) + " .code__dot").hasClass("code__dot--on"));
-		assertEquals("68000 · UTF-8 · ln 5 · 2 breakpoints", screen.find("#tool .tool__meta").text());
+		assertEquals(5, source(screen).getInt("cursor"));
+		assertEquals(List.of(2, 5), lines(source(screen)));
+		assertEquals("68000 · UTF-8 · 2 breakpoints", screen.find("#tool .tool__meta").text());
 	}
 
 	@Example
 	public void shouldSwitchFilesFromTheTabs() throws Exception {
-		final Screen screen = Screen.open(rig).click("#tool [hx-vals*=intro.s]");
+		Files.writeString(rig.project().dir().resolve("src/tables.i"), "sine:\tdc.w 0\n");
 
-		assertEquals("intro.s", screen.find("#tool .tool__tab--active").text());
-		assertTrue(screen.document().select("#tool .code__line--pc").isEmpty());
-		assertEquals(20, screen.document().select("#tool .code__line").size());
+		final Screen screen = Screen.open(rig).click("#tool [hx-vals*=tables.i]");
+
+		assertEquals("tables.i", screen.find("#tool .tool__tab--active").text());
+		assertEquals("tables.i", source(screen).getString("active"));
+		assertEquals(List.of("main.s", "tables.i"), screen.document().select("#tool .tool__tab").eachText());
 	}
 
 	@Example
 	public void shouldClearEveryBreakpointFromTheDebugMenu() throws Exception {
-		final Screen screen = Screen.open(rig).click("#menus [hx-post=/action/breakpoints-clear]");
+		final Screen screen = Screen.open(rig).trigger(GUTTER, Map.of("line", "2"))
+			.trigger(GUTTER, Map.of("line", "4")).click("#menus [hx-post=\"/action/breakpoints-clear\"]");
 
-		assertTrue(screen.document().select("#tool .code__dot--on").isEmpty());
+		assertEquals(List.of(), lines(source(screen)));
 	}
 
 	@Example
-	public void shouldRefuseALineTheFileDoesNotHave() throws Exception {
+	public void shouldRefuseALineTheFileCannotHave() throws Exception {
 		final Screen screen = Screen.open(rig);
 		final StudioState before = rig.session().state();
 
-		assertEquals(500, screen.trigger(line(5) + " .code__text", Map.of("line", "99")).status());
+		assertEquals(500, screen.trigger("#tool [data-editor-control=cursor]", Map.of("line", "0")).status());
 		assertEquals(before, rig.session().state());
 	}
 
@@ -273,7 +301,7 @@ public class StudioFlowTest {
 		final Screen screen = Screen.open(rig);
 		final StudioState before = rig.session().state();
 
-		assertEquals(500, screen.trigger(line(5) + " .code__gutter", Map.of("line", "five")).status());
+		assertEquals(500, screen.trigger(GUTTER, Map.of("line", "five")).status());
 		assertEquals(before, rig.session().state());
 	}
 
@@ -349,24 +377,27 @@ public class StudioFlowTest {
 
 	@Example
 	public void shouldShowRegistersCopperMemoryAndBreakpoints() throws Exception {
-		final Screen screen = Screen.open(rig).click(railTool(Tool.DEBUGGER));
+		final Screen screen = Screen.open(rig).trigger(GUTTER, Map.of("line", "3")).click(railTool(Tool.DEBUGGER));
 
 		assertEquals("00000017", screen.find("#tool .register:nth-of-type(1) .register__value").text());
 		assertEquals("END", screen.find("#tool .copper__row:last-of-type .copper__decoded").text());
 		assertEquals(4, screen.document().select("#tool .memory__row").size());
-		assertEquals("plasma.s:13", screen.find("#tool .breakpoint__location").text());
+		assertEquals("main.s:3", screen.find("#tool .breakpoint__location").text());
 		assertEquals("Pause · F5", screen.find("#tool .debugger__bar [hx-post=/action/run]").text());
 	}
 
 	/* A breakpoint can be set in any file, so the card names none. */
 	@Example
 	public void shouldListTheBreakpointsOfEveryFile() throws Exception {
-		final Screen screen = Screen.open(rig).click("#tool [hx-vals*=intro.s]").click(line(5) + " .code__gutter")
+		Files.writeString(rig.project().dir().resolve("src/tables.i"), "sine:\tdc.w 0\n");
+
+		final Screen screen = Screen.open(rig).trigger(GUTTER, Map.of("line", "3"))
+			.click("#tool [hx-vals*=tables.i]").trigger(GUTTER, Map.of("line", "1"))
 			.click(railTool(Tool.DEBUGGER));
 
 		assertTrue(screen.document().select("#tool .card__title").eachText()
 			.contains("Breakpoints · click a line number in Code to toggle"));
-		assertEquals(List.of("plasma.s:13", "intro.s:5"),
+		assertEquals(List.of("main.s:3", "tables.i:1"),
 			screen.document().select("#tool .breakpoint__location").eachText());
 	}
 
@@ -381,19 +412,11 @@ public class StudioFlowTest {
 	}
 
 	@Example
-	public void shouldCountTheHitWhenTheRunComesRound() throws Exception {
+	public void shouldStopWhereTheRunStartedOnceItComesRound() throws Exception {
 		final Screen screen = Screen.open(rig).click(railTool(Tool.DEBUGGER))
 			.press("f8").press("f8").press("f8").press("f10");
 
-		assertEquals("stopped · plasma.s:13 · 1,171 hits", screen.find("#tool .debugger__status").text());
-		assertEquals("1,171 hits", screen.find("#tool .breakpoint__hits").text());
-	}
-
-	@Example
-	public void shouldMarkTheLineTheRunStoppedOnInTheCode() throws Exception {
-		final Screen screen = Screen.open(rig).press("f8").click(railTool(Tool.CODE));
-
-		assertTrue(screen.find(line(14)).hasClass("code__line--pc"));
+		assertEquals("stopped · plasma.s:13", screen.find("#tool .debugger__status").text());
 	}
 
 	@Example
@@ -424,43 +447,29 @@ public class StudioFlowTest {
 	}
 
 	@Example
-	public void shouldJumpToTheLineAWarningNames() throws Exception {
-		rig.session().change(state -> state.withBuild(Optional.of(new BuildReport("nightfall.adf", List.of(),
-			List.of(new BuildWarning("plasma.s", 24, "scaled index needs 68020")), List.of(), 2911,
-			Duration.ofMillis(900)))));
-		final Screen screen = Screen.open(rig).click(railTool(Tool.SPRITES));
-
-		assertEquals("1 warning · plasma.s:24", screen.find("#status .status__warning").text());
-		assertEquals("last build 2,911 bytes · 0.9s", screen.find("#status .status__build").text());
-		screen.click("#status .status__warning");
-		assertEquals("plasma.s", screen.find("#tool .tool__tab--active").text());
-		assertTrue(screen.find(line(24)).hasClass("code__line--cursor"));
-	}
-
-	@Example
 	public void shouldForgetTheNoteOnTheNextAction() throws Exception {
-		final Screen screen = Screen.open(rig).press("ctrl+b").click(railTool(Tool.SPRITES));
+		final Screen screen = noted(Screen.open(rig), rig).click(railTool(Tool.SPRITES));
 
 		assertTrue(screen.document().select("#status .status__note").isEmpty());
 	}
 
 	@Example
 	public void shouldForgetTheNoteOnABreakpointToggle() throws Exception {
-		final Screen screen = Screen.open(rig).press("ctrl+b").click(line(20) + " .code__gutter");
+		final Screen screen = noted(Screen.open(rig), rig).trigger(GUTTER, Map.of("line", "2"));
 
 		assertTrue(screen.document().select("#status .status__note").isEmpty());
 	}
 
 	@Example
 	public void shouldForgetTheNoteOnABuildOptionToggle() throws Exception {
-		final Screen screen = Screen.open(rig).press("ctrl+b").click("#menus [hx-vals*=SHRINKLER]");
+		final Screen screen = noted(Screen.open(rig), rig).click("#menus [hx-vals*=SHRINKLER]");
 
 		assertTrue(screen.document().select("#status .status__note").isEmpty());
 	}
 
 	@Example
 	public void shouldForgetTheNoteOnASpritePaint() throws Exception {
-		final Screen screen = Screen.open(rig).click(railTool(Tool.SPRITES)).press("ctrl+b")
+		final Screen screen = noted(Screen.open(rig).click(railTool(Tool.SPRITES)), rig)
 			.click(CELLS + ":nth-of-type(1)");
 
 		assertTrue(screen.document().select("#status .status__note").isEmpty());
@@ -553,13 +562,13 @@ public class StudioFlowTest {
 
 	@Example
 	public void shouldChangeNothingButTheTimeToDrawTheNextPart() throws Exception {
-		final Screen screen = Screen.open(rig).press("ctrl+b");
+		final Screen screen = noted(Screen.open(rig), rig);
 		final StudioState before = rig.session().state();
 
 		screen.click("#timeline [data-boundary]");
 
 		assertEquals(before, rig.session().state());
-		assertEquals(NOTHING_TO_BUILD, screen.find("#status .status__note").text());
+		assertEquals("Opened demo.chp (demo)", screen.find("#status .status__note").text());
 	}
 
 	@Example
@@ -601,7 +610,7 @@ public class StudioFlowTest {
 
 	@Example
 	public void shouldOfferTheExitsOfALoopingLevel() throws Exception {
-		final Screen screen = Screen.open(rig).click("#menus [hx-vals*=blitzball]");
+		final Screen screen = open(made(ProjectKind.GAME, "arcade"));
 
 		assertEquals("↻ Level 1 · 0:30 per pass · exits:", screen.find("#timeline .timeline__loop > span").text());
 		screen.click("#timeline .timeline__exit:nth-of-type(1)");
@@ -621,7 +630,7 @@ public class StudioFlowTest {
 
 		assertEquals(500, screen.trigger("#timeline .track__lane .block", Map.of("index", "9")).status());
 		assertEquals(before, rig.session().state());
-		screen.click("#menus [hx-vals*=blitzball]");
+		open(made(ProjectKind.GAME, "arcade"), screen);
 
 		final StudioState looping = rig.session().state();
 
@@ -653,7 +662,8 @@ public class StudioFlowTest {
 	public void shouldDescribeTheProjectInItsSettings() throws Exception {
 		final Screen screen = Screen.open(rig).click("#menus [hx-vals*=SETTINGS]");
 
-		assertTrue(screen.document().select("#modal dd").eachText().contains("nightfall.chp (demo)"));
+		assertEquals("demo", screen.find("#modal [data-field][name=name]").val());
+		assertTrue(screen.document().select("#modal dd").eachText().contains("demo"));
 		assertTrue(screen.find("#modal .modal__rows").hasClass("modal__rows--settings"));
 	}
 
@@ -667,15 +677,28 @@ public class StudioFlowTest {
 	/* A control that names an action nobody answers would only show as a 404 in a browser console. */
 	@Example
 	public void shouldBindEveryControlToAnActionThatExists() throws Exception {
+		final Path arcade = made(ProjectKind.GAME, "arcade");
 		final Screen screen = Screen.open(rig);
 		final List<String> posted = new ArrayList<>();
 
-		for (final String project : List.of("nightfall", "blitzball")) {
-			screen.click("#menus [hx-vals*=" + project + "]");
+		for (final Path project : List.of(rig.project().chp(), arcade)) {
+			open(project, screen);
 
 			for (final Tool tool : Tool.values()) {
 				screen.click(railTool(tool));
 				posted.addAll(screen.document().select("[hx-post]").eachAttr("hx-post"));
+			}
+
+			for (final String dialog : List.of("SETTINGS", "SHORTCUTS", "ABOUT")) {
+				screen.click("#menus [hx-vals*=" + dialog + "]");
+				posted.addAll(screen.document().select("[hx-post]").eachAttr("hx-post"));
+				screen.press("escape");
+			}
+
+			for (final String dialog : List.of("project-new", "project-open")) {
+				screen.click("#menus [hx-post=\"/action/" + dialog + "\"]");
+				posted.addAll(screen.document().select("[hx-post]").eachAttr("hx-post"));
+				screen.press("escape");
 			}
 		}
 
@@ -685,9 +708,11 @@ public class StudioFlowTest {
 
 	@Example
 	public void shouldKeepOneOfEachRegionAfterManyChanges() throws Exception {
-		final Screen screen = Screen.open(rig).press("ctrl+b").press("f8").press("ctrl+2")
-			.click("#menus [hx-vals*=AGA]").press("ctrl+j").press("ctrl+j").press("ctrl+/").press("escape")
-			.click("#menus [hx-vals*=blitzball]");
+		final Path arcade = made(ProjectKind.GAME, "arcade");
+		final Screen screen = Screen.open(rig).press("f8").press("ctrl+2")
+			.click("#menus [hx-vals*=AGA]").press("ctrl+j").press("ctrl+j").press("ctrl+/").press("escape");
+
+		open(arcade, screen);
 
 		assertAll(Arrays.stream(Region.values()).map(region -> () ->
 			assertEquals(1, screen.document().select("#" + region.id()).size(), region.id())));

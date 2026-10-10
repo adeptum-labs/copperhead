@@ -20,13 +20,24 @@ import java.util.Locale;
 import org.copperhead.web.action.View;
 
 /**
- * The dialog over the studio, if one is open: a title and either rows of name and value or lines of text. Each
- * kind lays its rows out its own way: shortcuts name the keys at the far side, settings give values beside names.
+ * The dialog over the studio, if one is open: a title, rows of name and value, the fields of a form, entries to
+ * pick from, lines of text and the buttons that answer it. Each kind lays its rows out its own way: shortcuts name
+ * the keys at the far side, settings give values beside names. The whole card is the form its buttons send.
  */
-public record ModalView(Modal kind, String title, List<PairView> rows, List<String> lines) implements View {
+public record ModalView(Modal kind, String title, List<PairView> rows, List<String> lines, List<EntryView> entries,
+	List<FieldView> fields, List<ButtonView> buttons) implements View {
+
 	public ModalView {
 		rows = List.copyOf(rows);
 		lines = List.copyOf(lines);
+		entries = List.copyOf(entries);
+		fields = List.copyOf(fields);
+		buttons = List.copyOf(buttons);
+	}
+
+	/** A dialog that only tells: rows and lines, closed with its close button. */
+	public ModalView(final Modal kind, final String title, final List<PairView> rows, final List<String> lines) {
+		this(kind, title, rows, lines, List.of(), List.of(), List.of());
 	}
 
 	public boolean open() {

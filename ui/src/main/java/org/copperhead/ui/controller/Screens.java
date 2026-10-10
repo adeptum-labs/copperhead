@@ -17,10 +17,12 @@ package org.copperhead.ui.controller;
 
 import java.util.Arrays;
 import java.util.EnumMap;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
 import org.copperhead.ui.session.StudioState;
 import org.copperhead.ui.view.IndexView;
+import org.copperhead.ui.view.ModalView;
 import org.copperhead.ui.view.Region;
 import org.copperhead.ui.view.Regions;
 import org.copperhead.web.action.View;
@@ -48,6 +50,11 @@ public final class Screens {
 
 	public static Regions all(final StudioState state) {
 		return regions(state, Region.values());
+	}
+
+	/** A dialog drawn from what its request brought, rather than from the state alone, and the status bar. */
+	public static Regions dialog(final StudioState state, final ModalView dialog) {
+		return new Regions(List.of(dialog, StatusViews.of(state)));
 	}
 
 	/** The regions a change to the running machine reaches: the controls, the tool, the screen, time and status. */

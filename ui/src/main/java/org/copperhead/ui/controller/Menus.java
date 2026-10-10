@@ -15,8 +15,11 @@
 
 package org.copperhead.ui.controller;
 
+import java.nio.file.Path;
 import java.util.List;
+import java.util.stream.Stream;
 import org.copperhead.core.build.BuildOption;
+import org.copperhead.core.project.ProjectLayout;
 import org.copperhead.core.project.Target;
 import org.copperhead.ui.session.StudioState;
 import org.copperhead.ui.view.ItemKind;
@@ -40,38 +43,48 @@ final class Menus {
 	private static final String MODAL = "modal";
 	private static final String BUILD_OPTION = "build-option";
 	private static final String BREAKPOINT = "breakpoint-cursor";
+	private static final String AT_CURSOR = Vals.spread("copperhead.editor.cursor()");
+	private static final String KIND = "kind";
 
 	private Menus() {
 	}
 
 	static MenusView of(final StudioState state) {
-		return new MenusView(state.project().file(), List.of(file(), edit(), view(state), build(state), debug(),
+		final String chp = state.workspace().map(directory -> ProjectLayout.chp(directory.file().name()))
+			.orElse("no project");
+
+		return new MenusView(chp, List.of(file(state), edit(state), view(state), build(state), debug(state),
 			help()));
 	}
 
-	private static MenuView file() {
-		return new MenuView("File", List.of(
-			later("New project…", "Ctrl+N"),
-			later("Open project…", "Ctrl+O"),
-			action("Open recent · nightfall.chp (demo)", NO_KEYS, "project", Vals.of("name", "nightfall")),
-			action("Open recent · blitzball.chp (game)", NO_KEYS, "project", Vals.of("name", "blitzball")),
-			later("Save", "Ctrl+S").withSeparated(true),
-			later("Save all", "Ctrl+Shift+S"),
-			later("Import asset…", "Ctrl+I").withSeparated(true),
-			action("Export ADF…", "Ctrl+Shift+E", "build", NO_VALS),
-			action("Project settings…", "Ctrl+,", MODAL, Vals.of("kind", Modal.SETTINGS)).withSeparated(true)));
+	private static MenuView file(final StudioState state) {
+		final boolean idle = !state.run().running();
+
+		return new MenuView("File", Stream.of(
+			Stream.of(
+				when(idle, action("New project…", "Ctrl+N", "project-new", NO_VALS)),
+				when(idle, action("Open project…", "Ctrl+O", "project-open", NO_VALS))),
+			state.environment().recent().stream().map(chp -> when(idle, recent(state, chp))),
+			Stream.of(
+				later("Save", "Ctrl+S").withSeparated(true),
+				later("Save all", "Ctrl+Shift+S"),
+				later("Import asset…", "Ctrl+I").withSeparated(true),
+				action("Export ADF…", "Ctrl+Shift+E", "build", NO_VALS),
+				project(state, action("Project settings…", NO_KEYS, MODAL, Vals.of(KIND, Modal.SETTINGS)))
+					.withSeparated(true)))
+			.flatMap(items -> items).toList());
 	}
 
-	private static MenuView edit() {
+	private static MenuView edit(final StudioState state) {
 		return new MenuView("Edit", List.of(
-			later("Undo", "Ctrl+Z"),
-			later("Redo", "Ctrl+Shift+Z"),
+			project(state, editor("Undo", "Ctrl+Z", "undo")),
+			project(state, editor("Redo", "Ctrl+Shift+Z", "redo")),
 			later("Cut", "Ctrl+X").withSeparated(true),
 			later("Copy", "Ctrl+C"),
 			later("Paste", "Ctrl+V"),
-			later("Find…", "Ctrl+F").withSeparated(true),
-			later("Go to line…", "Ctrl+L"),
-			action("Toggle breakpoint", "F9", BREAKPOINT, NO_VALS).withSeparated(true)));
+			project(state, editor("Find…", "Ctrl+F", "find")).withSeparated(true),
+			project(state, editor("Go to line…", "Ctrl+G", "goto-line")),
+			project(state, action("Toggle breakpoint", "F9", BREAKPOINT, AT_CURSOR)).withSeparated(true)));
 	}
 
 	private static MenuView view(final StudioState state) {
@@ -98,14 +111,14 @@ final class Menus {
 			option(state, BuildOption.SYMBOLS)));
 	}
 
-	private static MenuView debug() {
+	private static MenuView debug(final StudioState state) {
 		return new MenuView("Debug", List.of(
 			action("Run / Pause", "F5", "run", NO_VALS),
 			action("Step", "F8", "step", NO_VALS),
 			action("Step over", "F10", "step-over", NO_VALS),
 			action("Reset machine", "Shift+F5", "reset", NO_VALS),
-			action("Toggle breakpoint", NO_KEYS, BREAKPOINT, NO_VALS).withSeparated(true),
-			action("Clear all breakpoints", NO_KEYS, "breakpoints-clear", NO_VALS),
+			project(state, action("Toggle breakpoint", NO_KEYS, BREAKPOINT, AT_CURSOR)).withSeparated(true),
+			project(state, action("Clear all breakpoints", NO_KEYS, "breakpoints-clear", NO_VALS)),
 			action("Registers & memory", NO_KEYS, TOOL, Vals.of(TOOL, Tool.DEBUGGER)).withSeparated(true),
 			action("Copper list", NO_KEYS, TOOL, Vals.of(TOOL, Tool.DEBUGGER))));
 	}
@@ -115,8 +128,16 @@ final class Menus {
 			later("Hardware reference · OCS/ECS/AGA", NO_KEYS),
 			later("68000 instruction set", NO_KEYS),
 			later("Copper cookbook", NO_KEYS),
-			action("Keyboard shortcuts", "Ctrl+/", MODAL, Vals.of("kind", Modal.SHORTCUTS)).withSeparated(true),
-			action("About Copperhead", NO_KEYS, MODAL, Vals.of("kind", Modal.ABOUT)).withSeparated(true)));
+			action("Keyboard shortcuts", "Ctrl+/", MODAL, Vals.of(KIND, Modal.SHORTCUTS)).withSeparated(true),
+			action("About Copperhead", NO_KEYS, MODAL, Vals.of(KIND, Modal.ABOUT)).withSeparated(true)));
+	}
+
+	/* A project switch carries the unsaved buffers, so the studio can ask before they are left behind. */
+	private static MenuItemView recent(final StudioState state, final Path chp) {
+		final String vals = Vals.of(ProjectDialogs.PATH, chp);
+
+		return action("Open recent · " + chp.getFileName() + " · " + chp.getParent(), NO_KEYS, "project-recent",
+			state.workspace().isPresent() ? Vals.spread("copperhead.editor.buffers(" + vals + ")") : vals);
 	}
 
 	private static MenuItemView tool(final StudioState state, final Tool tool, final String keys) {
@@ -133,8 +154,20 @@ final class Menus {
 			.withChecked(state.options().on(option));
 	}
 
+	private static MenuItemView project(final StudioState state, final MenuItemView item) {
+		return when(state.workspace().isPresent(), item);
+	}
+
+	private static MenuItemView when(final boolean available, final MenuItemView item) {
+		return available ? item : item.withKind(ItemKind.OFF);
+	}
+
 	private static MenuItemView action(final String label, final String keys, final String action, final String vals) {
 		return new MenuItemView(label, keys, action, vals, false, false, ItemKind.ACTION);
+	}
+
+	private static MenuItemView editor(final String label, final String keys, final String command) {
+		return new MenuItemView(label, keys, command, NO_VALS, false, false, ItemKind.EDITOR);
 	}
 
 	private static MenuItemView later(final String label, final String keys) {

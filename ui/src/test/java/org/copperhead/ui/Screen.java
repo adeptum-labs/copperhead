@@ -46,6 +46,7 @@ public final class Screen {
 	private static final String DATA = "data-";
 	private static final String HTMX = "hx-";
 	private static final Set<String> FIELDS = Set.of("input", "select", "textarea");
+	private static final String CODE = "script:not([type=application/json])";
 	private static final int FIRST_SUCCESS = 200;
 	private static final int FIRST_REDIRECT = 300;
 	private static final Jsonb JSON = JsonbBuilder.create();
@@ -151,7 +152,7 @@ public final class Screen {
 				+ arrived.cssSelector());
 		}
 
-		if (!arrived.children().select("[hx-swap-oob], [data-hx-swap-oob], script").isEmpty()) {
+		if (!arrived.children().select("[hx-swap-oob], [data-hx-swap-oob], " + CODE).isEmpty()) {
 			throw new UnsupportedOperationException("Neither a nested swap nor a script is played out in #"
 				+ arrived.id());
 		}
