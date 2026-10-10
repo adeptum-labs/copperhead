@@ -19,23 +19,35 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import net.jqwik.api.Example;
+import org.apache.commons.compress.archivers.tar.TarConstants;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class TarballTest extends ScratchTest {
+	private static final String TOO_MUCH = "archive holds too many entries or too many bytes";
+	private static final String MALFORMED = "archive is malformed";
+
 	@Example
 	public void shouldUnpackTheTreeAndHandBackItsTopDirectory() throws Exception {
 		final Path top = Tarball.extract(archive(new TarFixture().directory("tool").file("tool/Makefile", "all:\n")
 			.directory("tool/src").file("tool/src/main.c", "int main(void) { return 0; }\n")
-			.executable("tool/configure", "#!/bin/sh\n").link("tool/current", "src")), into());
+			.executable("tool/configure", "#!/bin/sh\n")), into());
 
 		assertEquals(into().toRealPath().resolve("tool"), top);
 		assertEquals("all:\n", Files.readString(top.resolve("Makefile")));
-		assertEquals("int main(void) { return 0; }\n", Files.readString(top.resolve("current/main.c")));
+		assertEquals("int main(void) { return 0; }\n", Files.readString(top.resolve("src/main.c")));
 		assertTrue(Files.isExecutable(top.resolve("configure")));
 		assertFalse(Files.isExecutable(top.resolve("Makefile")));
+	}
+
+	@Example
+	public void shouldNotKeepASetuidBit() throws Exception {
+		final Path top = Tarball.extract(archive(new TarFixture().directory("tool").mode("tool/su", "x", 04777)),
+			into());
+
+		assertEquals(0, (int) Files.getAttribute(top.resolve("su"), "unix:mode") & 07000);
 	}
 
 	@Example
@@ -55,17 +67,77 @@ public class TarballTest extends ScratchTest {
 	}
 
 	@Example
-	public void shouldRefuseALinkThatLeadsOutOfTheFolder() throws Exception {
+	public void shouldRefuseANameWithANulCharacter() throws Exception {
+		assertTrue(refusal(new TarFixture().directory("tool").pax("path=tool/a\0b").file("tool/placeholder", "x"))
+			.startsWith("unsafe entry"));
+	}
+
+	@Example
+	public void shouldRefuseEveryKindOfLink() throws Exception {
 		assertEquals("unsafe entry tool/up", refusal(new TarFixture().directory("tool").link("tool/up", "../../")
 			.file("tool/up/escaped.s", "evil\n")));
 		assertEquals("unsafe entry tool/etc", refusal(new TarFixture().directory("tool").link("tool/etc", "/etc")));
+		assertEquals("unsafe entry tool/here", refusal(new TarFixture().directory("tool")
+			.directory("tool/src").link("tool/here", "src").file("tool/here/main.c", "int x;\n")));
+		assertEquals("unsafe entry tool/a", refusal(new TarFixture().directory("tool").link("tool/a", "..")
+			.link("tool/z", "a/../..")));
+		assertEquals("unsafe entry tool/h", refusal(new TarFixture().directory("tool").file("tool/f", "x")
+			.hardLink("tool/h", "tool/f")));
+		assertEquals("unsafe entry tool/s", refusal(new TarFixture().directory("tool").link("tool/s", ".")
+			.hardLink("tool/h", "tool/s")));
 		assertFalse(Files.exists(scratch().resolve("escaped.s")));
 	}
 
 	@Example
-	public void shouldRefuseToWriteThroughALinkInsideTheFolder() throws Exception {
-		assertEquals("unsafe entry tool/here/main.c", refusal(new TarFixture().directory("tool")
-			.directory("tool/src").link("tool/here", "src").file("tool/here/main.c", "int x;\n")));
+	public void shouldRefuseEverythingButPlainFilesAndFolders() throws Exception {
+		assertEquals("unsafe entry tool/chr", refusal(new TarFixture().directory("tool")
+			.special("tool/chr", TarConstants.LF_CHR)));
+		assertEquals("unsafe entry tool/blk", refusal(new TarFixture().directory("tool")
+			.special("tool/blk", TarConstants.LF_BLK)));
+		assertEquals("unsafe entry tool/fifo", refusal(new TarFixture().directory("tool")
+			.special("tool/fifo", TarConstants.LF_FIFO)));
+	}
+
+	@Example
+	public void shouldRefuseSparseFilesOfEveryKind() throws Exception {
+		assertEquals("unsafe entry tool/gnu", refusal(new TarFixture().directory("tool")
+			.special("tool/gnu", TarConstants.LF_GNUTYPE_SPARSE)));
+		assertEquals("unsafe entry tool/old", refusal(new TarFixture().directory("tool")
+			.pax("GNU.sparse.size=300000000", "GNU.sparse.numblocks=1", "GNU.sparse.map=0,10")
+			.file("tool/old", "x")));
+		assertEquals("unsafe entry tool/new", refusal(new TarFixture().directory("tool")
+			.pax("GNU.sparse.major=1", "GNU.sparse.minor=0", "GNU.sparse.realsize=300000000")
+			.file("tool/new", "0\n".concat("\0".repeat(510)))));
+	}
+
+	@Example
+	public void shouldRefuseMoreEntriesThanTheCap() throws Exception {
+		assertEquals(TOO_MUCH, refusal(new TarFixture().directory("tool").file("tool/a", "a").file("tool/b", "b"), 2,
+			1000));
+	}
+
+	@Example
+	public void shouldRefuseMoreBytesThanTheCap() throws Exception {
+		assertEquals(TOO_MUCH, refusal(new TarFixture().directory("tool").file("tool/a", "a".repeat(2000)), 10,
+			1000));
+		assertEquals(TOO_MUCH, refusal(new TarFixture().directory("tool").file("tool/a", "a".repeat(600))
+			.file("tool/b", "b".repeat(600)), 10, 1000));
+	}
+
+	@Example
+	public void shouldRefuseAHeaderTooBigToHoldInMemory() throws Exception {
+		assertEquals(MALFORMED, refusal(new TarFixture().directory("tool").longNameOfSize(16 * 1024 * 1024)
+			.file("tool/x", "x")));
+	}
+
+	@Example
+	public void shouldRefuseAnEndlessRunOfHeaders() throws Exception {
+		final TarFixture fixture = new TarFixture().directory("tool");
+
+		for (int header = 0; header < 30_000; header++) {
+			fixture.pax("a=b");
+		}
+		assertEquals(MALFORMED, refusal(fixture.file("tool/x", "x")));
 	}
 
 	@Example
@@ -86,5 +158,12 @@ public class TarballTest extends ScratchTest {
 		final Path archive = archive(fixture);
 
 		return assertThrows(IOException.class, () -> Tarball.extract(archive, into())).getMessage();
+	}
+
+	private String refusal(final TarFixture fixture, final int maxEntries, final long maxBytes) throws IOException {
+		final Path archive = archive(fixture);
+
+		return assertThrows(IOException.class, () -> Tarball.extract(archive, into(), maxEntries, maxBytes))
+			.getMessage();
 	}
 }

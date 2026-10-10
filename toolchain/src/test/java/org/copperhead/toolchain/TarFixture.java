@@ -58,10 +58,47 @@ final class TarFixture {
 	}
 
 	TarFixture link(final String name, final String target) throws IOException {
-		final TarArchiveEntry entry = new TarArchiveEntry(name, TarConstants.LF_SYMLINK);
+		return link(name, target, TarConstants.LF_SYMLINK);
+	}
+
+	private TarFixture link(final String name, final String target, final byte type) throws IOException {
+		final TarArchiveEntry entry = new TarArchiveEntry(name, type);
 
 		entry.setLinkName(target);
 		return add(entry, "");
+	}
+
+	TarFixture mode(final String name, final String text, final int mode) throws IOException {
+		return add(withMode(new TarArchiveEntry(name), mode), text);
+	}
+
+	TarFixture hardLink(final String name, final String target) throws IOException {
+		return link(name, target, TarConstants.LF_LINK);
+	}
+
+	TarFixture special(final String name, final byte type) throws IOException {
+		return add(new TarArchiveEntry(name, type), "");
+	}
+
+	/** An extended header of the PAX kind holding the records {@code key=value} given as "key=value" strings. */
+	TarFixture pax(final String... records) throws IOException {
+		final StringBuilder body = new StringBuilder();
+
+		for (final String record : records) {
+			final String rest = " " + record + "\n";
+			int length = rest.length();
+
+			while (String.valueOf(length).length() + rest.length() != length) {
+				length = String.valueOf(length).length() + rest.length();
+			}
+			body.append(length).append(rest);
+		}
+		return add(new TarArchiveEntry("././@PaxHeader", TarConstants.LF_PAX_EXTENDED_HEADER_LC), body.toString());
+	}
+
+	/** A GNU long-name header of the given size, filled with a letter, followed by nothing it could name. */
+	TarFixture longNameOfSize(final int size) throws IOException {
+		return add(new TarArchiveEntry("././@LongLink", TarConstants.LF_GNUTYPE_LONGNAME), "a".repeat(size));
 	}
 
 	byte[] bytes() throws IOException {
