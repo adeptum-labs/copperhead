@@ -146,16 +146,15 @@ public class BuildService {
 	}
 
 	public synchronized void start(final boolean andRun) {
-		final ProjectDirectory project = session.state().workspace()
-			.orElseThrow(() -> new IllegalStateException("No project is open"));
-		final BuildRequest request = new BuildRequest(project, preferences.tool(PinnedSource.VASM.tool()),
-			preferences.tool(PinnedSource.SHRINKLER.tool()), preferences.trustedVasm());
+		final ProjectDirectory project = begin();
 		final CountDownLatch over = new CountDownLatch(1);
-		final Job job = jobs.create(request, REFUSED, event -> take(event, andRun, over));
-
-		begin(new Active(job::cancel, over));
 
 		try {
+			final BuildRequest request = new BuildRequest(project, preferences.tool(PinnedSource.VASM.tool()),
+				preferences.tool(PinnedSource.SHRINKLER.tool()), preferences.trustedVasm());
+			final Job job = jobs.create(request, REFUSED, event -> take(event, andRun, over));
+
+			active = Optional.of(new Active(job::cancel, over));
 			executor.execute(() -> {
 				try {
 					job.run();
@@ -198,13 +197,16 @@ public class BuildService {
 		return active;
 	}
 
-	private void begin(final Active started) {
-		if (session.state().run().running()) {
-			throw new IllegalStateException("A build is already running");
-		}
+	/* The project is read in the very change that starts the run, so a switch cannot land between the two. */
+	private ProjectDirectory begin() {
+		return session.change(state -> {
+			if (state.run().running()) {
+				throw new IllegalStateException("A build is already running");
+			}
 
-		active = Optional.of(started);
-		session.change(state -> state.withRun(BuildRun.started()));
+			state.workspace().orElseThrow(() -> new IllegalStateException("No project is open"));
+			return state.withRun(BuildRun.started());
+		}).workspace().orElseThrow();
 	}
 
 	private void take(final BuildEvent event, final boolean andRun, final CountDownLatch over) {

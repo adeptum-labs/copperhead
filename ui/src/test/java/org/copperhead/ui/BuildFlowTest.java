@@ -84,6 +84,12 @@ public class BuildFlowTest {
 		return finished(screen.click(CANCEL));
 	}
 
+	/* The screen and the timeline must show what the session says, however the build ended. */
+	private static void assertShown(final Screen screen, final String state, final String running) {
+		assertEquals(state, screen.find("#emulator .emulator__state").text());
+		assertEquals(running, screen.find("#timeline").attr("data-running"));
+	}
+
 	private boolean emulatorRuns() {
 		return rig.session().state().running();
 	}
@@ -146,17 +152,19 @@ public class BuildFlowTest {
 	@Example
 	public void shouldStartTheRunOnceTheBuildHasSucceeded() throws Exception {
 		stopEmulator();
-		finished(Screen.open(rig).trigger(BUILD_AND_RUN, Map.of()));
+		final Screen screen = finished(Screen.open(rig).trigger(BUILD_AND_RUN, Map.of()));
 
 		assertTrue(emulatorRuns());
+		assertShown(screen, "running", "true");
 	}
 
 	@Example
 	public void shouldNotStartTheRunOfABuildThatFailed() throws Exception {
 		stopEmulator();
-		finished(saved(Screen.open(rig), FAILED).trigger(BUILD_AND_RUN, Map.of()));
+		final Screen screen = finished(saved(Screen.open(rig), FAILED).trigger(BUILD_AND_RUN, Map.of()));
 
 		assertFalse(emulatorRuns());
+		assertShown(screen, "paused", "false");
 	}
 
 	@Example
@@ -167,6 +175,7 @@ public class BuildFlowTest {
 		assertFalse(emulatorRuns());
 		cancelled(screen);
 		assertFalse(emulatorRuns());
+		assertShown(screen, "paused", "false");
 	}
 
 	@Example

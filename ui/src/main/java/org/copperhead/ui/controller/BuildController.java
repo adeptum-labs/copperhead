@@ -35,6 +35,9 @@ import org.copperhead.web.action.Form;
 @ApplicationScoped
 public class BuildController {
 	private static final Region[] HELD_BACK = {Region.MENUS, Region.MACHINE, Region.TOOL};
+	/* A build that ends may start the machine, so what shows it running is drawn again as well. */
+	private static final Region[] ENDED = {Region.MENUS, Region.MACHINE, Region.TOOL, Region.EMULATOR,
+		Region.TIMELINE};
 
 	private final ProjectSession session;
 	private final BuildService builds;
@@ -90,7 +93,7 @@ public class BuildController {
 		final Phase now = state.run().phase();
 
 		if (seen != now) {
-			return Screens.regions(state, HELD_BACK);
+			return Screens.regions(state, ENDED);
 		}
 
 		return state.tool() == Tool.BUILD ? Screens.regions(state, Region.TOOL) : Screens.regions(state);

@@ -22,6 +22,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import net.jqwik.api.Example;
 import net.jqwik.api.lifecycle.AfterTry;
 import net.jqwik.api.lifecycle.BeforeTry;
@@ -30,6 +31,7 @@ import org.copperhead.core.build.BuildWarning;
 import org.copperhead.core.project.ProjectKind;
 import org.copperhead.core.project.Target;
 import org.copperhead.toolchain.BuildEvent;
+import org.copperhead.toolchain.BuildRequest;
 import org.copperhead.toolchain.ProjectDirectory;
 import org.copperhead.ui.TempDirectory;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -150,6 +152,19 @@ public class BuildServiceTest {
 
 		assertFalse(session.state().run().running());
 		assertEquals("The build ended but its report could not be shown", session.state().note());
+	}
+
+	@Example
+	public void shouldBuildTheProjectOpenWhenTheRunBegins() {
+		final AtomicReference<BuildRequest> asked = new AtomicReference<>();
+		final BuildService service = serving((request, trust, sink) -> {
+			asked.set(request);
+			return finishing(failed()).create(request, trust, sink);
+		}, Runnable::run);
+
+		service.start(false);
+
+		assertEquals(session.state().workspace().orElseThrow(), asked.get().project());
 	}
 
 	@Example
