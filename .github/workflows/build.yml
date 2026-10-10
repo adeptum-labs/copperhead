@@ -2,6 +2,7 @@ name: Build
 
 on:
   push:
+    branches: [master]
   pull_request:
 
 permissions:
@@ -9,27 +10,36 @@ permissions:
 
 concurrency:
   group: build-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
 
 jobs:
   build:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-java@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6
         with:
           distribution: temurin
           java-version: '25'
           cache: maven
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+      - name: Read the Playwright version the build uses
+        id: playwright
+        run: echo "version=$(mvn -B -q -N help:evaluate -Dexpression=playwright.version -DforceStdout)" >> "$GITHUB_OUTPUT"
       - name: Cache the browsers Playwright drives
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('pom.xml') }}
-          restore-keys: playwright-${{ runner.os }}-
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
       - name: Install the libraries Chromium needs
-        run: npx --yes playwright@1.63.0 install-deps chromium
+        env:
+          PLAYWRIGHT_VERSION: ${{ steps.playwright.outputs.version }}
+        run: npx --yes "playwright@$PLAYWRIGHT_VERSION" install-deps chromium
       - name: Build and test, the browser tests included
         run: mvn -B install -Pbrowser
       - name: Rebuild the editor bundle and compare it with the committed one
@@ -39,7 +49,7 @@ jobs:
             ui/src/main/resources/static/js/editor.bundle.js.provenance
       - name: Keep the test reports of a failed run
         if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: test-reports
           path: |
@@ -51,8 +61,10 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-java@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6
         with:
           distribution: temurin
           java-version: '25'
@@ -60,7 +72,7 @@ jobs:
       - name: Fetch, compile and run vasm and Shrinkler, and build both templates
         run: mvn -B verify -Ptoolchain -pl toolchain -am
       - name: Keep the template disks for the boot test
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: template-disks
           path: toolchain/target/disks/*.adf
@@ -71,22 +83,25 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/download-artifact@v8
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: template-disks
           path: disks
       - name: Install FS-UAE, Xvfb and ImageMagick
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq fs-uae xvfb imagemagick
+          sudo apt-get install -y -qq fs-uae xvfb imagemagick libgl1-mesa-dri
       - name: Boot the demo template, crunched
         run: .github/scripts/boot-smoke.sh disks/nightrun.adf nightrun.png
       - name: Boot the demo template, not crunched
+        if: success() || failure()
         run: .github/scripts/boot-smoke.sh disks/daybreak.adf daybreak.png
       - name: Keep the screenshots
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: boot-screenshots
           path: '*.png'

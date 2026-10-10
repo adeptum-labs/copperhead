@@ -61,10 +61,22 @@ public class LiveToolchainIT {
 
 	@BeforeContainer
 	public static void fetchAndCompileTheTools() throws Exception {
+		removeDisksOfEarlierRuns();
 		root = Files.createTempDirectory("copperhead-live");
 		vasm = toolchain().ensure(PinnedSource.VASM, Optional.empty(), Optional.empty(), System.out::println);
 		shrinkler = toolchain().ensure(PinnedSource.SHRINKLER, Optional.empty(), Optional.empty(),
 			System.out::println);
+	}
+
+	private static void removeDisksOfEarlierRuns() throws IOException {
+		if (!Files.isDirectory(DISKS)) {
+			return;
+		}
+		try (Stream<Path> kept = Files.list(DISKS)) {
+			for (final Path disk : kept.toList()) {
+				Files.delete(disk);
+			}
+		}
 	}
 
 	@AfterContainer
