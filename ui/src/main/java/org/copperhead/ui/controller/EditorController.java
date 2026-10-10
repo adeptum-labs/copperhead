@@ -17,6 +17,8 @@ package org.copperhead.ui.controller;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import java.util.List;
+import org.copperhead.toolchain.ProjectDirectory;
 import org.copperhead.ui.session.ProjectSession;
 import org.copperhead.ui.session.StudioState;
 import org.copperhead.ui.view.Region;
@@ -25,8 +27,8 @@ import org.copperhead.web.action.Action;
 import org.copperhead.web.action.Form;
 
 /**
- * The editor's side on the server: which source is open, where its cursor is, and the breakpoints. The page keeps
- * the text being edited; what it is sent is what is on disk.
+ * The editor's side on the server: which source is open, saving what the page edited, and the breakpoints, which
+ * live in the project file. The page keeps the text being edited; what it is sent back is what is on disk.
  */
 @ApplicationScoped
 public class EditorController {
@@ -47,6 +49,28 @@ public class EditorController {
 		return Screens.regions(session.change(state -> state.openFile(name)), Region.TOOL);
 	}
 
+	@Action("file-save")
+	public Regions onSave(final Form form) {
+		final ProjectDirectory directory = Workspaces.open(session.state());
+		final String name = Workspaces.source(directory, form.get(NAME));
+		final String text = form.get("text");
+
+		if (text == null) {
+			throw new IllegalArgumentException("No text came to save in " + name);
+		}
+
+		Workspaces.write(() -> directory.write(name, text));
+		return Screens.regions(session.change(state -> state.withNote("Saved " + name)), Region.TOOL);
+	}
+
+	@Action("file-save-all")
+	public Regions onSaveAll(final Form form) {
+		final List<String> saved = Buffers.save(Workspaces.open(session.state()), form);
+
+		return Screens.regions(session.change(state -> state.withNote(saved.isEmpty() ? "Nothing to save"
+			: "Saved " + String.join(", ", saved))), Region.TOOL);
+	}
+
 	/* The editor moves its own cursor; the studio only remembers where, for F9 and for the next time it is drawn. */
 	@Action("cursor")
 	public void onMoveCursor(final Form form) {
@@ -59,7 +83,7 @@ public class EditorController {
 	public Regions onClickGutter(final Form form) {
 		final int line = Integer.parseInt(form.get(LINE));
 
-		return Screens.regions(session.change(state -> state.toggleBreakpoint(line)), Region.TOOL);
+		return Screens.regions(session.change(state -> Workspaces.saved(state.toggleBreakpoint(line))), Region.TOOL);
 	}
 
 	@Action("breakpoint-cursor")
@@ -67,17 +91,30 @@ public class EditorController {
 		final StudioState state = session.state();
 		final int line = form.has(LINE) ? Integer.parseInt(form.get(LINE)) : state.cursor();
 
-		return Screens.regions(session.change(changed -> changed.moveCursor(line).toggleBreakpoint(line)),
-			Region.TOOL);
+		return Screens.regions(session.change(changed -> Workspaces.saved(changed.moveCursor(line)
+			.toggleBreakpoint(line))), Region.TOOL);
 	}
 
 	@Action("breakpoints-clear")
 	public Regions onClickClearBreakpoints() {
-		return Screens.regions(session.change(StudioState::clearBreakpoints), Region.TOOL);
+		return Screens.regions(session.change(state -> Workspaces.saved(state.clearBreakpoints())), Region.TOOL);
 	}
 
 	@Action("goto-warning")
 	public Regions onClickWarning() {
 		return Screens.regions(session.change(StudioState::showWarning), Region.MENUS, Region.RAIL, Region.TOOL);
+	}
+
+	/* Nothing changed on disk since the page loaded the source, so nothing is drawn anew and the answer is empty. */
+	@Action("source-check")
+	public Regions onShowSource(final Form form) {
+		final ProjectDirectory directory = Workspaces.open(session.state());
+		final String name = Workspaces.source(directory, form.get(NAME));
+
+		if (Workspaces.read(() -> directory.modified(name)) == Long.parseLong(form.get("modified"))) {
+			return null;
+		}
+
+		return Screens.regions(session.state(), Region.TOOL);
 	}
 }

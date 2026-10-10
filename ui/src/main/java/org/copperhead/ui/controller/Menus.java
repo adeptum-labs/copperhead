@@ -36,6 +36,9 @@ final class Menus {
 	static final String LIGHT_DARK = "Ctrl+Shift+L";
 	/* The page works out the theme to switch to, since it is the page that wears it. */
 	static final String NEXT_THEME = "js:{theme: document.documentElement.dataset.theme === 'light' ? 'dark' : 'light'}";
+	/* The editor's unsaved buffers travel along with every command that must not lose them. */
+	static final String BUFFERS = Vals.spread("copperhead.editor.buffers({})");
+	private static final String BUFFER = Vals.spread("copperhead.editor.buffer()");
 
 	private static final String NO_KEYS = "";
 	private static final String NO_VALS = "";
@@ -66,8 +69,9 @@ final class Menus {
 				when(idle, action("Open project…", "Ctrl+O", "project-open", NO_VALS))),
 			state.environment().recent().stream().map(chp -> when(idle, recent(state, chp))),
 			Stream.of(
-				later("Save", "Ctrl+S").withSeparated(true),
-				later("Save all", "Ctrl+Shift+S"),
+				project(state, action("Save", "Ctrl+S", "file-save", BUFFER))
+					.withSeparated(true),
+				project(state, action("Save all", "Ctrl+Shift+S", "file-save-all", BUFFERS)),
 				later("Import asset…", "Ctrl+I").withSeparated(true),
 				action("Export ADF…", "Ctrl+Shift+E", "build", NO_VALS),
 				project(state, action("Project settings…", NO_KEYS, MODAL, Vals.of(KIND, Modal.SETTINGS)))

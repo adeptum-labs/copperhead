@@ -62,7 +62,7 @@ public class WorkbenchController {
 	public Regions onClickTarget(final Form form) {
 		final Target target = Target.chipset(form.get("target"));
 
-		return Screens.all(session.change(state -> state.withTarget(target)));
+		return Screens.all(session.change(state -> Workspaces.saved(state.withTarget(target))));
 	}
 
 	@Action("modal")

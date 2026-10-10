@@ -99,4 +99,10 @@ final class Workspaces {
 
 		return name;
 	}
+
+	/** Writes the project file when what the studio holds of it, its machine, options or breakpoints, moved on. */
+	static StudioState saved(final StudioState state) {
+		return state.projectFile().filter(wanted -> !wanted.equals(open(state).file()))
+			.map(wanted -> state.withWorkspace(Optional.of(read(() -> open(state).save(wanted))))).orElse(state);
+	}
 }

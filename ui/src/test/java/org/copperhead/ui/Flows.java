@@ -45,6 +45,11 @@ final class Flows {
 			.map(mark -> mark.getInt("line")).toList();
 	}
 
+	/** Saves the entry file with the text given, as Ctrl+S does from the editor. */
+	static Screen saved(final Screen screen, final String text) throws Exception {
+		return screen.trigger("[data-key=\"ctrl+s\"]", Map.of("name", "main.s", "text", text));
+	}
+
 	/** Leaves a note on the status bar, the one opening the project again leaves, whichever tool is shown. */
 	static Screen noted(final Screen screen, final WorkbenchRig rig) throws Exception {
 		return screen.trigger("#menus [hx-post=\"/action/project-recent\"]",

@@ -28,6 +28,7 @@ final class ModalViews {
 		new PairView("Play / pause", "F5"),
 		new PairView("Step / step over", "F8 · F10"),
 		new PairView("Toggle breakpoint on cursor line", "F9"),
+		new PairView("Save / save all", "Ctrl+S · Ctrl+Shift+S"),
 		new PairView("Build ADF / build & run", "Ctrl+B · Ctrl+Shift+B"),
 		new PairView("Switch tool", "Ctrl+1 – Ctrl+5"),
 		new PairView("Show / hide timeline", "Ctrl+J"),

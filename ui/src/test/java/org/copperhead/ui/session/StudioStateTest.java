@@ -20,6 +20,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import net.jqwik.api.Example;
+import org.copperhead.core.build.BuildOption;
 import org.copperhead.core.build.BuildOptions;
 import org.copperhead.core.build.BuildReport;
 import org.copperhead.core.build.BuildWarning;
@@ -168,5 +169,15 @@ public class StudioStateTest {
 
 		assertEquals(13, round.pc());
 		assertEquals(1, round.breakpoints().getFirst().hits());
+	}
+
+	@Example
+	public void shouldHoldTheProjectFileTheWayTheStudioChangedIt() {
+		final ProjectFile file = game.withTarget(Target.A500_OCS).toggleOption(BuildOption.SHRINKLER)
+			.toggleBreakpoint(3).projectFile().orElseThrow();
+
+		assertEquals(Target.A500_OCS, file.target());
+		assertFalse(file.crunch());
+		assertEquals(List.of(new Breakpoint("main.s", 7, 0), new Breakpoint("main.s", 3, 0)), file.breakpoints());
 	}
 }

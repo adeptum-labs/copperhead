@@ -37,7 +37,8 @@ public class BuildController {
 	public Regions onClickOption(final Form form) {
 		final BuildOption option = BuildOption.valueOf(form.get("option"));
 
-		return Screens.regions(session.change(state -> state.toggleOption(option)), Region.MENUS, Region.TOOL);
+		return Screens.regions(session.change(state -> Workspaces.saved(state.toggleOption(option))),
+			Region.MENUS, Region.TOOL);
 	}
 
 	@Action("build")

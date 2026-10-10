@@ -93,6 +93,13 @@ public record StudioState(Project project, Target target, Tool tool, Modal modal
 		return path.substring(path.lastIndexOf(SEPARATOR) + 1);
 	}
 
+	/** The project file as the studio holds it now: the machine, the options and the breakpoints chosen here. */
+	public Optional<ProjectFile> projectFile() {
+		return workspace.map(directory -> directory.file().withTarget(target).withCrunch(options.shrinkler())
+			.withSymbols(options.symbols()).withBreakpoints(breakpoints.stream()
+				.map(mark -> new Breakpoint(mark.file(), mark.line(), 0)).toList()));
+	}
+
 	public boolean breakpointAt(final String in, final int line) {
 		return breakpoints.stream().anyMatch(mark -> mark.file().equals(in) && mark.line() == line);
 	}
