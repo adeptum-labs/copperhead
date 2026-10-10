@@ -15,6 +15,8 @@
 
 package org.copperhead.ui.controller;
 
+import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import org.copperhead.toolchain.ProjectDirectory;
@@ -36,13 +38,36 @@ final class Buffers {
 		return form.has(FILES) ? List.of(form.get(FILES).split(SEPARATOR)) : List.of();
 	}
 
-	/** Writes every buffer sent; a name the project does not hold refuses them all before one is written. */
+	/** A disk that refused one buffer; the ones before it stay written, and the message says so. */
+	static final class Failed extends RuntimeException {
+		private static final long serialVersionUID = 1L;
+
+		Failed(final String name, final List<String> saved, final IOException cause) {
+			super(name + " could not be saved: " + Workspaces.reason(cause)
+				+ (saved.isEmpty() ? "" : "; " + String.join(", ", saved) + " already saved"), cause);
+		}
+	}
+
+	/**
+	 * Writes every buffer sent; a name the project does not hold, or one with no text, refuses them all before one
+	 * is written. A write the disk refuses stops the rest and reports what was saved before it.
+	 */
 	static List<String> save(final ProjectDirectory directory, final Form form) {
 		final List<String> names = names(form);
+		final List<String> saved = new ArrayList<>();
 
 		names.forEach(name -> text(form, Workspaces.source(directory, name)));
-		names.forEach(name -> Workspaces.write(() -> directory.write(name, text(form, name))));
-		return names;
+
+		for (final String name : names) {
+			try {
+				directory.write(name, text(form, name));
+				saved.add(name);
+			} catch (IOException e) {
+				throw new Failed(name, saved, e);
+			}
+		}
+
+		return saved;
 	}
 
 	private static String text(final Form form, final String name) {

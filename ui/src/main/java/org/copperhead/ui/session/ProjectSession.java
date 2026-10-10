@@ -18,12 +18,14 @@ package org.copperhead.ui.session;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.InstantSource;
 import java.util.Optional;
 import java.util.function.UnaryOperator;
+import org.copperhead.core.project.ProjectLayout;
 import org.copperhead.core.project.Target;
 import org.copperhead.core.sample.SampleProjects;
 import org.copperhead.toolchain.ProjectDirectory;
@@ -69,10 +71,30 @@ public class ProjectSession {
 
 	private static Optional<ProjectDirectory> reopen(final Path chp) {
 		try {
-			return Optional.of(ProjectDirectory.open(chp));
+			return Optional.of(open(chp));
 		} catch (IOException | IllegalArgumentException e) {
 			return Optional.empty();
 		}
+	}
+
+	/**
+	 * Opens a project file. One called something other than the name it holds is refused: the studio saves a project
+	 * under its name, so that would write, and on a rename delete, another file than the one opened.
+	 */
+	public static ProjectDirectory open(final Path chp) throws IOException {
+		if (!Files.isRegularFile(chp)) {
+			throw new IOException(chp + " is not a project file");
+		}
+
+		final ProjectDirectory directory = ProjectDirectory.open(chp);
+		final String expected = ProjectLayout.chp(directory.file().name());
+
+		if (!chp.getFileName().toString().equals(expected)) {
+			throw new IOException(chp.getFileName() + " holds the project " + directory.file().name()
+				+ ", so the file has to be called " + expected);
+		}
+
+		return directory;
 	}
 
 	public synchronized StudioState state() {

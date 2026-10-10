@@ -21,6 +21,7 @@ import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Optional;
 import org.copperhead.core.project.ProjectLayout;
 import org.copperhead.toolchain.ProjectDirectory;
 import org.copperhead.ui.session.StudioState;
@@ -75,6 +76,11 @@ final class Workspaces {
 		} catch (IOException e) {
 			return false;
 		}
+	}
+
+	/** What went wrong in words for the person; some exceptions carry no message of their own. */
+	static String reason(final Exception failure) {
+		return Optional.ofNullable(failure.getMessage()).orElseGet(() -> failure.getClass().getSimpleName());
 	}
 
 	static ProjectDirectory open(final StudioState state) {

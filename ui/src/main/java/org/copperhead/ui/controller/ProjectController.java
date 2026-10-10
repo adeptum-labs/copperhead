@@ -86,8 +86,8 @@ public class ProjectController {
 		final Path chp = inside(form.get(ProjectDialogs.PATH));
 
 		return switchTo(form, "project-open", Map.of(ProjectDialogs.PATH, chp.toString()),
-			() -> ProjectDirectory.open(chp),
-			error -> ProjectDialogs.open(home, chp.getParent(), error, editing()));
+			() -> ProjectSession.open(chp),
+			error -> ProjectDialogs.open(home, folderOf(chp), error, editing()));
 	}
 
 	@Action("project-recent")
@@ -99,7 +99,7 @@ public class ProjectController {
 		}
 
 		return switchTo(form, "project-recent", Map.of(ProjectDialogs.PATH, chp.toString()),
-			() -> ProjectDirectory.open(chp),
+			() -> ProjectSession.open(chp),
 			error -> ProjectDialogs.open(home, home, error, editing()));
 	}
 
@@ -200,11 +200,16 @@ public class ProjectController {
 
 		if (!unsaved.isEmpty() && !form.has(ProjectDialogs.SAVE) && !form.has(ProjectDialogs.DISCARD)) {
 			return Screens.dialog(session.change(state -> state.withModal(Modal.DISCARD)),
-				ProjectDialogs.discard(action, pending, unsaved));
+				ProjectDialogs.discard(action, pending, unsaved, ""));
 		}
 
 		if (form.has(ProjectDialogs.SAVE)) {
-			Buffers.save(Workspaces.open(session.state()), form);
+			try {
+				Buffers.save(Workspaces.open(session.state()), form);
+			} catch (Buffers.Failed e) {
+				return Screens.dialog(session.change(state -> state.withModal(Modal.DISCARD)),
+					ProjectDialogs.discard(action, pending, unsaved, e.getMessage()));
+			}
 		}
 
 		final ProjectDirectory opened;
@@ -212,7 +217,7 @@ public class ProjectController {
 		try {
 			opened = opening.open();
 		} catch (IOException | IllegalArgumentException e) {
-			final ModalView dialog = failed.apply(e.getMessage());
+			final ModalView dialog = failed.apply(Workspaces.reason(e));
 
 			return Screens.dialog(session.change(state -> state.withModal(dialog.kind())), dialog);
 		}
@@ -229,6 +234,13 @@ public class ProjectController {
 	private Path near(final StudioState state) {
 		return state.workspace().map(directory -> directory.dir().getParent())
 			.filter(folder -> folder.startsWith(home)).orElse(home);
+	}
+
+	/* The folder an error dialog looks in: the one holding the file asked for, never one above the home folder. */
+	private Path folderOf(final Path chp) {
+		final Path folder = Files.isDirectory(chp) ? chp : chp.getParent();
+
+		return folder.startsWith(home) ? folder : home;
 	}
 
 	private boolean editing() {

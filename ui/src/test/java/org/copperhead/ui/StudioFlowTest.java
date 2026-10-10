@@ -233,10 +233,6 @@ public class StudioFlowTest {
 		assertEquals("Coming in a later release", importing.attr("title"));
 	}
 
-	private static String line(final int number) {
-		return "#tool .code__line:nth-of-type(" + number + ")";
-	}
-
 	@Example
 	public void shouldOpenTheProjectAtItsEntryFile() throws Exception {
 		final Screen screen = Screen.open(rig);
@@ -277,6 +273,31 @@ public class StudioFlowTest {
 		assertEquals("tables.i", screen.find("#tool .tool__tab--active").text());
 		assertEquals("tables.i", source(screen).getString("active"));
 		assertEquals(List.of("main.s", "tables.i"), screen.document().select("#tool .tool__tab").eachText());
+	}
+
+	@Example
+	public void shouldRefuseATabThatIsNoSourceOfTheProject() throws Exception {
+		final Screen screen = Screen.open(rig);
+		final StudioState before = rig.session().state();
+
+		for (final String name : List.of("nope.s", "../main.s", "sub/main.s")) {
+			assertEquals(500, screen.trigger("#tool .tool__tab", Map.of("name", name)).status(), name);
+			assertEquals(before, rig.session().state(), name);
+		}
+	}
+
+	@Example
+	public void shouldWriteASourceThatClosesTheScriptElementWithItsBracketsEscaped() throws Exception {
+		final String text = "</script><b>&amp;\n";
+
+		Files.writeString(rig.project().dir().resolve("src/main.s"), text);
+
+		final Screen screen = Screen.open(rig);
+		final String block = screen.find("#tool script[data-source]").data();
+
+		assertFalse(block.contains("</script"));
+		assertTrue(block.contains("\\u003c/script>"));
+		assertEquals(text, source(screen).getJsonArray("files").getJsonObject(0).getString("text"));
 	}
 
 	@Example

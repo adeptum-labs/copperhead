@@ -20,6 +20,9 @@ import java.util.stream.Collectors;
 
 /** The value a control sends with its action, written as the JSON htmx reads from {@code hx-vals}. */
 public final class Vals {
+	private static final char LINE_SEPARATOR = 0x2028;
+	private static final char PARAGRAPH_SEPARATOR = 0x2029;
+
 	private Vals() {
 	}
 
@@ -41,7 +44,23 @@ public final class Vals {
 			.collect(Collectors.joining(",", "{", "}"));
 	}
 
+	/* A folder may be named with any character, and JSON allows no raw control character in a string. */
 	private static String quoted(final String value) {
-		return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
+		final StringBuilder quoted = new StringBuilder("\"");
+
+		value.chars().forEach(character -> quoted.append(escaped((char) character)));
+		return quoted.append('"').toString();
+	}
+
+	private static String escaped(final char character) {
+		return switch (character) {
+			case '"' -> "\\\"";
+			case '\\' -> "\\\\";
+			case '\n' -> "\\n";
+			case '\r' -> "\\r";
+			case '\t' -> "\\t";
+			default -> character < ' ' || character == LINE_SEPARATOR || character == PARAGRAPH_SEPARATOR
+				? "\\u%04x".formatted((int) character) : String.valueOf(character);
+		};
 	}
 }

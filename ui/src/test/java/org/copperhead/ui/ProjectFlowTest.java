@@ -17,6 +17,7 @@ package org.copperhead.ui;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -29,10 +30,13 @@ import org.copperhead.core.project.ProjectKind;
 import org.copperhead.core.project.Target;
 import org.copperhead.toolchain.ProjectDirectory;
 import org.copperhead.ui.session.StudioState;
+import org.copperhead.ui.view.Modal;
+import org.jsoup.nodes.Element;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.assumeFalse;
 
 /** Making, finding, opening and setting up projects, all within the home folder of the person. */
 public class ProjectFlowTest {
@@ -40,6 +44,7 @@ public class ProjectFlowTest {
 	private static final String ENTRY = "#modal .modal__entry";
 	private static final String RECENT = "#menus [hx-post=\"/action/project-recent\"]";
 	private static final String UNSAVED = "edited\n";
+	private static final List<String> EDITOR_COMMANDS = List.of("Undo", "Redo", "Find…", "Go to line…");
 
 	private final AtomicReference<Instant> now = new AtomicReference<>(Instant.EPOCH);
 	private WorkbenchRig rig;
@@ -76,6 +81,11 @@ public class ProjectFlowTest {
 		return screen.find("#menus .menus__project").text();
 	}
 
+	private static List<Element> editorItems(final Screen screen) {
+		return screen.document().select("#menus .menu__item").stream()
+			.filter(item -> EDITOR_COMMANDS.contains(item.select(".menu__label").text())).toList();
+	}
+
 	/* The dialog opens in the folder that holds the open project's own, and goes down the folders named. */
 	private Screen browsed(final Screen screen, final String... folders) throws Exception {
 		screen.click("#menus [hx-post=\"/action/project-open\"]");
@@ -101,14 +111,40 @@ public class ProjectFlowTest {
 			screen.document().select("#tool .welcome__actions .button").eachText());
 		assertEquals("no project open", screen.find("#tool .tool__meta").text());
 		assertEquals("no project", project(screen));
-		assertTrue(screen.document().select("#menus [data-editor]").stream()
-			.allMatch(item -> item.hasAttr("disabled")));
+		assertEquals(EDITOR_COMMANDS, editorItems(screen).stream().map(item -> item.select(".menu__label").text())
+			.toList());
+		assertTrue(editorItems(screen).stream().allMatch(item -> item.hasAttr("disabled")));
 	}
 
 	@Example
 	public void shouldOfferTheEditorCommandsOnceAProjectIsOpen() throws Exception {
+		final List<Element> items = editorItems(Screen.open(rig));
+
+		assertEquals(EDITOR_COMMANDS, items.stream().map(item -> item.select(".menu__label").text()).toList());
 		assertEquals(List.of("undo", "redo", "find", "goto-line"),
-			Screen.open(rig).document().select("#menus [data-editor]:not([disabled])").eachAttr("data-editor"));
+			items.stream().map(item -> item.attr("data-editor")).toList());
+		assertTrue(items.stream().noneMatch(item -> item.hasAttr("disabled")));
+	}
+
+	@Example
+	public void shouldRefuseTheSettingsWhileNoProjectIsOpen() throws Exception {
+		final Screen screen = welcome();
+		final StudioState before = rig.session().state();
+
+		assertEquals(500, screen.trigger("#menus [hx-post=\"/action/modal\"]", Map.of("kind", "SETTINGS")).status());
+		assertEquals(before, rig.session().state());
+		assertEquals("no project", project(Screen.open(rig)));
+	}
+
+	@Example
+	public void shouldStillDrawWhenASettingsDialogIsLeftOpenWithNoProject() throws Exception {
+		welcome();
+		rig.session().change(state -> state.withModal(Modal.SETTINGS));
+
+		final Screen screen = Screen.open(rig);
+
+		assertTrue(screen.find("#modal").hasAttr("hidden"));
+		assertEquals("no project", project(screen));
 	}
 
 	@Example
@@ -323,7 +359,105 @@ public class ProjectFlowTest {
 		assertEquals(Target.A1200_AGA, saved.target());
 		assertEquals("nova.chp", project(screen));
 		assertEquals("AGA", screen.find("#machine .machine__chipset--on").text());
-		assertEquals(folder.resolve("nova.chp"), rig.preferences().recent().getFirst());
+		assertEquals(List.of(folder.resolve("nova.chp")), rig.preferences().recent());
+	}
+
+	@Example
+	public void shouldRefuseARenameOntoAProjectFileThatIsThere() throws Exception {
+		final Path folder = projects().resolve("demo");
+		final Path other = Files.writeString(folder.resolve("nova.chp"), "kept");
+		final Screen screen = Screen.open(rig).click("#menus [hx-vals*=SETTINGS]")
+			.trigger(CREATE, Map.of("name", "nova", "target", "OCS", "loadAddress", "$20000",
+				"entry", "src/main.s"));
+
+		assertEquals("Project settings", screen.find("#modal .modal__title").text());
+		assertEquals("The folder already holds nova.chp", screen.find("#modal .modal__line").text());
+		assertEquals("kept", Files.readString(other));
+		assertTrue(Files.isRegularFile(folder.resolve("demo.chp")));
+		assertEquals("demo.chp", project(screen));
+	}
+
+	@Example
+	public void shouldNotOpenAProjectFileCalledAnythingButItsName() throws Exception {
+		final Path folder = projects().resolve("demo");
+		final Path copy = Files.copy(folder.resolve("demo.chp"), folder.resolve("copy.chp"));
+		final StudioState before = rig.session().state();
+		final Screen screen = Screen.open(rig).trigger("#menus [hx-post=\"/action/project-open\"]",
+			Map.of("path", copy.toString()));
+
+		assertEquals("Open project", screen.find("#modal .modal__title").text());
+		assertTrue(screen.find("#modal .modal__line").text().contains("has to be called demo.chp"));
+		assertEquals(before.workspace(), rig.session().state().workspace());
+		assertTrue(Files.isRegularFile(folder.resolve("demo.chp")));
+	}
+
+	@Example
+	public void shouldLookInTheHomeWhenTheFileAskedForIsTheHomeItself() throws Exception {
+		final StudioState before = rig.session().state();
+
+		for (final String path : List.of(".", "projects/..", rig.home().toString())) {
+			final Screen screen = Screen.open(rig).trigger("#menus [hx-post=\"/action/project-open\"]",
+				Map.of("path", path));
+
+			assertEquals("Open project", screen.find("#modal .modal__title").text(), path);
+			assertEquals("~", screen.find("#modal dd").text(), path);
+			assertEquals(before.workspace(), rig.session().state().workspace(), path);
+		}
+	}
+
+	@Example
+	public void shouldRefuseAFolderMadeThroughALinkOutOfTheHome() throws Exception {
+		final Path outside = Files.createTempDirectory("copperhead-outside");
+
+		try {
+			final Path link = Files.createSymbolicLink(projects().resolve("escape"), outside);
+			final Screen screen = Screen.open(rig).click("#menus [hx-post=\"/action/project-new\"]");
+			final StudioState before = rig.session().state();
+
+			assertEquals(500, screen.trigger(CREATE, draft("nova", link)).status());
+			assertEquals(before, rig.session().state());
+			assertFalse(Files.exists(outside.resolve("nova")));
+		} finally {
+			TempDirectory.delete(outside);
+		}
+	}
+
+	@Example
+	public void shouldSaveNothingWhenOneOfTheBuffersIsNoSourceOfTheProject() throws Exception {
+		final Path arcade = made("arcade");
+		final String saved = Files.readString(projects().resolve("demo/src/main.s"));
+		final Screen screen = asked(arcade);
+		final StudioState before = rig.session().state();
+
+		for (final String bad : List.of("nope.s", "../main.s", "sub/main.s")) {
+			assertEquals(500, screen.trigger(CREATE, Map.of("path", arcade.toString(), "save", "true",
+				"files", "main.s," + bad, "main.s", UNSAVED, bad, UNSAVED)).status(), bad);
+			assertEquals(saved, Files.readString(projects().resolve("demo/src/main.s")), bad);
+			assertEquals(before, rig.session().state(), bad);
+		}
+	}
+
+	@Example
+	public void shouldSayWhichBufferCouldNotBeSavedAndStay() throws Exception {
+		final Path src = projects().resolve("demo/src");
+		final Path arcade = made("arcade");
+		final Screen screen = asked(arcade);
+		final StudioState before = rig.session().state();
+
+		Files.setPosixFilePermissions(src, PosixFilePermissions.fromString("r-xr-xr-x"));
+
+		try {
+			assumeFalse(Files.isWritable(src), "a folder that cannot be written is writable to this user");
+			screen.trigger(CREATE, Map.of("path", arcade.toString(), "save", "true", "files", "main.s",
+				"main.s", UNSAVED));
+			assertEquals("Unsaved changes", screen.find("#modal .modal__title").text());
+			assertTrue(screen.document().select("#modal .modal__line").first().text()
+				.startsWith("main.s could not be saved"));
+			assertEquals("demo.chp", project(screen));
+			assertEquals(before.workspace(), rig.session().state().workspace());
+		} finally {
+			Files.setPosixFilePermissions(src, PosixFilePermissions.fromString("rwxr-xr-x"));
+		}
 	}
 
 	@Example

@@ -1,0 +1,37 @@
+/*
+    Copperhead
+    Copyright © 2026 Adam Waldenberg and Adeptum AB
+
+    This program is free software: you can redistribute it and/or modify it under the terms of the
+    GNU General Public License as published by the Free Software Foundation, version 3 of the License.
+
+    This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without
+    even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License along with this program.
+    If not, see <http://www.gnu.org/licenses/>.
+ */
+
+package org.copperhead.ui.view;
+
+import jakarta.json.Json;
+import java.io.StringReader;
+import java.util.Map;
+import net.jqwik.api.Example;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+public class ValsTest {
+	@Example
+	public void shouldQuoteWhatJsonCannotHoldRaw() {
+		assertEquals("{\"a\":\"x\\ny\\t\\\"\\\\\\u0001\"}", Vals.of("a", "x\ny\t\"\\" + (char) 1));
+	}
+
+	@Example
+	public void shouldReadBackAFolderNamedWithLineBreaks() {
+		final String name = "/home/a\nb\r" + (char) 0x2028 + (char) 0x2029 + (char) 0x1f + "c";
+		final String vals = Vals.of(Map.of("path", name));
+
+		assertEquals(name, Json.createReader(new StringReader(vals)).readObject().getString("path"));
+	}
+}

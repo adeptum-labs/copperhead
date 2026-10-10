@@ -49,8 +49,8 @@ final class ModalViews {
 					"OCS/ECS/AGA"),
 				state.workspace().map(directory -> "Project: " + directory.chp()).orElse("No project open"),
 				"Copyright © 2026 Adam Waldenberg and Adeptum AB · GNU General Public License, version 3"));
-			case SETTINGS -> ProjectDialogs.settings(state,
-				ProjectDialogs.settingsOf(Workspaces.open(state).file()), "");
+			case SETTINGS -> state.workspace().map(directory -> ProjectDialogs.settings(state,
+				ProjectDialogs.settingsOf(directory.file()), "")).orElse(CLOSED);
 		};
 	}
 

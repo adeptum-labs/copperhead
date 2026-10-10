@@ -22,6 +22,7 @@ import org.copperhead.core.project.Target;
 import org.copperhead.ui.session.Layout;
 import org.copperhead.ui.session.Preferences;
 import org.copperhead.ui.session.ProjectSession;
+import org.copperhead.ui.session.StudioState;
 import org.copperhead.ui.view.Modal;
 import org.copperhead.ui.view.Region;
 import org.copperhead.ui.view.Regions;
@@ -72,7 +73,16 @@ public class WorkbenchController {
 			throw new IllegalArgumentException("The dialog " + modal + " opens from its own action");
 		}
 
-		return Screens.regions(session.change(state -> state.withModal(modal)), Region.MODAL);
+		return Screens.regions(session.change(state -> told(state, modal)), Region.MODAL);
+	}
+
+	/* The settings are the project's, so with none open there is nothing to draw them from. */
+	private static StudioState told(final StudioState state, final Modal modal) {
+		if (modal == Modal.SETTINGS && state.workspace().isEmpty()) {
+			throw new IllegalStateException("No project is open");
+		}
+
+		return state.withModal(modal);
 	}
 
 	@Action("modal-close")

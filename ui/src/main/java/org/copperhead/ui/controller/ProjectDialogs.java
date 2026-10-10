@@ -106,16 +106,23 @@ final class ProjectDialogs {
 			List.of(), List.of(cancel()));
 	}
 
-	/** Asks before the unsaved buffers are left behind, offering to save them, to drop them, or to stay. */
-	static ModalView discard(final String action, final Map<String, String> pending, final List<String> dirty) {
+	/**
+	 * Asks before the unsaved buffers are left behind, offering to save them, to drop them, or to stay. After a save
+	 * the disk refused, the reason leads the dialog.
+	 */
+	static ModalView discard(final String action, final Map<String, String> pending, final List<String> dirty,
+		final String failure) {
+
 		final Map<String, String> saving = new LinkedHashMap<>(pending);
 		final Map<String, String> dropping = new LinkedHashMap<>(pending);
+		final String unsaved = listed(dirty) + (dirty.size() == 1 ? " has" : " have")
+			+ " changes that are not saved.";
 
 		saving.put(SAVE, YES);
 		dropping.put(DISCARD, YES);
 
 		return new ModalView(Modal.DISCARD, "Unsaved changes", List.of(),
-			List.of(listed(dirty) + (dirty.size() == 1 ? " has" : " have") + " changes that are not saved."),
+			failure.isEmpty() ? List.of(unsaved) : List.of(failure, unsaved),
 			List.of(), List.of(), List.of(
 				new ButtonView("Save all", "/action/" + action,
 					Vals.spread("copperhead.editor.buffers(" + Vals.of(saving) + ")"), true),
