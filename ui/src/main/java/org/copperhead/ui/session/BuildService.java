@@ -27,10 +27,11 @@ import java.time.Duration;
 import java.util.Arrays;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Function;
-import java.util.function.UnaryOperator;
 import java.util.stream.Stream;
 import org.copperhead.core.build.BuildLine;
 import org.copperhead.core.build.BuildReport;
@@ -46,6 +47,8 @@ import org.copperhead.toolchain.ToolStore;
 import org.copperhead.toolchain.Toolchain;
 import org.copperhead.toolchain.TrustPrompt;
 import org.copperhead.toolchain.XdgDirs;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Runs one build at a time, off the thread that asked for it. What the build writes lands in the session line by
@@ -53,11 +56,14 @@ import org.copperhead.toolchain.XdgDirs;
  */
 @ApplicationScoped
 public class BuildService {
+	private static final Logger LOG = LoggerFactory.getLogger(BuildService.class);
 	private static final Duration FETCH = Duration.ofMinutes(2);
 	private static final Duration COMPILE = Duration.ofMinutes(5);
 	private static final Duration STEP = Duration.ofMinutes(2);
 	private static final Path OS_RELEASE = Path.of("/etc/os-release");
 	private static final String TOOLS = "tools";
+	/* Killing the tools of a cancelled build takes moments; past this, one that will not die is left behind. */
+	private static final Duration SHUTDOWN = Duration.ofSeconds(5);
 	/* Until the person can be asked, a vasm source Copperhead does not pin is refused rather than built with. */
 	private static final TrustPrompt REFUSED = (tool, version, sha256) -> false;
 
@@ -65,7 +71,7 @@ public class BuildService {
 	private final Preferences preferences;
 	private final Jobs jobs;
 	private final Executor executor;
-	private Optional<Runnable> stop = Optional.empty();
+	private Optional<Active> active = Optional.empty();
 
 	@Inject
 	public BuildService(final ProjectSession session, final Preferences preferences) {
@@ -80,6 +86,10 @@ public class BuildService {
 		this.preferences = preferences;
 		this.jobs = jobs;
 		this.executor = executor;
+	}
+
+	/* What stops the build that holds the slot, and the latch its thread counts down once it has cleaned up. */
+	private record Active(Runnable stop, CountDownLatch over) {
 	}
 
 	/** A build as the service runs it, which it can stop. */
@@ -140,37 +150,67 @@ public class BuildService {
 			.orElseThrow(() -> new IllegalStateException("No project is open"));
 		final BuildRequest request = new BuildRequest(project, preferences.tool(PinnedSource.VASM.tool()),
 			preferences.tool(PinnedSource.SHRINKLER.tool()), preferences.trustedVasm());
-		final Job job = jobs.create(request, REFUSED, this::take);
+		final CountDownLatch over = new CountDownLatch(1);
+		final Job job = jobs.create(request, REFUSED, event -> take(event, andRun, over));
 
-		begin(job::cancel, state -> state.withRunning(state.running() || andRun));
-		executor.execute(job);
-	}
+		begin(new Active(job::cancel, over));
 
-	/** Stops what runs; the container calls it as well when the studio closes, so no build outlives it. */
-	@PreDestroy
-	public void cancel() {
-		final Optional<Runnable> stopping;
-
-		synchronized (this) {
-			stopping = stop;
+		try {
+			executor.execute(() -> {
+				try {
+					job.run();
+				} finally {
+					over.countDown();
+				}
+			});
+		} catch (RuntimeException e) {
+			abandon(over, "The build could not be started");
+			throw e;
 		}
-
-		stopping.ifPresent(Runnable::run);
 	}
 
-	private void begin(final Runnable stopper, final UnaryOperator<StudioState> also) {
+	/** Asks what runs to stop, and does not wait for it to; the page learns of the end from its next poll. */
+	public void cancel() {
+		running().ifPresent(active -> active.stop().run());
+	}
+
+	/**
+	 * Called by the container when the studio closes: stops what runs and waits for the build's thread, which kills
+	 * the tools it started, so none of them outlives the studio. A tool that will not die cannot hold the studio up
+	 * for long.
+	 */
+	@PreDestroy
+	public void shutDown() {
+		final Optional<Active> active = running();
+
+		active.ifPresent(running -> running.stop().run());
+
+		try {
+			if (active.isPresent() && !active.get().over().await(SHUTDOWN.toMillis(), TimeUnit.MILLISECONDS)) {
+				LOG.warn("The build did not end within {} of the studio closing", SHUTDOWN);
+			}
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+		}
+	}
+
+	private synchronized Optional<Active> running() {
+		return active;
+	}
+
+	private void begin(final Active started) {
 		if (session.state().run().running()) {
 			throw new IllegalStateException("A build is already running");
 		}
 
-		stop = Optional.of(stopper);
-		session.change(state -> also.apply(state.withRun(BuildRun.started())));
+		active = Optional.of(started);
+		session.change(state -> state.withRun(BuildRun.started()));
 	}
 
-	private void take(final BuildEvent event) {
+	private void take(final BuildEvent event, final boolean andRun, final CountDownLatch over) {
 		switch (event) {
 			case BuildEvent.Line(final BuildLine line) -> add(line);
-			case BuildEvent.Finished(final BuildReport report) -> finish(report);
+			case BuildEvent.Finished(final BuildReport report) -> finish(report, andRun, over);
 		}
 	}
 
@@ -178,14 +218,31 @@ public class BuildService {
 		session.change(state -> state.withRun(state.run().add(line)));
 	}
 
-	private void finish(final BuildReport report) {
-		done();
-		session.change(state -> state.withBuild(Optional.of(report)).withRun(BuildRun.idle())
-			.withNote(note(report)));
+	/* A build that fails or is cancelled does not start the run it was asked to start once it was done. */
+	private void finish(final BuildReport report, final boolean andRun, final CountDownLatch over) {
+		try {
+			session.change(state -> state.withBuild(Optional.of(report)).withRun(BuildRun.idle())
+				.withRunning(state.running() || andRun && report.ok()).withNote(note(report)));
+		} catch (RuntimeException e) {
+			LOG.error("The report of the build could not be shown", e);
+			abandon(over, "The build ended but its report could not be shown");
+		} finally {
+			release(over);
+		}
 	}
 
-	private synchronized void done() {
-		stop = Optional.empty();
+	/* The studio never stays in a run that nothing is doing: it returns to idle however the build came to an end. */
+	private void abandon(final CountDownLatch over, final String note) {
+		try {
+			session.change(state -> state.withRun(BuildRun.idle()).withNote(note));
+		} finally {
+			release(over);
+		}
+	}
+
+	/* Only the build that still holds the slot gives it up: another may have started since it ended. */
+	private synchronized void release(final CountDownLatch over) {
+		active = active.filter(current -> current.over() != over);
 	}
 
 	private static String note(final BuildReport report) {

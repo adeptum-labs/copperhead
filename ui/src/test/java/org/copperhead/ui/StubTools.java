@@ -24,7 +24,8 @@ import java.nio.file.attribute.PosixFilePermissions;
  * Shell scripts standing in for vasm and Shrinkler, so a build goes through every step without the real tools.
  * The vasm stand-in writes a small program, or a bootblock when that is what it assembles; a line of the source
  * holding {@link #ERROR} fails it with an error on that line, one holding {@link #WARNING} warns of it, and one
- * holding {@link #SLOW} keeps it busy long enough to be cancelled. The Shrinkler stand-in copies what it is given.
+ * holding {@link #SLOW} keeps it busy long enough to be cancelled, for as many seconds as follow it on the line.
+ * The Shrinkler stand-in copies what it is given.
  */
 public record StubTools(Path vasm, Path shrinkler) {
 	public static final String ERROR = "BOGUS";
@@ -47,7 +48,10 @@ public record StubTools(Path vasm, Path shrinkler) {
 		case "$source" in
 			*bootblock.s) printf 'DOS\\000' > "$out"; exit 0 ;;
 		esac
-		if grep -q SLOWLY "$source"; then sleep 30; fi
+		if grep -q SLOWLY "$source"; then
+			delay=$(sed -n 's/.*SLOWLY *//p' "$source" | head -n 1)
+			sleep "${delay:-30}"
+		fi
 		line=$(grep -n BOGUS "$source" | head -n 1 | cut -d: -f1)
 		if [ -n "$line" ]; then
 			echo "error 2 in line $line of \\"$source\\": unknown mnemonic <BOGUS>" >&2

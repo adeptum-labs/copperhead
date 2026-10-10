@@ -15,16 +15,21 @@
 
 package org.copperhead.ui.session;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Stream;
 import org.copperhead.core.build.BuildLine;
+import org.copperhead.core.build.Tone;
 
 /**
  * Where the build stands while it runs: the lines it has written so far, and the question it waits on when the vasm
  * it fetched is not the one Copperhead pins. Idle once it ends; the report it ended with is the studio's last build.
+ * It keeps the last {@value #LIMIT} lines and counts the ones it let go, so a tool that never stops talking cannot
+ * grow the studio without end.
  */
-public record BuildRun(Phase phase, List<BuildLine> log, Optional<TrustRequest> trust) {
+public record BuildRun(Phase phase, List<BuildLine> log, int omitted, Optional<TrustRequest> trust) {
+	public static final int LIMIT = 2000;
+
 	public enum Phase {
 		IDLE,
 		RUNNING,
@@ -40,11 +45,11 @@ public record BuildRun(Phase phase, List<BuildLine> log, Optional<TrustRequest> 
 	}
 
 	public static BuildRun idle() {
-		return new BuildRun(Phase.IDLE, List.of(), Optional.empty());
+		return new BuildRun(Phase.IDLE, List.of(), 0, Optional.empty());
 	}
 
 	public static BuildRun started() {
-		return new BuildRun(Phase.RUNNING, List.of(), Optional.empty());
+		return new BuildRun(Phase.RUNNING, List.of(), 0, Optional.empty());
 	}
 
 	public boolean running() {
@@ -52,19 +57,43 @@ public record BuildRun(Phase phase, List<BuildLine> log, Optional<TrustRequest> 
 	}
 
 	public BuildRun add(final BuildLine line) {
-		return new BuildRun(phase, Stream.concat(log.stream(), Stream.of(line)).toList(), trust);
+		final boolean full = log.size() >= LIMIT;
+		final List<BuildLine> kept = new ArrayList<>(log.subList(full ? 1 : 0, log.size()));
+
+		kept.add(line);
+		return new BuildRun(phase, kept, full ? omitted + 1 : omitted, trust);
+	}
+
+	/** The lines to read: those kept, under one that says how many went before them. */
+	public List<BuildLine> shown() {
+		return shown(log, omitted);
+	}
+
+	/** The last {@value #LIMIT} of the lines, under a line saying how many went before them, if any did. */
+	public static List<BuildLine> shown(final List<BuildLine> lines, final int before) {
+		final int dropped = before + Math.max(0, lines.size() - LIMIT);
+
+		if (dropped == 0) {
+			return lines;
+		}
+
+		final List<BuildLine> shown = new ArrayList<>();
+
+		shown.add(new BuildLine("... " + dropped + " earlier lines left out", Tone.PLAIN));
+		shown.addAll(lines.subList(lines.size() - Math.min(lines.size(), LIMIT), lines.size()));
+		return shown;
 	}
 
 	public BuildRun waiting(final TrustRequest request) {
-		return new BuildRun(Phase.WAITING, log, Optional.of(request));
+		return new BuildRun(Phase.WAITING, log, omitted, Optional.of(request));
 	}
 
 	public BuildRun resumed() {
-		return new BuildRun(Phase.RUNNING, log, Optional.empty());
+		return new BuildRun(Phase.RUNNING, log, omitted, Optional.empty());
 	}
 
 	/** Stopped, with what it wrote still to be read, since a fetch of the toolchain ends in no report of its own. */
 	public BuildRun ended() {
-		return new BuildRun(Phase.IDLE, log, Optional.empty());
+		return new BuildRun(Phase.IDLE, log, omitted, Optional.empty());
 	}
 }

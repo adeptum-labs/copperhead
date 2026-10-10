@@ -23,6 +23,7 @@ import org.copperhead.core.build.BuildOption;
 import org.copperhead.core.build.BuildReport;
 import org.copperhead.core.project.ProjectLayout;
 import org.copperhead.core.project.Target;
+import org.copperhead.ui.session.BuildRun;
 import org.copperhead.ui.session.StudioState;
 import org.copperhead.ui.view.BuildLineView;
 import org.copperhead.ui.view.BuildView;
@@ -89,7 +90,7 @@ final class BuildViews {
 
 	/* While a run goes on it shows what it wrote so far; after a build, the report's log; after a fetch, its own. */
 	private static List<BuildLine> log(final StudioState state) {
-		return state.run().running() || !state.run().log().isEmpty() ? state.run().log()
-			: state.build().map(BuildReport::log).orElse(List.of());
+		return state.run().running() || !state.run().log().isEmpty() ? state.run().shown()
+			: BuildRun.shown(state.build().map(BuildReport::log).orElse(List.of()), 0);
 	}
 }

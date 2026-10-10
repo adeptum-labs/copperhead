@@ -50,6 +50,7 @@ public class ProjectController {
 	private static final String NAME_RULE = "A name starts with a letter or digit and holds only letters, digits, "
 		+ "- and _, up to 64 of them.";
 	private static final String SOURCE = ".s";
+	private static final String BUILD_RUNNING = "A build is running; wait until it ends";
 
 	private final ProjectSession session;
 	private final Preferences preferences;
@@ -153,7 +154,8 @@ public class ProjectController {
 		final Map<String, String> values = Map.of(ProjectDialogs.NAME, form.get(ProjectDialogs.NAME).strip(),
 			ProjectDialogs.TARGET, form.get(ProjectDialogs.TARGET), ProjectDialogs.LOAD,
 			form.get(ProjectDialogs.LOAD).strip(), ProjectDialogs.ENTRY, form.get(ProjectDialogs.ENTRY));
-		final Optional<String> refused = refused(directory, values);
+		final Optional<String> refused = state.run().running() ? Optional.of(BUILD_RUNNING)
+			: refused(directory, values);
 
 		if (refused.isPresent()) {
 			return Screens.dialog(state, ProjectDialogs.settings(state, values, refused.get()));
@@ -174,8 +176,8 @@ public class ProjectController {
 
 		final List<Path> recent = preferences.recent();
 
-		return Screens.all(session.change(changed -> changed.withWorkspace(Optional.of(saved)).withTarget(target)
-			.withModal(Modal.NONE).withEnvironment(changed.environment().withRecent(recent))
+		return Screens.all(session.change(changed -> idle(changed).withWorkspace(Optional.of(saved))
+			.withTarget(target).withModal(Modal.NONE).withEnvironment(changed.environment().withRecent(recent))
 			.withNote("Saved the project settings")));
 	}
 
@@ -194,9 +196,7 @@ public class ProjectController {
 
 		final List<String> unsaved = Buffers.names(form);
 
-		if (session.state().run().running()) {
-			throw new IllegalStateException("A build is running");
-		}
+		idle(session.state());
 
 		if (!unsaved.isEmpty() && !form.has(ProjectDialogs.SAVE) && !form.has(ProjectDialogs.DISCARD)) {
 			return Screens.dialog(session.change(state -> state.withModal(Modal.DISCARD)),
@@ -226,8 +226,17 @@ public class ProjectController {
 
 		final List<Path> recent = preferences.recent();
 
-		return Screens.all(session.change(state -> state.enter(opened).withModal(Modal.NONE)
+		return Screens.all(session.change(state -> idle(state).enter(opened).withModal(Modal.NONE)
 			.withEnvironment(state.environment().withRecent(recent))));
+	}
+
+	/* Checked again inside the change: a build that starts in between must not find its project swapped away. */
+	private static StudioState idle(final StudioState state) {
+		if (state.run().running()) {
+			throw new IllegalStateException(BUILD_RUNNING);
+		}
+
+		return state;
 	}
 
 	/* The project's own folder is where the next one most likely belongs; without one, or out of reach, home. */

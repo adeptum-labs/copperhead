@@ -56,16 +56,27 @@ public class BuildController {
 	/* What the editor has not saved yet goes to disk first, since the assembler reads the files. */
 	@Action("build")
 	public Regions onClickBuild(final Form form) {
-		Buffers.save(Workspaces.open(session.state()), form);
+		saveBeforeBuilding(form);
 		builds.start(false);
 		return Screens.regions(session.state(), HELD_BACK);
 	}
 
 	@Action("build-run")
 	public Regions onClickBuildAndRun(final Form form) {
-		Buffers.save(Workspaces.open(session.state()), form);
+		saveBeforeBuilding(form);
 		builds.start(true);
 		return Screens.all(session.state());
+	}
+
+	/* A build that is refused writes nothing: the one running is reading these very files. */
+	private void saveBeforeBuilding(final Form form) {
+		final StudioState state = session.state();
+
+		if (state.run().running()) {
+			throw new IllegalStateException("A build is already running");
+		}
+
+		Buffers.save(Workspaces.open(state), form);
 	}
 
 	/*

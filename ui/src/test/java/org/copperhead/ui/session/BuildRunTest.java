@@ -17,6 +17,7 @@ package org.copperhead.ui.session;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.IntStream;
 import net.jqwik.api.Example;
 import org.copperhead.core.build.BuildLine;
 import org.copperhead.core.build.Tone;
@@ -70,5 +71,37 @@ public class BuildRunTest {
 
 		assertFalse(ended.running());
 		assertEquals(List.of(FIRST), ended.log());
+	}
+
+	@Example
+	public void shouldKeepTheLastLinesOnlyAndSayHowManyWentBefore() {
+		BuildRun run = BuildRun.started();
+
+		for (int number = 1; number <= 5000; number++) {
+			run = run.add(new BuildLine("line " + number, Tone.PLAIN));
+		}
+
+		assertEquals(BuildRun.LIMIT, run.log().size());
+		assertEquals(3000, run.omitted());
+		assertEquals(new BuildLine("... 3000 earlier lines left out", Tone.PLAIN), run.shown().getFirst());
+		assertEquals("line 3001", run.shown().get(1).text());
+		assertEquals("line 5000", run.shown().getLast().text());
+		assertEquals(BuildRun.LIMIT + 1, run.shown().size());
+	}
+
+	@Example
+	public void shouldShowAllLinesWhenNoneWereLeftOut() {
+		assertEquals(List.of(FIRST, SECOND), BuildRun.started().add(FIRST).add(SECOND).shown());
+	}
+
+	@Example
+	public void shouldLimitALogItIsGivenWhole() {
+		final List<BuildLine> lines = IntStream.rangeClosed(1, BuildRun.LIMIT + 5)
+			.mapToObj(number -> new BuildLine("line " + number, Tone.PLAIN)).toList();
+		final List<BuildLine> shown = BuildRun.shown(lines, 0);
+
+		assertEquals("... 5 earlier lines left out", shown.getFirst().text());
+		assertEquals("line 6", shown.get(1).text());
+		assertEquals(BuildRun.LIMIT + 1, shown.size());
 	}
 }

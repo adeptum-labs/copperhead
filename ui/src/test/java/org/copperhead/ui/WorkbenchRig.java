@@ -63,6 +63,7 @@ public class WorkbenchRig implements AutoCloseable {
 	/* No tool of the machine running the tests is ever found, so a missing one is always fetched, and refused. */
 	private static final Function<String, Optional<Path>> NOWHERE = name -> Optional.empty();
 
+	private final Thread.Builder builders = Thread.ofVirtual().name("build-test-", 0);
 	private final SessionToken token = SessionToken.random();
 	private final RecordingWindow window = new RecordingWindow();
 	private final Path home;
@@ -87,7 +88,7 @@ public class WorkbenchRig implements AutoCloseable {
 		session = new ProjectSession(preferences, clock);
 		builds = new BuildService(session, preferences,
 			BuildService.jobs(BuildService.toolchain(dirs, NOWHERE, home.resolve(OS_RELEASE)), STEP),
-			command -> Thread.ofVirtual().start(command));
+			builders::start);
 		actions = Actions.of(new WorkbenchController(session, preferences),
 			new ProjectController(session, preferences, home), new EditorController(session),
 			new SpriteController(session), new PaletteController(session), new DebuggerController(session),
@@ -168,7 +169,7 @@ public class WorkbenchRig implements AutoCloseable {
 	}
 
 	private void stop() throws Exception {
-		builds.cancel();
+		builds.shutDown();
 		server.stop();
 	}
 
