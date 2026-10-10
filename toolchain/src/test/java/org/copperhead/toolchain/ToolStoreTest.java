@@ -19,6 +19,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import net.jqwik.api.Example;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -66,6 +67,16 @@ public class ToolStoreTest extends ScratchTest {
 
 		assertEquals(Optional.empty(), store().find(PinnedSource.VASM, "../../bin"));
 		assertThrows(IllegalArgumentException.class, () -> store().install(PinnedSource.VASM, "../../bin", binary));
+	}
+
+	@Example
+	public void shouldTreatAHashInCapitalsAsTheSameHash() throws IOException {
+		final String capitals = SHA.toUpperCase(Locale.ROOT);
+		final Path installed = store().install(PinnedSource.VASM, capitals, built("first"));
+
+		assertEquals(scratch().resolve("tools/vasm").resolve(SHA).resolve("vasmm68k_mot"), installed);
+		assertEquals(Optional.of(installed), store().find(PinnedSource.VASM, capitals));
+		assertEquals(Optional.of(installed), store().find(PinnedSource.VASM, SHA));
 	}
 
 	private ToolStore store() {

@@ -16,12 +16,14 @@
 package org.copperhead.toolchain;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -31,7 +33,9 @@ import java.util.stream.Stream;
 
 /** Finds the assembler and the cruncher, or fetches, checks, compiles and stores them when they are not there yet. */
 public final class Toolchain {
-	private static final Pattern VERSION = Pattern.compile("#define\\s+_VER\\s+\"vasm\\s+([^\"]+)\"");
+	private static final Pattern VERSION =
+		Pattern.compile("#define\\s+_VER\\s+\"vasm\\s+([0-9A-Za-z.+-]{1,32})\"");
+	private static final int SCANNED_BYTES = 1 << 20;
 	private static final String UNKNOWN = "unknown";
 
 	private final ToolStore store;
@@ -57,7 +61,7 @@ public final class Toolchain {
 
 		return configured.filter(path -> Files.isRegularFile(path) && Files.isExecutable(path))
 			.or(() -> store.find(source, source.sha256()))
-			.or(() -> trusted.flatMap(sha256 -> store.find(source, sha256)))
+			.or(() -> trustedFor(source, trusted).flatMap(sha256 -> store.find(source, sha256)))
 			.or(() -> onPath.apply(source.executable()));
 	}
 
@@ -74,13 +78,16 @@ public final class Toolchain {
 		if (missing.isPresent()) {
 			throw new ToolchainException(missing.get());
 		}
-		final Path work = Files.createTempDirectory(Files.createDirectories(scratch), source.tool());
+		try (Workspace workspace = new Workspace(Files.createTempDirectory(Files.createDirectories(scratch),
+			source.tool()))) {
 
-		try {
+			final Path work = workspace.path();
+
 			log.accept("fetching " + source.uri());
 			final Fetcher.Fetched fetched = fetcher.fetch(source.uri(), work);
 
-			if (!fetched.sha256().equals(source.sha256()) && !trusted.equals(Optional.of(fetched.sha256()))) {
+			if (!fetched.sha256().equals(source.sha256())
+				&& !trustedFor(source, trusted).equals(Optional.of(fetched.sha256()))) {
 				throw refusal(source, fetched, work);
 			}
 			final Path tree = Tarball.extract(fetched.file(), work.resolve("tree"));
@@ -89,9 +96,16 @@ public final class Toolchain {
 
 			log.accept("installed " + installed);
 			return installed;
-		} finally {
-			delete(work);
 		}
+	}
+
+	/* Only vasm has a trust flow; for Shrinkler a different archive is refused whatever the preferences say. */
+	private static Optional<String> trustedFor(final PinnedSource source, final Optional<String> trusted) {
+		return trusted.filter(sha256 -> isVasm(source)).map(sha256 -> sha256.toLowerCase(Locale.ROOT));
+	}
+
+	private static boolean isVasm(final PinnedSource source) {
+		return PinnedSource.VASM.tool().equals(source.tool());
 	}
 
 	/* vasm's host replaces its release archive in place, so a different archive is most likely a new release, which
@@ -99,7 +113,7 @@ public final class Toolchain {
 	private static ToolchainException refusal(final PinnedSource source, final Fetcher.Fetched fetched, final Path work)
 		throws IOException {
 
-		if (!PinnedSource.VASM.tool().equals(source.tool())) {
+		if (!isVasm(source)) {
 			return new ToolchainException(source.tool() + " " + source.version() + " arrived with sha-256 "
 				+ fetched.sha256() + " instead of the pinned one; refusing it, as its tagged release never "
 				+ "changes and this may be tampering");
@@ -109,28 +123,35 @@ public final class Toolchain {
 		return new HashMismatch(source.tool(), version(quarantined), fetched.sha256());
 	}
 
-	/* Read from the unpacked sources, which are never built before the user accepts them. A link is not followed:
-	   the archive is not trusted yet. */
+	/* Read from the unpacked sources, which are never built before the user accepts them. A link is not followed
+	   and only the start of the file is scanned: the archive is not trusted yet, so neither its size nor the
+	   characters of the version it claims are. */
 	private static String version(final Path tree) throws IOException {
 		final Path source = tree.resolve("vasm.c");
 
 		if (!Files.isRegularFile(source, LinkOption.NOFOLLOW_LINKS)) {
 			return UNKNOWN;
 		}
-		try (Stream<String> lines = Files.lines(source, StandardCharsets.ISO_8859_1)) {
-			return lines.map(VERSION::matcher).filter(Matcher::find).map(found -> found.group(1)).findFirst()
-				.orElse(UNKNOWN);
+		try (InputStream in = Files.newInputStream(source, LinkOption.NOFOLLOW_LINKS)) {
+			final Matcher found = VERSION.matcher(new String(in.readNBytes(SCANNED_BYTES),
+				StandardCharsets.ISO_8859_1));
+
+			return found.find() ? found.group(1) : UNKNOWN;
 		}
 	}
 
-	private static void delete(final Path tree) throws IOException {
-		final List<Path> paths;
+	/* A failed cleanup is attached to the failure that made it necessary instead of replacing it. */
+	private record Workspace(Path path) implements AutoCloseable {
+		@Override
+		public void close() throws IOException {
+			final List<Path> paths;
 
-		try (Stream<Path> walked = Files.walk(tree)) {
-			paths = walked.sorted(Comparator.reverseOrder()).toList();
-		}
-		for (final Path path : paths) {
-			Files.delete(path);
+			try (Stream<Path> walked = Files.walk(path)) {
+				paths = walked.sorted(Comparator.reverseOrder()).toList();
+			}
+			for (final Path each : paths) {
+				Files.delete(each);
+			}
 		}
 	}
 }

@@ -20,6 +20,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.PosixFilePermissions;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.regex.Pattern;
 
@@ -37,7 +38,9 @@ public final class ToolStore {
 		this.root = root;
 	}
 
-	public Optional<Path> find(final PinnedSource source, final String sha256) {
+	public Optional<Path> find(final PinnedSource source, final String hash) {
+		final String sha256 = hash.toLowerCase(Locale.ROOT);
+
 		if (!SHA256.matcher(sha256).matches()) {
 			return Optional.empty();
 		}
@@ -49,7 +52,9 @@ public final class ToolStore {
 
 	/* Copied next to its final name and moved there in one step, so a build running at the same time never finds
 	   half a program. */
-	public Path install(final PinnedSource source, final String sha256, final Path binary) throws IOException {
+	public Path install(final PinnedSource source, final String hash, final Path binary) throws IOException {
+		final String sha256 = hash.toLowerCase(Locale.ROOT);
+
 		if (!SHA256.matcher(sha256).matches()) {
 			throw new IllegalArgumentException("not a sha-256: " + sha256);
 		}
