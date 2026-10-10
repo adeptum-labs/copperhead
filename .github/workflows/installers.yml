@@ -4,6 +4,7 @@ on:
   push:
     branches: [master]
     tags: ['v*']
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -29,19 +30,18 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq fakeroot rpm
-      - name: Build the packages
-        run: mvn -B install -Pinstaller -DskipTests
-      - name: Check that the packaged runtime serves the studio's files
-        run: mvn -B -Pinstaller -pl desktop failsafe:integration-test failsafe:verify
-      - name: Pack the portable folder, keeping its file modes
-        run: tar -C desktop/target/dist -czf desktop/target/dist/Copperhead-portable.tar.gz Copperhead
+      - name: Build the packages and check that the packaged runtime serves the studio's files
+        run: mvn -B -Pinstaller verify
+      - name: Gather the packages, the portable folder with its file modes, and the check that runs them
+        run: |
+          mkdir packages
+          cp desktop/target/dist/*.deb desktop/target/dist/*.rpm desktop/src/test/ci/installed-check.sh \
+            desktop/src/test/ci/close-window.py packages/
+          tar -C desktop/target/dist -czf packages/Copperhead-portable.tar.gz Copperhead
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: packages
-          path: |
-            desktop/target/dist/*.deb
-            desktop/target/dist/*.rpm
-            desktop/target/dist/Copperhead-portable.tar.gz
+          path: packages/
           if-no-files-found: error
 
   install:
@@ -68,9 +68,7 @@ jobs:
       image: ${{ matrix.image }}
       options: --shm-size=512m --init
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          persist-credentials: false
+      # No checkout: a bare container has neither git nor tar, and the check comes along with the packages it runs.
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: packages
@@ -80,5 +78,6 @@ jobs:
         env:
           PACKAGE: ${{ matrix.package }}
           DESKTOP: ${{ matrix.desktop }}
+          COPPERHEAD_INSTALLED_CHECK: '1'
         # PACKAGE is left unquoted on purpose: the shell expands the file name pattern.
-        run: bash desktop/src/test/ci/installed-check.sh $PACKAGE "$DESKTOP"
+        run: bash packages/installed-check.sh $PACKAGE "$DESKTOP"

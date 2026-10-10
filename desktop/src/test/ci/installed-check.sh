@@ -6,14 +6,25 @@
 # Usage: installed-check.sh <copperhead_*.deb | copperhead-*.rpm | Copperhead-portable.tar.gz> [x11|wayland]
 set -euo pipefail
 
-# It installs and removes packages as root, which is only fine in a container thrown away afterwards.
-if [ "${CI:-}" != true ] && [ "${COPPERHEAD_INSTALLED_CHECK:-}" != 1 ]; then
-	echo "Refusing to run outside CI: it installs and removes packages as root." >&2
+# It installs and removes packages and adds a user, which is only fine in a container thrown away afterwards. CI=true
+# alone proves nothing, as developers export it too, so a container has to be seen as well, unless the person
+# running it vouches for the machine.
+in_container() {
+	[ -f /.dockerenv ] || [ -f /run/.containerenv ] || [ -n "${container:-}" ]
+}
+
+if [ "${COPPERHEAD_INSTALLED_CHECK:-}" != 1 ] && { [ "${CI:-}" != true ] || ! in_container; }; then
+	echo "Refusing to run: it installs and removes packages and adds a user, which only a CI container may have." >&2
 	echo "In a throwaway container, set COPPERHEAD_INSTALLED_CHECK=1 to run it anyway." >&2
 	exit 2
 fi
 
-package=$(realpath "$1")
+if [ "$(id -u)" != 0 ]; then
+	echo "Refusing to run: it has to be root, as it is in a CI container." >&2
+	exit 2
+fi
+
+package=$(realpath "${1:?usage: installed-check.sh <package|portable-tar> [x11|wayland]}")
 desktop=${2:-x11}
 here=$(dirname "$(realpath "$0")")
 
@@ -38,20 +49,19 @@ fail() {
 	exit 1
 }
 
-# Whatever was started, however far the checks got, goes with the script.
+# Whatever was started, however far the checks got, goes with the script. Everything it starts runs as the user it
+# created, Weston's Xwayland and the engine's helpers included, so that user's processes are all it ever stops.
 stop_what_was_started() {
-	local name
-
-	for name in Copperhead jcef_helper Xvfb weston Xwayland; do
-		pkill -x "$name" 2>/dev/null || true
-	done
+	pkill -u "$user" 2>/dev/null || true
 }
 
-trap stop_what_was_started EXIT
-
 # A semicolon, not &&: a command line that ends in & would otherwise put the cd in the background with it.
-as_user() {
+start_as_user() {
 	runuser -u "$user" -- bash -ec "cd ~; $1"
+}
+
+as_user() {
+	runuser -u "$user" -- timeout 60 bash -ec "cd ~; $1"
 }
 
 # Runs the script as the user until it succeeds, the way a person would look again a moment later.
@@ -68,7 +78,7 @@ await() {
 	done
 }
 
-family() {
+detect_family() {
 	case " $ID ${ID_LIKE:-} " in
 		*" debian "* | *" ubuntu "*) echo debian ;;
 		*" fedora "* | *" rhel "*) echo fedora ;;
@@ -79,20 +89,20 @@ family() {
 # Only what the checks need. The libraries Copperhead runs on have to come in through the package, which is what a
 # person installing it depends on.
 install_tools() {
-	if [ "$(family)" = debian ]; then
+	if [ "$family" = debian ]; then
 		export DEBIAN_FRONTEND=noninteractive
 		apt-get update -qq
 		apt-get install -y -qq xvfb xauth procps curl xdotool imagemagick tesseract-ocr python3-xlib >/dev/null
 	else
 		dnf install -y -q xorg-x11-server-Xvfb xorg-x11-xauth procps-ng curl which xdotool ImageMagick tesseract \
-			tesseract-langpack-eng python3-xlib util-linux shadow-utils >/dev/null
+			tesseract-langpack-eng python3-xlib util-linux shadow-utils tar gzip >/dev/null
 	fi
 }
 
 # GNOME on Wayland is the default session of Ubuntu, Fedora and the distributions built on them. GTK 4 comes with
 # every GNOME desktop, and the browser engine loads it there when it is left to run on Wayland.
 install_wayland() {
-	if [ "$(family)" = debian ]; then
+	if [ "$family" = debian ]; then
 		apt-get install -y -qq weston xwayland libgtk-4-1 >/dev/null
 	else
 		dnf install -y -q weston xorg-x11-server-Xwayland gtk4 >/dev/null
@@ -114,7 +124,7 @@ install_copperhead() {
 		*.tar.gz)
 			install_libraries
 			mkdir -p "$(dirname "$portable")"
-			tar -xzf "$package" -C "$(dirname "$portable")"
+			tar --no-same-owner -xzf "$package" -C "$(dirname "$portable")"
 			;;
 		*) fail "not a package: $package" ;;
 	esac
@@ -143,7 +153,7 @@ check_menu_entry() {
 }
 
 start_on_x11() {
-	as_user "setsid Xvfb :99 -screen 0 1600x1000x24 >/dev/null 2>&1 &
+	start_as_user "setsid Xvfb :99 -screen 0 1600x1000x24 >/dev/null 2>&1 &
 		sleep 2
 		DISPLAY=:99 setsid nohup '$home/bin/Copperhead' >$log 2>&1 &"
 }
@@ -156,7 +166,7 @@ start_on_wayland() {
 		current_desktop=ubuntu:GNOME
 	fi
 
-	as_user "export XDG_RUNTIME_DIR=/tmp/runtime-$user
+	start_as_user "export XDG_RUNTIME_DIR=/tmp/runtime-$user
 		mkdir -p -m 0700 \"\$XDG_RUNTIME_DIR\"
 		setsid weston --backend=headless --renderer=pixman --xwayland --socket=wayland-1 \
 			--width=1600 --height=1000 >/tmp/weston.log 2>&1 &
@@ -174,7 +184,7 @@ address() {
 check_refuses_requests_without_the_token() {
 	local status
 
-	status=$(as_user "curl -s -o /dev/null -w '%{http_code}' '$1/'")
+	status=$(as_user "curl -s --max-time 10 -o /dev/null -w '%{http_code}' '$1/' || true")
 	[ "$status" = 403 ] || fail "the page without the token answered $status"
 }
 
@@ -189,10 +199,11 @@ check_shows_the_welcome_pane() {
 		"$screen import -window root -resize 200% png:- | tesseract stdin stdout 2>/dev/null | grep -qiF '$first_page'"
 }
 
+# The helpers of the engine only exist once the page is up, so the platform they were told to draw on is read after it.
 check_draws_inside_its_own_window() {
-	as_user "pgrep -af '[j]cef_helper' | grep -o -- '--ozone-platform=[a-z0-9]*' | sort -u || true"
 	await "the welcome pane drawn inside the window" "window=\$($screen xdotool search --name '^$title\$' | head -1)
 		$screen import -window \"\$window\" -resize 200% png:- | tesseract stdin stdout 2>/dev/null | grep -qiF '$first_page'"
+	as_user "pgrep -af '[j]cef_helper' | grep -o -- '--ozone-platform=[a-z0-9]*' | sort -u || true"
 }
 
 check_window_class() {
@@ -233,6 +244,8 @@ else
 	screen=DISPLAY=:99
 fi
 
+family=$(detect_family) || exit 1
+
 install_tools
 
 if [ "$desktop" = wayland ]; then
@@ -242,6 +255,7 @@ fi
 install_copperhead
 cp "$here/close-window.py" /tmp/close-window.py
 useradd -m "$user"
+trap stop_what_was_started EXIT
 
 if [ "$desktop" = wayland ]; then
 	start_on_wayland
