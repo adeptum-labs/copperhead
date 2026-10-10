@@ -15,22 +15,41 @@
 
 package org.copperhead.ui.session;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.UnaryOperator;
 import net.jqwik.api.Example;
+import net.jqwik.api.lifecycle.AfterTry;
+import net.jqwik.api.lifecycle.BeforeTry;
+import org.copperhead.ui.TempDirectory;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 public class ProjectSessionTest {
 	private final AtomicReference<Instant> now = new AtomicReference<>(Instant.EPOCH);
-	private final ProjectSession session = new ProjectSession(now::get);
+	private TempDirectory home;
+	private Preferences preferences;
+	private ProjectSession session;
+
+	@BeforeTry
+	public void launch() throws Exception {
+		home = new TempDirectory();
+		preferences = new Preferences(home.path().resolve("preferences.json"));
+		session = new ProjectSession(preferences, now::get);
+	}
+
+	@AfterTry
+	public void remove() throws Exception {
+		home.close();
+	}
 
 	@Example
 	public void shouldForgetTheNoteOfTheLastChange() {
-		session.change(state -> state.withNote("Built nightfall.adf · 2,911 bytes"));
+		session.change(state -> state.withNote("Built demo.adf · 1,031 bytes"));
 
 		assertEquals("", session.change(UnaryOperator.identity()).note());
 	}
@@ -65,5 +84,22 @@ public class ProjectSessionTest {
 		now.set(Instant.EPOCH.plusSeconds(90));
 
 		assertEquals(Duration.ofMillis(5_400), session.state().position());
+	}
+
+	@Example
+	public void shouldLaunchInTheLayoutLeftLastTime() {
+		preferences.layout(new Layout("light", 40, 300));
+
+		assertEquals(new Layout("light", 40, 300), new ProjectSession(preferences, now::get).state().layout());
+	}
+
+	@Example
+	public void shouldSayOnceThatThePreferencesCouldNotBeRead() throws Exception {
+		final Path file = home.path().resolve("broken.json");
+
+		Files.writeString(file, "not json");
+
+		assertEquals("preferences were unreadable; moved to preferences.json.bak",
+			new ProjectSession(new Preferences(file), now::get).state().note());
 	}
 }

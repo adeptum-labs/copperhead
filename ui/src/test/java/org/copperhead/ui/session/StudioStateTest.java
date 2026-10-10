@@ -158,4 +158,12 @@ public class StudioStateTest {
 		assertEquals(13, round.pc());
 		assertEquals(1171, round.breakpoints().getFirst().hits());
 	}
+
+	@Example
+	public void shouldOpenWithNoProjectInTheDefaultLayoutWithNothingRunning() {
+		assertTrue(opened.workspace().isEmpty());
+		assertEquals(Layout.defaults(), opened.layout());
+		assertEquals(BuildRun.idle(), opened.run());
+		assertEquals(List.of(), opened.environment().recent());
+	}
 }

@@ -1,12 +1,10 @@
 <!DOCTYPE html>
-<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<html lang="en" xmlns:th="http://www.thymeleaf.org" th:attr="data-theme=${view.layout().theme()}">
 	<head>
 		<meta charset="utf-8">
 		<meta name="viewport" content="width=device-width, initial-scale=1">
 		<title th:text="${view.title()}">Copperhead</title>
 		<link rel="stylesheet" href="/static/css/copperhead.css">
-		<!-- Runs before the first paint, so a stored light theme never flashes dark. -->
-		<script>document.documentElement.dataset.theme = localStorage.getItem("theme") || "dark";</script>
 		<script src="/static/js/htmx.min.js" defer></script>
 		<script src="/static/js/window.js" defer></script>
 		<script src="/static/js/menu.js" defer></script>
@@ -24,7 +22,9 @@
 			<span class="titlebar__spacer"></span>
 			<th:block th:with="view=${view.region('MACHINE')}"><div th:replace="~{__${view.template()}__}"></div></th:block>
 			<span class="titlebar__spacer"></span>
-			<button class="titlebar__theme" type="button" data-theme-toggle aria-label="Switch theme">
+			<button class="titlebar__theme" type="button" data-theme-toggle aria-label="Switch theme"
+				hx-post="/action/theme"
+				hx-vals="js:{theme: document.documentElement.dataset.theme === 'light' ? 'dark' : 'light'}">
 				<span class="titlebar__light">Light</span><span class="titlebar__dark">Dark</span>
 			</button>
 			<div class="titlebar__controls">
@@ -43,7 +43,7 @@
 
 		<div class="studio__body">
 			<th:block th:with="view=${view.region('RAIL')}"><div th:replace="~{__${view.template()}__}"></div></th:block>
-			<main class="workspace" data-workspace>
+			<main class="workspace" data-workspace th:style="${view.sizes()}">
 				<div class="workspace__top">
 					<th:block th:with="view=${view.region('TOOL')}"><div th:replace="~{__${view.template()}__}"></div></th:block>
 					<div class="splitter splitter--vertical" data-splitter="vertical" role="separator"

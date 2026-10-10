@@ -23,7 +23,7 @@ public record MenuItemView(String label, String keys, String action, String vals
 	ItemKind kind) {
 
 	public String post() {
-		return kind == ItemKind.ACTION ? "/action/" + action : null;
+		return kind == ItemKind.ACTION || kind == ItemKind.THEME ? "/action/" + action : null;
 	}
 
 	public String values() {

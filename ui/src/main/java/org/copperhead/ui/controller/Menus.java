@@ -31,6 +31,8 @@ import org.copperhead.ui.view.Vals;
 final class Menus {
 	/* Linux desktops take Ctrl+Alt+T to open a terminal before the page ever sees it. */
 	static final String LIGHT_DARK = "Ctrl+Shift+L";
+	/* The page works out the theme to switch to, since it is the page that wears it. */
+	static final String NEXT_THEME = "js:{theme: document.documentElement.dataset.theme === 'light' ? 'dark' : 'light'}";
 
 	private static final String NO_KEYS = "";
 	private static final String NO_VALS = "";
@@ -82,7 +84,7 @@ final class Menus {
 			action("Show timeline", "Ctrl+J", "timeline", NO_VALS).withChecked(state.timelineShown())
 				.withSeparated(true),
 			later("Focus emulator", "Ctrl+E"),
-			new MenuItemView("Light mode", LIGHT_DARK, NO_VALS, NO_VALS, false, true, ItemKind.THEME)));
+			new MenuItemView("Light mode", LIGHT_DARK, "theme", NEXT_THEME, false, true, ItemKind.THEME)));
 	}
 
 	private static MenuView build(final StudioState state) {

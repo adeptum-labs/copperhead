@@ -16,16 +16,24 @@
 package org.copperhead.ui.view;
 
 import java.util.Map;
+import org.copperhead.ui.session.Layout;
 import org.copperhead.web.action.View;
 
-/** The whole window, made of its regions so the first page and every later swap draw them alike. */
-public record IndexView(String title, Map<Region, View> regions) implements View {
+/**
+ * The whole window, made of its regions so the first page and every later swap draw them alike, laid out the way
+ * the person left it: the theme on the page itself, the pane sizes as the custom properties the workspace reads.
+ */
+public record IndexView(String title, Map<Region, View> regions, Layout layout) implements View {
 	public IndexView {
 		regions = Map.copyOf(regions);
 	}
 
 	public View region(final String name) {
 		return regions.get(Region.valueOf(name));
+	}
+
+	public String sizes() {
+		return "--split:" + layout.split() + "%;--bottom:" + layout.bottom() + "px";
 	}
 
 	@Override

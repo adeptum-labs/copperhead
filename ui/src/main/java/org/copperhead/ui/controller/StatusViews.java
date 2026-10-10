@@ -35,6 +35,6 @@ final class StatusViews {
 				+ (warnings.size() == 1 ? " warning · " : " warnings · ") + warnings.getFirst().location(),
 			!warnings.isEmpty(), "last build " + BuildViews.outcome(state), state.note(),
 			"Part %02d · %s".formatted(at + 1, part.name()), Clock.frames(state.position()),
-			state.target().label());
+			state.target().label(), state.layout().theme());
 	}
 }

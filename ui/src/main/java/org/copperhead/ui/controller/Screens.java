@@ -36,7 +36,7 @@ public final class Screens {
 		final Map<Region, View> regions = new EnumMap<>(Region.class);
 
 		Arrays.stream(Region.values()).forEach(region -> regions.put(region, render(state, region)));
-		return new IndexView(TITLE, regions);
+		return new IndexView(TITLE, regions, state.layout());
 	}
 
 	/* The status bar always comes along, because every change clears its note and a bar left alone would go on

@@ -20,6 +20,8 @@ import jakarta.inject.Inject;
 import org.copperhead.core.project.Project;
 import org.copperhead.core.project.Target;
 import org.copperhead.core.sample.SampleProjects;
+import org.copperhead.ui.session.Layout;
+import org.copperhead.ui.session.Preferences;
 import org.copperhead.ui.session.ProjectSession;
 import org.copperhead.ui.view.Modal;
 import org.copperhead.ui.view.Region;
@@ -28,14 +30,23 @@ import org.copperhead.ui.view.Tool;
 import org.copperhead.web.action.Action;
 import org.copperhead.web.action.Form;
 
-/** The commands of the window itself: which tool is shown, which project and machine, and the dialogs. */
+/**
+ * The commands of the window itself: which tool is shown, which project and machine, the dialogs, and how the
+ * person likes the window, which is kept with their preferences so the next launch opens it the same way.
+ */
 @ApplicationScoped
 public class WorkbenchController {
+	private static final String THEME = "theme";
+	private static final String SPLIT = "split";
+	private static final String BOTTOM = "bottom";
+
 	private final ProjectSession session;
+	private final Preferences preferences;
 
 	@Inject
-	public WorkbenchController(final ProjectSession session) {
+	public WorkbenchController(final ProjectSession session, final Preferences preferences) {
 		this.session = session;
+		this.preferences = preferences;
 	}
 
 	@Action("tool")
@@ -76,5 +87,26 @@ public class WorkbenchController {
 	public Regions onClickTimeline() {
 		return Screens.regions(session.change(state -> state.withTimelineShown(!state.timelineShown())),
 			Region.MENUS, Region.TIMELINE);
+	}
+
+	/* The status bar carries the theme, and the page takes it from there. */
+	@Action("theme")
+	public Regions onClickTheme(final Form form) {
+		final Layout layout = preferences.layout().withTheme(form.get(THEME));
+
+		preferences.layout(layout);
+		return Screens.regions(session.change(state -> state.withLayout(layout)));
+	}
+
+	/* The page has laid itself out while the splitter was dragged; this only remembers where it was let go. */
+	@Action("layout")
+	public void onDragSplitter(final Form form) {
+		final Layout saved = preferences.layout();
+		final Layout layout = saved.withTheme(form.has(THEME) ? form.get(THEME) : saved.theme())
+			.withSplit(form.has(SPLIT) ? Integer.parseInt(form.get(SPLIT)) : saved.split())
+			.withBottom(form.has(BOTTOM) ? Integer.parseInt(form.get(BOTTOM)) : saved.bottom());
+
+		preferences.layout(layout);
+		session.change(state -> state.withLayout(layout));
 	}
 }

@@ -17,10 +17,12 @@ package org.copperhead.ui.view;
 
 import org.copperhead.web.action.View;
 
-/** The status bar: what the last build said, what just happened, and where the run is. */
+/**
+ * The status bar: what the last build said, what just happened, and where the run is. It comes with every answer,
+ * so it also carries the theme for the page to wear.
+ */
 public record StatusView(String warnings, boolean warns, String lastBuild, String note, String part, long frame,
-	String machine) implements View {
-
+	String machine, String theme) implements View {
 	@Override
 	public String template() {
 		return "fragments/status :: status";

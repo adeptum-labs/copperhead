@@ -13,37 +13,23 @@
     If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* The panes keep the sizes they were dragged to from one start to the next. Storage can be refused, which only
-   costs that memory. */
-const SPLIT = { key: "copperhead.split", low: 36, high: 78 };
-const BOTTOM = { key: "copperhead.bottom", low: 120, high: 460, share: 0.42 };
-
-const remember = (key, value) => {
-	try {
-		localStorage.setItem(key, String(value));
-	} catch {
-		/* kept for this run only */
-	}
-};
-
-const recall = (key) => {
-	try {
-		return Number(localStorage.getItem(key));
-	} catch {
-		return 0;
-	}
-};
+/* The panes keep the sizes they were dragged to from one start to the next: once a drag ends the server keeps them
+   with the other preferences, and draws the next page with them. */
+const SPLIT = { low: 36, high: 78 };
+const BOTTOM = { low: 120, high: 460, share: 0.42 };
 
 const clamp = (value, low, high) => Math.min(high, Math.max(low, value));
 
 /* The capture is lost when the button is released and when the drag is cancelled, so the split lets go of the
-   pointer in both cases. */
-const drag = (handle, move) => {
+   pointer and remembers where it ended in both cases. */
+const drag = (handle, move, done) => {
 	handle.addEventListener("pointerdown", (event) => {
 		handle.setPointerCapture(event.pointerId);
 		handle.addEventListener("pointermove", move);
-		handle.addEventListener("lostpointercapture", () => handle.removeEventListener("pointermove", move),
-			{ once: true });
+		handle.addEventListener("lostpointercapture", () => {
+			handle.removeEventListener("pointermove", move);
+			done();
+		}, { once: true });
 	});
 };
 
@@ -51,37 +37,28 @@ const workspace = document.querySelector("[data-workspace]");
 
 if (workspace) {
 	const top = workspace.querySelector(".workspace__top");
-
-	const split = (percent) => {
-		const value = clamp(percent, SPLIT.low, SPLIT.high);
-
-		workspace.style.setProperty("--split", `${value}%`);
-		return value;
+	const sizes = {
+		split: parseFloat(workspace.style.getPropertyValue("--split")),
+		bottom: parseFloat(workspace.style.getPropertyValue("--bottom"))
 	};
 
-	/* The timeline never takes more than its share of the window, however tall it was dragged. */
-	const bottom = (pixels) => {
-		const value = clamp(pixels, BOTTOM.low, Math.min(BOTTOM.high, workspace.clientHeight * BOTTOM.share));
-
-		workspace.style.setProperty("--bottom", `${value}px`);
-		return value;
-	};
-
-	if (recall(SPLIT.key)) {
-		split(recall(SPLIT.key));
-	}
-
-	if (recall(BOTTOM.key)) {
-		bottom(recall(BOTTOM.key));
-	}
+	const remember = () => fetch("/action/layout", {
+		method: "POST",
+		body: new URLSearchParams({ split: Math.round(sizes.split), bottom: Math.round(sizes.bottom) })
+	});
 
 	drag(workspace.querySelector("[data-splitter=vertical]"), (event) => {
 		const box = top.getBoundingClientRect();
 
-		remember(SPLIT.key, split((event.clientX - box.left) / box.width * 100));
-	});
+		sizes.split = clamp((event.clientX - box.left) / box.width * 100, SPLIT.low, SPLIT.high);
+		workspace.style.setProperty("--split", `${sizes.split}%`);
+	}, remember);
 
+	/* The timeline never takes more than its share of the window, however tall it was dragged. */
 	drag(workspace.querySelector("[data-splitter=horizontal]"), (event) => {
-		remember(BOTTOM.key, bottom(workspace.getBoundingClientRect().bottom - event.clientY));
-	});
+		const tallest = Math.min(BOTTOM.high, workspace.clientHeight * BOTTOM.share);
+
+		sizes.bottom = clamp(workspace.getBoundingClientRect().bottom - event.clientY, BOTTOM.low, tallest);
+		workspace.style.setProperty("--bottom", `${sizes.bottom}px`);
+	}, remember);
 }

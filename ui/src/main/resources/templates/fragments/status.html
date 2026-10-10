@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en" xmlns:th="http://www.thymeleaf.org">
 	<body>
-		<footer th:fragment="status" id="status" class="status" hx-swap-oob="true">
+		<footer th:fragment="status" id="status" class="status" hx-swap-oob="true" th:attr="data-theme=${view.theme()}">
 			<span>vasm 1.9h</span>
 			<span class="status__ok">0 errors</span>
 			<button class="status__warning" type="button" th:if="${view.warns()}" hx-post="/action/goto-warning"

@@ -29,6 +29,7 @@ import org.copperhead.core.graphics.Sprite;
 import org.copperhead.core.project.Project;
 import org.copperhead.core.project.Target;
 import org.copperhead.core.sample.SampleMachine;
+import org.copperhead.toolchain.ProjectDirectory;
 import org.copperhead.ui.view.Modal;
 import org.copperhead.ui.view.Tool;
 
@@ -40,7 +41,7 @@ import org.copperhead.ui.view.Tool;
 public record StudioState(Project project, Target target, Tool tool, Modal modal, boolean running,
 	boolean timelineShown, String note, String file, int cursor, List<Breakpoint> breakpoints, int pc, int d0,
 	Sprite sprite, int spriteColour, int paletteIndex, BuildOptions options, Optional<BuildReport> build,
-	Duration position) {
+	Duration position, Optional<ProjectDirectory> workspace, Layout layout, BuildRun run, Environment environment) {
 
 	private static final int BYTE = 0xFF;
 	private static final int FIRST_D0 = 0x17;
@@ -61,7 +62,8 @@ public record StudioState(Project project, Target target, Tool tool, Modal modal
 		return new StudioState(project, target, Tool.CODE, Modal.NONE, true, true, "", traced, project.breakpoint(),
 			List.of(new Breakpoint(traced, project.breakpoint(), FIRST_HITS)), project.breakpoint(), FIRST_D0,
 			SampleMachine.ball(), BASE_COLOUR, FIRST_PICK, BuildOptions.defaults(), Optional.empty(),
-			FIRST_POSITION);
+			FIRST_POSITION,
+			Optional.empty(), Layout.defaults(), BuildRun.idle(), Environment.of(List.of()));
 	}
 
 	/**
@@ -69,8 +71,9 @@ public record StudioState(Project project, Target target, Tool tool, Modal modal
 	 * machine and how the window is laid out, which belong to the person rather than to a project.
 	 */
 	public StudioState switchTo(final Project other) {
-		return open(other, target).withTool(tool).withTimelineShown(timelineShown)
-			.withNote("Opened %s (%s)".formatted(other.file(), other.kind().name().toLowerCase(Locale.ROOT)));
+		return open(other, target).withTool(tool).withTimelineShown(timelineShown).withLayout(layout)
+			.withEnvironment(environment).withNote("Opened %s (%s)".formatted(other.file(),
+				other.kind().name().toLowerCase(Locale.ROOT)));
 	}
 
 	public boolean breakpointAt(final String in, final int line) {

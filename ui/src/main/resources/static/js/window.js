@@ -69,15 +69,10 @@ for (const handle of document.querySelectorAll("[data-resize]")) {
 	hold(handle, getComputedStyle(handle).cursor, "resize/start/" + handle.dataset.resize, "resize/end");
 }
 
-/* The theme is switched from the title bar and from the View menu. The menu is drawn anew whenever a check
-   mark in it changes, so the click is caught on the document rather than on either control. */
-document.addEventListener("click", (event) => {
-	if (!event.target.closest("[data-theme-toggle]")) {
-		return;
+/* The server keeps the theme with the other preferences and names it on the status bar it sends with every answer,
+   so a switch from the title bar, the View menu or the preferences reaches the page the same way. */
+document.addEventListener("htmx:oobAfterSwap", (event) => {
+	if (event.target.id === "status") {
+		document.documentElement.dataset.theme = event.target.dataset.theme;
 	}
-
-	const theme = document.documentElement.dataset.theme === "light" ? "dark" : "light";
-
-	document.documentElement.dataset.theme = theme;
-	localStorage.setItem("theme", theme);
 });

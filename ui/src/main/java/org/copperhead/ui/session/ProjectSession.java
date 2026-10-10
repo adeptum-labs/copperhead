@@ -16,6 +16,7 @@
 package org.copperhead.ui.session;
 
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.InstantSource;
@@ -31,16 +32,18 @@ import org.copperhead.core.sample.SampleProjects;
 @ApplicationScoped
 public class ProjectSession {
 	private final InstantSource clock;
-	private StudioState state = StudioState.open(SampleProjects.nightfall(), Target.A500_OCS);
+	private StudioState state;
 	private Instant since;
 
-	public ProjectSession() {
-		this(steady());
+	@Inject
+	public ProjectSession(final Preferences preferences) {
+		this(preferences, steady());
 	}
 
-	public ProjectSession(final InstantSource clock) {
+	public ProjectSession(final Preferences preferences, final InstantSource clock) {
 		this.clock = clock;
 		this.since = clock.instant();
+		this.state = launch(preferences);
 	}
 
 	/* The wall clock can be set back or jump ahead while the machine runs; the run should only ever see time pass. */
@@ -48,6 +51,14 @@ public class ProjectSession {
 		final long origin = System.nanoTime();
 
 		return () -> Instant.EPOCH.plusNanos(System.nanoTime() - origin);
+	}
+
+	/* A launch lays the window out as the person left it, and says so when their preferences could not be read. */
+	private static StudioState launch(final Preferences preferences) {
+		final StudioState opened = StudioState.open(SampleProjects.nightfall(), Target.A500_OCS)
+			.withLayout(preferences.layout());
+
+		return preferences.note().map(opened::withNote).orElse(opened);
 	}
 
 	public synchronized StudioState state() {
