@@ -154,7 +154,6 @@ public class EditorIT extends EditorTest {
 	@Example
 	public void shouldUnderlineABuildErrorAndShowItFromTheStatusBar() {
 		typeAtTheTop("\t" + StubTools.ERROR + " d0\n");
-		awaitCaretHeard(2);
 		page().keyboard().press("Control+b");
 
 		assertThat(page().locator("#tool .cm-lintRange-error")).isVisible();
@@ -168,7 +167,6 @@ public class EditorIT extends EditorTest {
 	@Example
 	public void shouldSaveUnsavedTextBeforeBuilding() {
 		typeAtTheTop("; built as typed\n");
-		awaitCaretHeard(2);
 		page().keyboard().press("Control+b");
 
 		await("the unsaved text written", () -> onDisk().startsWith("; built as typed\n"));

@@ -136,7 +136,7 @@ public class WorkbenchController {
 			.withBottom(form.has(BOTTOM) ? Integer.parseInt(form.get(BOTTOM)) : saved.bottom());
 
 		preferences.layout(layout);
-		session.change(state -> state.withLayout(layout));
+		session.update(state -> state.withLayout(layout));
 	}
 
 	@Action("preferences-save")

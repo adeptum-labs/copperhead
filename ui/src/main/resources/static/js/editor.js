@@ -140,7 +140,7 @@
 	/* The caret goes where the server puts it to show a message, and on a source shown for the first time; otherwise
 	   it stays where it was, and the server hears of that instead. */
 	const place = (sent, buffer, first) => {
-		if (revealing || first) {
+		if ((revealing && buffer.name === sent.active) || first) {
 			kit.reveal(shown.view, sent.cursor);
 		}
 

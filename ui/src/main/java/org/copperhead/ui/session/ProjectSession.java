@@ -107,8 +107,16 @@ public class ProjectSession {
 	 * Applies a change. The note in the status bar tells what the last action did, so every change starts
 	 * without one. A change that throws leaves the studio as it was, and the page keeps what it shows.
 	 */
-	public synchronized StudioState change(final UnaryOperator<StudioState> change) {
-		state = change.apply(settle().withNote(""));
+	public StudioState change(final UnaryOperator<StudioState> change) {
+		return update(current -> change.apply(current.withNote("")));
+	}
+
+	/**
+	 * Applies a change that no answer draws, so the note the page has not yet been shown stays: a build ending while
+	 * a caret report is on its way would otherwise lose its result. A change that throws leaves the studio as it was.
+	 */
+	public synchronized StudioState update(final UnaryOperator<StudioState> change) {
+		state = change.apply(settle());
 		return state;
 	}
 

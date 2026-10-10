@@ -30,6 +30,7 @@ import org.copperhead.core.project.Target;
 import org.copperhead.toolchain.ProjectDirectory;
 import org.copperhead.ui.TempDirectory;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -60,6 +61,24 @@ public class ProjectSessionTest {
 		session.change(state -> state.withNote("Built demo.adf · 1,031 bytes"));
 
 		assertEquals("", session.change(UnaryOperator.identity()).note());
+	}
+
+	@Example
+	public void shouldKeepTheNoteWhenAnUpdateIsNotDrawn() {
+		session.change(state -> state.withNote("Built demo.adf · 1,031 bytes"));
+
+		assertEquals("Built demo.adf · 1,031 bytes", session.update(state -> state.withRunning(false)).note());
+		assertFalse(session.state().running());
+	}
+
+	@Example
+	public void shouldLeaveTheStudioAsItWasWhenAnUpdateFails() {
+		final StudioState before = session.state();
+
+		assertThrows(IllegalArgumentException.class, () -> session.update(state -> {
+			throw new IllegalArgumentException("refused");
+		}));
+		assertSame(before, session.state());
 	}
 
 	@Example

@@ -22,6 +22,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
 import java.nio.file.attribute.PosixFilePermissions;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -36,6 +37,7 @@ import org.copperhead.ui.session.StudioState;
 import org.copperhead.web.action.ActionFailed;
 import org.copperhead.web.action.Form;
 import static org.copperhead.ui.Flows.GUTTER;
+import static org.copperhead.ui.Flows.finished;
 import static org.copperhead.ui.Flows.lines;
 import static org.copperhead.ui.Flows.noted;
 import static org.copperhead.ui.Flows.owned;
@@ -53,6 +55,9 @@ public class EditorFlowTest {
 	private static final String SAVE = "[data-key=\"ctrl+s\"]";
 	private static final String SAVE_ALL = "[data-key=\"ctrl+shift+s\"]";
 	private static final String CHECK = "#tool [data-editor-control=check]";
+	private static final String CURSOR = "#tool [data-editor-control=cursor]";
+	private static final Duration NOTE_WAIT = Duration.ofSeconds(20);
+	private static final long NOTE_POLL_MILLIS = 10;
 
 	private final AtomicReference<Instant> now = new AtomicReference<>(Instant.EPOCH);
 	private WorkbenchRig rig;
@@ -199,7 +204,7 @@ public class EditorFlowTest {
 		assertEquals(400, screen.trigger(SAVE, Map.of("text", "x")).status());
 		assertEquals(400, screen.trigger(SAVE, Map.of("name", "main.s")).status());
 		assertEquals(400, screen.trigger(GUTTER, Map.of()).status());
-		assertEquals(400, screen.trigger("#tool [data-editor-control=cursor]", Map.of()).status());
+		assertEquals(400, screen.trigger(CURSOR, Map.of()).status());
 		assertEquals(400, screen.trigger(CHECK, Map.of()).status());
 		assertEquals(state, rig.session().state());
 	}
@@ -345,8 +350,39 @@ public class EditorFlowTest {
 	public void shouldRememberTheCursorWithoutRedrawingTheEditor() throws Exception {
 		final Screen screen = Screen.open(rig);
 
-		assertEquals(204, screen.trigger("#tool [data-editor-control=cursor]", Map.of("line", "7")).status());
+		assertEquals(204, screen.trigger(CURSOR, Map.of("line", "7")).status());
 		assertEquals(7, rig.session().state().cursor());
+	}
+
+	@Example
+	public void shouldShowTheNoteOfABuildThatEndedBeforeACaretReportArrived() throws Exception {
+		final Screen screen = Screen.open(rig).trigger("[data-key=\"ctrl+b\"]", Map.of());
+
+		awaitNote("Built demo.adf · 7 bytes");
+		assertEquals(204, screen.trigger(CURSOR, Map.of("line", "7")).status());
+
+		assertEquals("Built demo.adf · 7 bytes", finished(screen).find("#status .status__note").text());
+	}
+
+	@Example
+	public void shouldKeepTheNoteWhileAnAnswerThatDrawsNothingComes() throws Exception {
+		final Screen screen = noted(Screen.open(rig), rig);
+		final String note = rig.session().state().note();
+		final String modified = String.valueOf(Files.getLastModifiedTime(file("main.s")).toMillis());
+
+		assertEquals(204, screen.trigger(CURSOR, Map.of("line", "7")).status());
+		assertEquals(204, screen.client().submit("/action/layout", "split=44&bottom=320").statusCode());
+		assertEquals(204, screen.trigger(CHECK, Map.of("name", "main.s", "modified", modified)).status());
+		assertEquals(note, rig.session().state().note());
+	}
+
+	private void awaitNote(final String note) throws InterruptedException {
+		final long deadline = System.nanoTime() + NOTE_WAIT.toNanos();
+
+		while (!note.equals(rig.session().state().note())) {
+			assertTrue(System.nanoTime() < deadline, "The note never came: " + note);
+			Thread.sleep(NOTE_POLL_MILLIS);
+		}
 	}
 
 	@Example

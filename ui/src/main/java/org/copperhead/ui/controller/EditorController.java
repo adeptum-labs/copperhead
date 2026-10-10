@@ -77,7 +77,7 @@ public class EditorController {
 	public void onMoveCursor(final Form form) {
 		final int line = Integer.parseInt(form.require(LINE));
 
-		session.change(state -> state.moveCursor(line));
+		session.update(state -> state.moveCursor(line));
 	}
 
 	@Action("breakpoint")
