@@ -18,7 +18,7 @@ import { indentLess, insertTab, redo, undo } from "@codemirror/commands";
 import { indentUnit } from "@codemirror/language";
 import { lintGutter, setDiagnostics } from "@codemirror/lint";
 import { gotoLine, highlightSelectionMatches, openSearchPanel, search, searchKeymap } from "@codemirror/search";
-import { EditorState, RangeSet, StateEffect, StateField } from "@codemirror/state";
+import { Compartment, EditorState, RangeSet, StateEffect, StateField, Text } from "@codemirror/state";
 import {
 	EditorView, GutterMarker, gutter, highlightActiveLine, highlightActiveLineGutter, keymap, lineNumbers, showPanel
 } from "@codemirror/view";
@@ -37,11 +37,28 @@ const NO_HOOKS = { toggle: () => false };
 
 const last = (effects, type, value) => effects.reduce((held, effect) => effect.is(type) ? effect.value : held, value);
 
-const clamp = (doc, line) => Math.min(Math.max(line, 1), doc.lines);
+/* A line the server sent that is no number at all counts as the first line, so one bad entry spoils nothing else. */
+const clamp = (doc, line) => Math.min(Math.max(Math.trunc(Number(line)) || 1, 1), doc.lines);
 
 /* A file saved with CRLF throughout is split on CRLF and written back with it. Any other mix is split on LF only, so a
    stray CR stays in its line and goes back to the disk where it was. */
 const separatorOf = (text) => text.includes("\r\n") && !/(^|[^\r])\n/.test(text) ? "\r\n" : "\n";
+
+const separator = new Compartment();
+
+const separatorFor = (text) => EditorState.lineSeparator.of(separatorOf(text));
+
+/* A text from the disk replaces the whole document, split the way that text is: the disk may have changed from LF to
+   CRLF or back since the state was made, and the state splits what it is given by the separator it started with. */
+const replacement = (state, text) => {
+	const doc = Text.of(text.split(separatorOf(text)));
+
+	return {
+		doc,
+		changes: { from: 0, to: state.doc.length, insert: doc },
+		effect: separator.reconfigure(separatorFor(text))
+	};
+};
 
 export const textOf = (state) => state.sliceDoc();
 
@@ -59,6 +76,10 @@ export const loaded = (state) => state.field(disk);
 
 /* The lists the server sent the last time, so a list it did not change does not undo what the page did since. */
 const setServed = StateEffect.define();
+
+/* Held after a reload, which swept the old lists away with the old text: the next lists differ from it, so they are
+   put on the new text even when the server sends the very same ones. */
+const UNSERVED = { breakpoints: null, diagnostics: null };
 
 const served = StateField.define({
 	create: () => ({ breakpoints: "[]", diagnostics: "[]" }),
@@ -111,7 +132,8 @@ export const caretLine = (state) => state.doc.lineAt(state.selection.main.head).
 const severityOf = (name) => SEVERITIES.find(([, pattern]) => pattern.test(name ?? ""))?.[0] ?? "info";
 
 /* The assembler names only the line, so a message marks it from its first character that is not blank. */
-const diagnosticAt = (doc) => ({ line, severity, message }) => {
+const diagnosticAt = (doc) => (entry) => {
+	const { line, severity, message } = entry ?? {};
 	const at = doc.line(clamp(doc, line));
 	const from = at.from + at.text.length - at.text.trimStart().length;
 
@@ -144,11 +166,21 @@ const settled = (state) => {
 	return [setDisk.of({ text, modified }), setConflict.of(null)];
 };
 
+/* Replacing the whole document sweeps the breakpoints and messages away, so the lists the server sent last are put
+   on the new text again. */
+const listedAgain = (state, doc) => {
+	const { breakpoints: lines, diagnostics } = state.field(served);
+
+	return [setBreakpoints.of(JSON.parse(lines ?? "[]")),
+		...setDiagnostics(state, JSON.parse(diagnostics ?? "[]").map(diagnosticAt(doc))).effects];
+};
+
 /* The disk took a new text while the page held changes of its own: which one stays is the user's choice. */
-export const takeDisk = (state) => ({
-	changes: { from: 0, to: state.doc.length, insert: state.field(conflict).text },
-	effects: settled(state)
-});
+export const takeDisk = (state) => {
+	const { doc, changes, effect } = replacement(state, state.field(conflict).text);
+
+	return { changes, effects: [...settled(state), effect, ...listedAgain(state, doc)] };
+};
 
 export const keepMine = (state) => ({ effects: settled(state) });
 
@@ -214,7 +246,7 @@ const editing = (hooks) => {
 export const createState = (source, hooks = NO_HOOKS) => marked(EditorState.create({
 	doc: source.text,
 	extensions: [
-		EditorState.lineSeparator.of(separatorOf(source.text)),
+		separator.of(separatorFor(source.text)),
 		disk.init(() => ({ text: source.text, modified: source.modified })),
 		served,
 		breakpoints,
@@ -237,7 +269,8 @@ export const reconcile = (state, source) => {
 	}
 
 	if (!dirty(state)) {
-		const reloaded = state.update({ ...caughtUp, changes: { from: 0, to: state.doc.length, insert: source.text } });
+		const { changes, effect } = replacement(state, source.text);
+		const reloaded = state.update({ changes, effects: [...caughtUp.effects, effect, setServed.of(UNSERVED)] });
 
 		return { state: marked(reloaded.state, source), outcome: "reloaded" };
 	}

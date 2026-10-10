@@ -34,15 +34,18 @@ const INSTRUCTIONS = new Set([
 	...CONDITIONS.flatMap((condition) => [`b${condition}`, `db${condition}`, `s${condition}`, `trap${condition}`])
 ]);
 
-const DIRECTIVES = new Set(`align bss bss_c bss_f cnop code code_c code_f data data_c data_f dc dcb ds else elseif end
-	endc endif endm endr equ equr even fail idnt if ifb ifc ifd ifeq ifge ifgt ifle iflt ifnb ifnc ifnd ifne incbin incdir
-	include list macro mexit nolist odd offset opt org output printt printv public rept rorg rs rsreset rsset section
-	set so text ttl xdef xref`.split(/\s+/));
+const DIRECTIVES = new Set(`align blk bss bss_c bss_f cargs clrfo clrso cnop code code_c code_f comm data data_c data_f
+	dc dcb dr ds dx echo else elseif end endc endif endm endr equ equr even fail fo global idnt if ifb ifc ifd ifeq ifge
+	ifgt ifle iflt ifmacrod ifmacrond ifnb ifnc ifnd ifne ifp1 ifp2 incbin incdir include inform lcomm list llen macro
+	mexit nolist odd offset opt org output page plen printt printv public reg rept rorg rs rsreset rsset section set
+	setfo setso so text ttl weak xdef xref`.split(/\s+/));
 
 const SIZES = new Set(["b", "w", "l", "s"]);
 
-const LABEL = /^(?:[A-Za-z_.][\w.$]*|\d+\$):{0,2}/;
-const INDENTED_LABEL = /^(?:[A-Za-z_.][\w.$]*|\d+\$)::?/;
+/* A macro makes a label unique with \@ or one of its arguments \1 to \9, as in loc\@: */
+const LABEL_NAME = String.raw`(?:[A-Za-z_.](?:[\w.$]|\\[@1-9])*|\d+\$)`;
+const LABEL = new RegExp(`^${LABEL_NAME}:{0,2}`);
+const INDENTED_LABEL = new RegExp(`^${LABEL_NAME}::?`);
 const WORD = /^[A-Za-z_]\w*(?:\.\w+)?/;
 
 /* Tried in order: a local label such as 1$ before the number it starts with, a register before the symbol. */

@@ -3,8 +3,8 @@ editor.bundle.js · CodeMirror 6 with the 68k Motorola mode of ui/frontend
 Built rather than fetched at runtime, so that what ships is what was reviewed. ui/frontend/build.sh
 rebuilds it from exactly the versions below, which package-lock.json pins.
 
-  sha256     afab7d359280e5cbe7396d0b4eb57d362fdfe124c921612d2c9bd988207e5677
-  bytes      360228
+  sha256     d0671aa6d458760e00141c515028f24b6c32c23fdfc0c781ae48c637da58beb9
+  bytes      360807
   esbuild    0.28.2
 
 Packages in the bundle:

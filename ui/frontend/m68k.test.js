@@ -175,3 +175,20 @@ test("a line comment is a semicolon, for the editor's comment command", () => {
 	assert.equal(m68k.name, "m68k");
 	assert.deepEqual(m68kParser.languageData.commentTokens, { line: ";" });
 });
+
+test("a macro makes a label unique with \\@ or an argument, and the label keeps its colon and instruction", () => {
+	assert.deepEqual(tokens("loc\\@: nop"), [["loc\\@:", "labelName"], ["nop", "keyword"]]);
+	assert.deepEqual(tokens("\tfoo\\@:\tmoveq #0,d0")[0], ["foo\\@:", "labelName"]);
+	assert.deepEqual(tokens("skip\\1\\2:")[0], ["skip\\1\\2:", "labelName"]);
+	assert.deepEqual(tokens("loc\\@")[0], ["loc\\@", "labelName"]);
+});
+
+test("the rest of vasm's directives are told from instructions and macro calls", () => {
+	const directives = ["reg d0-d3", "cargs 4", "global x", "weak x", "comm x,4", "lcomm x,4", "fo.w 1", "setfo 0",
+		"clrfo", "setso 0", "clrso", "ifmacrod X", "ifmacrond X", "ifp1", "ifp2", "echo hi", "inform 0,\"x\"", "dr.w 1",
+		"dx.b 1", "blk.l 4,0", "page", "plen 60", "llen 80"];
+
+	for (const line of directives) {
+		assert.equal(types(`\t${line}`)[0], "meta", line);
+	}
+});

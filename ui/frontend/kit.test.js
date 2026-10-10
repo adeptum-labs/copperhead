@@ -138,3 +138,79 @@ test("a file changed on disk under changed text is left to the user, who keeps t
 	assert.equal(textOf(taken), "other\n");
 	assert.equal(dirty(taken), false);
 });
+
+const LISTS = {
+	breakpoints: [2, 3],
+	diagnostics: [{ line: 2, severity: "error", message: "bad" }]
+};
+
+const marks = (state) => [breakpointLines(state), messages(state).map(([severity, , , message]) => [severity, message])];
+
+test("a file reloaded from the disk keeps its breakpoints and messages when the server sends the same lists", () => {
+	const { state, outcome } = reconcile(createState(source(LISTS)),source({ ...LISTS, text: "a\nb\nc\nd\n", modified: 200 }));
+
+	assert.equal(outcome, "reloaded");
+	assert.deepEqual(marks(state), [[2, 3], [["error", "bad"]]]);
+	assert.deepEqual(messages(state).map(([, from, to]) => [from, to]), [[2, 3]]);
+});
+
+test("reconciling the same source again changes nothing", () => {
+	const again = source({ ...LISTS, text: "a\nb\nc\nd\n", modified: 200 });
+	const first = reconcile(createState(source(LISTS)), again).state;
+	const second = reconcile(first, again);
+
+	assert.equal(second.outcome, "kept");
+	assert.deepEqual(marks(second.state), marks(first));
+	assert.equal(textOf(second.state), "a\nb\nc\nd\n");
+});
+
+test("taking the disk's text puts the last lists on it", () => {
+	const typed = type(createState(source(LISTS)), 0, "; mine\n");
+	const { state } = reconcile(typed, source({ ...LISTS, text: "a\nb\nc\nd\n", modified: 200 }));
+	const taken = state.update(takeDisk(state)).state;
+
+	assert.equal(textOf(taken), "a\nb\nc\nd\n");
+	assert.deepEqual(marks(taken), [[2, 3], [["error", "bad"]]]);
+	assert.deepEqual(messages(taken).map(([, from, to]) => [from, to]), [[2, 3]]);
+});
+
+test("keeping my text leaves my edits, breakpoints and messages as they are", () => {
+	const typed = type(createState(source(LISTS)), 0, "; mine\n");
+	const { state } = reconcile(typed, source({ ...LISTS, text: "other\n", modified: 200 }));
+	const kept = state.update(keepMine(state)).state;
+
+	assert.equal(textOf(kept), `; mine\n${MAIN}`);
+	assert.deepEqual(marks(kept), marks(state));
+	assert.deepEqual(breakpointLines(kept), [3, 4]);
+});
+
+test("entries the server got wrong are placed at the first line or the last, and nothing throws", () => {
+	const garbage = [null, "x", {}, { line: NaN, message: "nan" }, { line: -4, message: "negative" },
+		{ line: 1e9, message: "huge" }, { line: "2", severity: 7, message: "text" }];
+	const state = createState(source({ breakpoints: [null, "x", NaN, -3, 1e9, undefined, Infinity], diagnostics: garbage }));
+
+	assert.deepEqual(breakpointLines(state), [1, 4]);
+	assert.equal(messages(state).length, garbage.length);
+	assert.doesNotThrow(() => reconcile(state, source({ breakpoints: [NaN], diagnostics: garbage, text: "z\n" })));
+});
+
+test("a disk that moved from LF to CRLF and back is shown without stray carriage returns", () => {
+	const lf = createState(source({ text: "a\nb\n" }));
+	const crlf = reconcile(lf, source({ text: "a\r\nb\r\nc\r\n", modified: 200 })).state;
+
+	assert.equal(crlf.doc.lines, 4);
+	assert.equal(crlf.doc.line(1).text, "a");
+	assert.equal(textOf(crlf), "a\r\nb\r\nc\r\n");
+	assert.equal(dirty(crlf), false);
+
+	const typed = type(crlf, 0, "x");
+	const edited = type(createState(source({ text: "a\r\nb\r\n" })), 0, "x");
+	const back = reconcile(edited, source({ text: "p\nq\n", modified: 300 }));
+	const taken = back.state.update(takeDisk(back.state));
+
+	assert.equal(textOf(typed), "xa\r\nb\r\nc\r\n");
+	assert.equal(back.outcome, "conflict");
+	assert.equal(textOf(taken.state), "p\nq\n");
+	assert.equal(taken.state.doc.lines, 3);
+	assert.equal(dirty(taken.state), false);
+});
