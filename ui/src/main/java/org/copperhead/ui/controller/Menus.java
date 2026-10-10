@@ -88,7 +88,8 @@ final class Menus {
 			later("Paste", "Ctrl+V"),
 			project(state, editor("Find…", "Ctrl+F", "find")).withSeparated(true),
 			project(state, editor("Go to line…", "Ctrl+G", "goto-line")),
-			project(state, action("Toggle breakpoint", "F9", BREAKPOINT, AT_CURSOR)).withSeparated(true)));
+			project(state, action("Toggle breakpoint", "F9", BREAKPOINT, AT_CURSOR)).withSeparated(true),
+			action("Preferences…", "Ctrl+,", MODAL, Vals.of(KIND, Modal.PREFERENCES)).withSeparated(true)));
 	}
 
 	private static MenuView view(final StudioState state) {

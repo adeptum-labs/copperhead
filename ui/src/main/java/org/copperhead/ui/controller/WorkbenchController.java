@@ -17,7 +17,13 @@ package org.copperhead.ui.controller;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
+import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Stream;
 import org.copperhead.core.project.Target;
 import org.copperhead.ui.session.BuildService;
 import org.copperhead.ui.session.Layout;
@@ -75,6 +81,11 @@ public class WorkbenchController {
 	public Regions onClickModal(final Form form) {
 		final Modal modal = Modal.valueOf(form.get("kind"));
 
+		if (modal == Modal.PREFERENCES) {
+			return Screens.dialog(session.change(state -> state.withModal(modal)),
+				ModalViews.preferences(ModalViews.preferencesOf(preferences), ""));
+		}
+
 		if (!TOLD.contains(modal)) {
 			throw new IllegalArgumentException("The dialog " + modal + " opens from its own action");
 		}
@@ -126,5 +137,54 @@ public class WorkbenchController {
 
 		preferences.layout(layout);
 		session.change(state -> state.withLayout(layout));
+	}
+
+	@Action("preferences-save")
+	public Regions onClickSavePreferences(final Form form) {
+		final Map<String, String> values = Map.of(ModalViews.THEME, form.get(ModalViews.THEME),
+			ModalViews.VASM, form.get(ModalViews.VASM).strip(), ModalViews.SHRINKLER,
+			form.get(ModalViews.SHRINKLER).strip());
+		final Optional<String> refused = refused(values);
+
+		if (refused.isPresent()) {
+			return Screens.dialog(session.state(), ModalViews.preferences(values, refused.get()));
+		}
+
+		final Layout layout = preferences.layout().withTheme(values.get(ModalViews.THEME));
+
+		preferences.layout(layout);
+		preferences.tool(ModalViews.VASM, tool(values.get(ModalViews.VASM)));
+		preferences.tool(ModalViews.SHRINKLER, tool(values.get(ModalViews.SHRINKLER)));
+
+		final List<ToolStatus> found = builds.tools();
+
+		return Screens.all(session.change(state -> state.withLayout(layout).withModal(Modal.NONE)
+			.withEnvironment(state.environment().withTools(found)).withNote("Saved preferences")));
+	}
+
+	/*
+	 * A tool is a program that runs, named by where it is, not by a path relative to wherever Copperhead started.
+	 * What is typed here is later executed by the build, so it is checked before it is kept.
+	 */
+	private static Optional<String> refused(final Map<String, String> values) {
+		if (!List.of(Layout.DARK, Layout.LIGHT).contains(values.get(ModalViews.THEME))) {
+			return Optional.of(ModalViews.THEME + ": " + values.get(ModalViews.THEME) + " is not a theme");
+		}
+
+		return Stream.of(ModalViews.VASM, ModalViews.SHRINKLER).filter(name -> unrunnable(values.get(name)))
+			.findFirst().map(name -> name + ": " + values.get(name) + " is not a program Copperhead can run");
+	}
+
+	private static boolean unrunnable(final String typed) {
+		try {
+			return tool(typed).filter(path -> !path.isAbsolute() || !path.equals(path.normalize())
+				|| !Files.isRegularFile(path) || !Files.isExecutable(path)).isPresent();
+		} catch (InvalidPathException e) {
+			return true;
+		}
+	}
+
+	private static Optional<Path> tool(final String path) {
+		return path.isEmpty() ? Optional.empty() : Optional.of(Path.of(path));
 	}
 }

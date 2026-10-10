@@ -702,7 +702,7 @@ public class StudioFlowTest {
 				posted.addAll(screen.document().select("[hx-post]").eachAttr("hx-post"));
 			}
 
-			for (final String dialog : List.of("SETTINGS", "SHORTCUTS", "ABOUT")) {
+			for (final String dialog : List.of("SETTINGS", "PREFERENCES", "SHORTCUTS", "ABOUT")) {
 				screen.click("#menus [hx-vals*=" + dialog + "]");
 				posted.addAll(screen.document().select("[hx-post]").eachAttr("hx-post"));
 				screen.press("escape");

@@ -16,16 +16,26 @@
 package org.copperhead.ui.controller;
 
 import java.util.List;
+import java.util.Map;
 import org.copperhead.toolchain.PinnedSource;
 import org.copperhead.ui.session.BuildRun.TrustRequest;
+import org.copperhead.ui.session.Layout;
+import org.copperhead.ui.session.Preferences;
 import org.copperhead.ui.session.StudioState;
 import org.copperhead.ui.view.ButtonView;
+import org.copperhead.ui.view.ChoiceView;
+import org.copperhead.ui.view.FieldView;
 import org.copperhead.ui.view.Modal;
 import org.copperhead.ui.view.ModalView;
 import org.copperhead.ui.view.PairView;
 import org.copperhead.ui.view.Vals;
 
 final class ModalViews {
+	static final String THEME = "theme";
+	static final String VASM = PinnedSource.VASM.tool();
+	static final String SHRINKLER = PinnedSource.SHRINKLER.tool();
+
+	private static final String FIELDS = Vals.spread("copperhead.fields(this)");
 	private static final ModalView CLOSED = new ModalView(Modal.NONE, "", List.of(), List.of());
 	private static final List<PairView> SHORTCUTS = List.of(
 		new PairView("Play / pause", "F5"),
@@ -36,6 +46,7 @@ final class ModalViews {
 		new PairView("Switch tool", "Ctrl+1 – Ctrl+5"),
 		new PairView("Show / hide timeline", "Ctrl+J"),
 		new PairView("Light / dark mode", Menus.LIGHT_DARK),
+		new PairView("Preferences", "Ctrl+,"),
 		new PairView("Open menu", "click · hover to switch"),
 		new PairView("Close menu / dialog", "Esc"));
 
@@ -57,6 +68,27 @@ final class ModalViews {
 				ProjectDialogs.settingsOf(directory.file()), "")).orElse(CLOSED);
 			case TRUST -> state.run().trust().map(ModalViews::trust).orElse(CLOSED);
 		};
+	}
+
+	/** The person's preferences, as saved or as typed when they were refused. */
+	static ModalView preferences(final Map<String, String> values, final String error) {
+		return new ModalView(Modal.PREFERENCES, "Preferences", List.of(),
+			List.of(error.isEmpty() ? "Leave a tool empty to have Copperhead fetch and compile the version it "
+				+ "pins." : error),
+			List.of(), List.of(
+				new FieldView(THEME, "Theme", values.get(THEME), List.of(
+					new ChoiceView(Layout.DARK, "Dark", Layout.DARK.equals(values.get(THEME))),
+					new ChoiceView(Layout.LIGHT, "Light", Layout.LIGHT.equals(values.get(THEME))))),
+				FieldView.text(VASM, tool(PinnedSource.VASM), values.get(VASM)),
+				FieldView.text(SHRINKLER, tool(PinnedSource.SHRINKLER), values.get(SHRINKLER))),
+			List.of(new ButtonView("Save", "/action/preferences-save", FIELDS, true),
+				new ButtonView("Cancel", "/action/modal-close", null, false)));
+	}
+
+	static Map<String, String> preferencesOf(final Preferences preferences) {
+		return Map.of(THEME, preferences.layout().theme(),
+			VASM, preferences.tool(VASM).map(Object::toString).orElse(""),
+			SHRINKLER, preferences.tool(SHRINKLER).map(Object::toString).orElse(""));
 	}
 
 	private static ModalView trust(final TrustRequest request) {
