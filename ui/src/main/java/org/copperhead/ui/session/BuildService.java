@@ -328,8 +328,9 @@ public class BuildService {
 		}
 	}
 
+	/* A line is no answer to anything the person did, so a note such as a save's stays until they act again. */
 	private void add(final BuildLine line) {
-		session.change(state -> state.withRun(state.run().add(line)));
+		session.update(state -> state.withRun(state.run().add(line)));
 	}
 
 	/* A build that fails or is cancelled does not start the run it was asked to start once it was done. */

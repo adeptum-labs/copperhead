@@ -28,8 +28,10 @@ import java.util.concurrent.atomic.AtomicReference;
 import net.jqwik.api.Example;
 import net.jqwik.api.lifecycle.AfterTry;
 import net.jqwik.api.lifecycle.BeforeTry;
+import org.copperhead.core.build.BuildLine;
 import org.copperhead.core.build.BuildReport;
 import org.copperhead.core.build.BuildWarning;
+import org.copperhead.core.build.Tone;
 import org.copperhead.core.project.ProjectKind;
 import org.copperhead.core.project.Target;
 import org.copperhead.toolchain.BuildEvent;
@@ -216,6 +218,28 @@ public class BuildServiceTest {
 		service.start(false);
 		assertFalse(session.state().run().running());
 		assertEquals("Build failed · 1 error", session.state().note());
+	}
+
+	@Example
+	public void shouldKeepTheNoteOfASaveWhileTheBuildWritesLines() {
+		final AtomicReference<String> noted = new AtomicReference<>();
+		final BuildService service = serving((request, trust, sink) -> new BuildService.Job() {
+			@Override
+			public void run() {
+				session.change(state -> state.withNote("Saved main.s"));
+				sink.accept(new BuildEvent.Line(new BuildLine("vasm -quiet src/main.s", Tone.PLAIN)));
+				noted.set(session.state().note());
+				sink.accept(new BuildEvent.Finished(failed()));
+			}
+
+			@Override
+			public void cancel() {
+			}
+		}, Runnable::run);
+
+		service.start(false);
+
+		assertEquals("Saved main.s", noted.get());
 	}
 
 	@Example
