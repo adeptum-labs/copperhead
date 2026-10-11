@@ -19,6 +19,7 @@ import jakarta.json.Json;
 import jakarta.json.JsonObject;
 import jakarta.json.JsonObjectBuilder;
 import jakarta.json.JsonValue;
+import java.io.StringReader;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
@@ -108,6 +109,61 @@ public class ProjectFileTest {
 			.as((file, slot, entry, crunch, symbols, breakpoints, unknown) -> new ProjectFile(file.format(),
 				file.name(), file.kind(), file.target(), slot * 4, "src/" + entry, crunch, symbols,
 				breakpoints, unknown));
+	}
+
+	/* A later version may add keys inside the build options and inside each breakpoint as well. */
+	@Property
+	public void shouldKeepUnknownKeysInsideTheBuildAndEachBreakpointThroughASave(
+		@ForAll("files") final ProjectFile file, @ForAll("unknownKeys") final JsonObject inBuild,
+		@ForAll("unknownKeys") final JsonObject inEachMark) {
+
+		final JsonObject written = Json.createReader(new StringReader(file.toJson())).readObject();
+		final JsonObjectBuilder later = Json.createObjectBuilder(written)
+			.add("build", Json.createObjectBuilder(written.getJsonObject("build")).addAll(
+				Json.createObjectBuilder(inBuild)))
+			.add("breakpoints", Json.createArrayBuilder(written.getJsonArray("breakpoints").stream()
+				.map(mark -> Json.createObjectBuilder(mark.asJsonObject())
+					.addAll(Json.createObjectBuilder(inEachMark)).build()).toList()));
+		final ProjectFile read = ProjectFile.parse(later.build().toString());
+		final JsonObject saved = Json.createReader(new StringReader(read.toJson())).readObject();
+
+		assertEquals(file.breakpoints(), read.breakpoints());
+		assertEquals(file.options(), read.options());
+		assertEquals(read, ProjectFile.parse(read.toJson()));
+		inBuild.forEach((key, value) -> assertEquals(value, saved.getJsonObject("build").get(key), key));
+		saved.getJsonArray("breakpoints").getValuesAs(JsonObject.class)
+			.forEach(mark -> inEachMark.forEach((key, value) -> assertEquals(value, mark.get(key), key)));
+	}
+
+	@Provide
+	public Arbitrary<JsonObject> unknownKeys() {
+		return Arbitraries.maps(Arbitraries.strings().alpha().ofMinLength(1).ofMaxLength(8).map("x"::concat),
+			Arbitraries.oneOf(Arbitraries.strings().alpha().withChars(' ', '"').ofMaxLength(8)
+				.map(Json::createValue), Arbitraries.integers().map(Json::createValue),
+				Arbitraries.of(JsonValue.TRUE, JsonValue.NULL)))
+			.ofMaxSize(3).map(ProjectFileTest::object);
+	}
+
+	/* A breakpoint's own keys stay with it while it stays on its line, and go with one taken away. */
+	@Example
+	public void shouldNotLetAnUnknownKeyInsideTheBuildOrABreakpointHideAKnownOne() {
+		final ProjectFile read = ProjectFile.parse("""
+			{"name": "nightfall", "kind": "DEMO", "build": {"crunch": true, "level": 9},
+			 "breakpoints": [{"file": "main.s", "line": 3, "if": "d0"},
+			                 {"file": "main.s", "line": 7, "if": "d1"}]}
+			""");
+		final ProjectFile hidden = new ProjectFile(1, "nightfall", ProjectKind.DEMO, Target.A500_OCS, 0x2_0000,
+			"src/main.s", true, false, List.of(),
+			object(Map.of("build", object(Map.of("crunch", JsonValue.FALSE)))));
+		final JsonObject saved = Json.createReader(new StringReader(read.withCrunch(false)
+			.withBreakpoints(List.of(new Breakpoint("main.s", 3, 0))).toJson())).readObject();
+
+		assertFalse(saved.getJsonObject("build").getBoolean("crunch"));
+		assertEquals(9, saved.getJsonObject("build").getInt("level"));
+		assertEquals(List.of(Json.createObjectBuilder().add("file", "main.s").add("line", 3).add("if", "d0")
+			.build()), saved.getJsonArray("breakpoints"));
+		assertTrue(ProjectFile.parse(hidden.toJson()).crunch());
+		assertEquals(JsonValue.EMPTY_JSON_OBJECT, hidden.extras());
 	}
 
 	@Example
