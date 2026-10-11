@@ -30,6 +30,7 @@ import java.util.concurrent.Executors;
 final class LocalServer implements AutoCloseable {
 	private static final int OK = 200;
 	private static final int NO_BODY = -1;
+	private static final int CHUNK = 1 << 16;
 
 	private final HttpServer server;
 	private final HttpClient client;
@@ -48,6 +49,39 @@ final class LocalServer implements AutoCloseable {
 			exchange.sendResponseHeaders(OK, body.length);
 			try (OutputStream out = exchange.getResponseBody()) {
 				out.write(body);
+			}
+		});
+		return this;
+	}
+
+	/** Claims a body of the length given and sends none of it for a while. */
+	LocalServer claim(final String path, final long length, final Duration silence) {
+		server.createContext(path, exchange -> {
+			try {
+				exchange.sendResponseHeaders(OK, length);
+				exchange.getResponseBody().flush();
+				Thread.sleep(silence);
+			} catch (final InterruptedException e) {
+				Thread.currentThread().interrupt();
+			} finally {
+				exchange.close();
+			}
+		});
+		return this;
+	}
+
+	/** Sends a body that names no length and never ends, until the client hangs up. */
+	LocalServer endless(final String path) {
+		server.createContext(path, exchange -> {
+			final byte[] chunk = new byte[CHUNK];
+
+			exchange.sendResponseHeaders(OK, 0);
+			try (OutputStream out = exchange.getResponseBody()) {
+				while (!Thread.currentThread().isInterrupted()) {
+					out.write(chunk);
+				}
+			} catch (final IOException e) {
+				exchange.close();
 			}
 		});
 		return this;

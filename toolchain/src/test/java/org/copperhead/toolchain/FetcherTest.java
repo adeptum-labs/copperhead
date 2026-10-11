@@ -79,6 +79,30 @@ public class FetcherTest extends ScratchTest {
 		}
 	}
 
+	@Example
+	public void shouldRefuseAnArchiveThatClaimsToBeLargerThanTheLimit() throws Exception {
+		try (LocalServer server = new LocalServer().claim("/huge.tar.gz", Fetcher.LIMIT + 1, STALL)) {
+			final Instant start = Instant.now();
+			final IOException refused = assertThrows(IOException.class, () -> fetch(server, "/huge.tar.gz"));
+
+			assertTrue(Duration.between(start, Instant.now()).compareTo(STALL) < 0);
+			assertTrue(refused.getMessage().endsWith("the download is larger than the 64 MB Copperhead accepts"),
+				refused.getMessage());
+			assertEquals(0, listed(scratch()).size());
+		}
+	}
+
+	@Example
+	public void shouldCutOffAnArchiveThatGrowsPastTheLimitAndKeepNoneOfIt() throws Exception {
+		try (LocalServer server = new LocalServer().endless("/endless.tar.gz")) {
+			final IOException refused = assertThrows(IOException.class, () -> fetch(server, "/endless.tar.gz"));
+
+			assertTrue(refused.getMessage().endsWith("the download is larger than the 64 MB Copperhead accepts"),
+				refused.getMessage());
+			assertEquals(0, listed(scratch()).size());
+		}
+	}
+
 	private Fetcher.Fetched fetch(final LocalServer server, final String path) throws Exception {
 		return new Fetcher(server.client(), PATIENT).fetch(server.uri(path), scratch());
 	}
