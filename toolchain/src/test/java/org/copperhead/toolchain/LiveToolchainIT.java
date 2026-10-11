@@ -144,6 +144,16 @@ public class LiveToolchainIT {
 		assertTrue(report.ok() || !report.errors().isEmpty(), report.log().toString());
 	}
 
+	/* vasm takes an include from its working folder first; the boot loader's must be the one Copperhead ships. */
+	@Example
+	public void shouldNotAssembleAShrinklerUnpackerPlantedInTheProjectIntoTheBootBlock() throws IOException {
+		final ProjectDirectory project = project("planted", ProjectKind.DEMO, Target.A500_OCS, true);
+
+		Files.writeString(project.dir().resolve("ShrinklerDecompress.S"), "\tfail \"the planted unpacker\"\n");
+
+		bootable(project);
+	}
+
 	private static void bootable(final ProjectDirectory project) throws IOException {
 		final BuildReport report = build(project);
 

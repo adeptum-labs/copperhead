@@ -269,11 +269,14 @@ public final class BuildJob implements Runnable {
 			}
 		}
 		discard(project, LOADER);
-		final int exit = run("vasm", List.of(vasm.toString(), "-quiet", "-m68000", "-Fbin",
+		/* vasm looks for an include in its working folder before any other, so a ShrinklerDecompress.S planted in
+		   the project folder would be assembled into the boot block. In the boot folder, the one just copied is
+		   the only one it finds. */
+		final int exit = run("vasm", List.of(vasm.toString(), "-quiet", "-nocompdir", "-m68000", "-Fbin",
 			"-DLOAD=" + LoadAddress.format(file.loadAddress()), "-DSTAGE=" + LoadAddress.format(stage),
 			"-DCRUNCHED=" + (file.crunch() ? 1 : 0), "-DPAYLOAD_LEN=" + TrackDisk.padded(payload), "-o",
-			job.path(LOADER_FILE),
-			BOOT_FOLDER + "/" + LOADER_SOURCE), project, text -> assembler(text, false));
+			boot.relativize(project.dir().resolve(job.path(LOADER_FILE))).toString(), LOADER_SOURCE), boot,
+			text -> assembler(text, false));
 
 		if (exit != 0) {
 			throw new ToolchainException("the boot loader did not assemble: vasm stopped with exit code "
@@ -315,9 +318,15 @@ public final class BuildJob implements Runnable {
 	private int run(final String name, final List<String> command, final ProjectDirectory project,
 		final Consumer<String> output) throws IOException, InterruptedException {
 
+		return run(name, command, project.dir(), output);
+	}
+
+	private int run(final String name, final List<String> command, final Path folder, final Consumer<String> output)
+		throws IOException, InterruptedException {
+
 		stopIfCancelled();
 		plain(name + " " + String.join(" ", command.subList(1, command.size())));
-		return Processes.run(name, command, project.dir(), stepTimeout, output);
+		return Processes.run(name, command, folder, stepTimeout, output);
 	}
 
 	/* Called on the thread that reads the assembler's output. */

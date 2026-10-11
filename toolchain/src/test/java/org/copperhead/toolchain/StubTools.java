@@ -27,7 +27,7 @@ import java.util.List;
  * {@code <script>.calls} beside themselves.
  */
 public final class StubTools {
-	private static final String NOTE_CALL = "#!/bin/sh\necho \"$*\" >> \"$0.calls\"\n";
+	private static final String NOTE_CALL = "#!/bin/sh\necho \"$*\" >> \"$0.calls\"\npwd -P >> \"$0.folders\"\n";
 	/* The file after -o, and the last argument, which is the source. */
 	private static final String ARGUMENTS = "out=\nprev=\nfor arg; do\n\tif [ \"$prev\" = -o ]; then out=$arg; fi\n"
 		+ "\tprev=$arg\ndone\n";
@@ -95,9 +95,18 @@ public final class StubTools {
 	}
 
 	public static List<String> calls(final Path script) throws IOException {
-		final Path calls = script.resolveSibling(script.getFileName() + ".calls");
+		return noted(script, ".calls");
+	}
 
-		return Files.exists(calls) ? Files.readAllLines(calls) : List.of();
+	/** The working folder of each call, every link in it resolved. */
+	public static List<String> folders(final Path script) throws IOException {
+		return noted(script, ".folders");
+	}
+
+	private static List<String> noted(final Path script, final String suffix) throws IOException {
+		final Path notes = script.resolveSibling(script.getFileName() + suffix);
+
+		return Files.exists(notes) ? Files.readAllLines(notes) : List.of();
 	}
 
 	private static Path script(final Path dir, final String name, final String body) throws IOException {

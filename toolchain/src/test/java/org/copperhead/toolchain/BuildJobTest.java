@@ -30,6 +30,7 @@ import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.function.Function;
+import java.util.stream.IntStream;
 import net.jqwik.api.Example;
 import org.copperhead.core.build.Bootblock;
 import org.copperhead.core.build.BuildLine;
@@ -71,8 +72,8 @@ public class BuildJobTest extends ScratchTest {
 		assertEquals(700, report.bytes());
 		assertEquals(List.of(new BuildWarning("src/main.s", 3, "unused label")), report.warnings());
 		assertEquals(List.of("-quiet -m68000 -Fbin -DLOAD=$20000 -o build/.job/main.bin src/main.s",
-			"-quiet -m68000 -Fbin -DLOAD=$20000 -DSTAGE=$20800 -DCRUNCHED=1 -DPAYLOAD_LEN=1024 "
-				+ "-o build/.job/boot.bin build/boot/bootblock.s"), jobCalls(vasm));
+			"-quiet -nocompdir -m68000 -Fbin -DLOAD=$20000 -DSTAGE=$20800 -DCRUNCHED=1 -DPAYLOAD_LEN=1024 "
+				+ "-o ../.job/boot.bin bootblock.s"), jobCalls(vasm));
 		assertEquals(List.of("-d -9 -p build/main.bin build/main.shr"), StubTools.calls(shrinkler));
 		assertTrue(report.log().contains(new BuildLine("crunched 700 bytes", Tone.PLAIN)));
 		assertEquals(2, Collections.frequency(report.log(), new BuildLine(WARNING, Tone.WARN)));
@@ -103,8 +104,8 @@ public class BuildJobTest extends ScratchTest {
 		assertEquals(2000, report.bytes());
 		assertEquals(List.of("-quiet -m68020 -Fbin -DLOAD=$20000 -L build/.job/main.lst -o build/.job/main.bin "
 				+ "src/main.s",
-			"-quiet -m68000 -Fbin -DLOAD=$20000 -DSTAGE=$207D0 -DCRUNCHED=0 -DPAYLOAD_LEN=2048 "
-				+ "-o build/.job/boot.bin build/boot/bootblock.s"), jobCalls(vasm));
+			"-quiet -nocompdir -m68000 -Fbin -DLOAD=$20000 -DSTAGE=$207D0 -DCRUNCHED=0 -DPAYLOAD_LEN=2048 "
+				+ "-o ../.job/boot.bin bootblock.s"), jobCalls(vasm));
 		assertEquals(List.of(), StubTools.calls(shrinkler));
 	}
 
@@ -287,12 +288,31 @@ public class BuildJobTest extends ScratchTest {
 		final Path vasm = StubTools.vasm(scratch().resolve("bin"), 2048, 300);
 
 		assertTrue(build(project, vasm, StubTools.shrinkler(scratch().resolve("bin"), 700)).ok());
-		final List<Path> folders = StubTools.calls(vasm).stream()
-			.map(call -> Path.of(call.replaceAll("^.* -o (\\S+) .*$", "$1")).getParent()).distinct().toList();
+		final List<String> folders = StubTools.folders(vasm);
+		final List<Path> outputs = StubTools.calls(vasm).stream()
+			.map(call -> Path.of(call.replaceAll("^.* -o (\\S+) .*$", "$1"))).toList();
+		final List<Path> jobs = IntStream.range(0, outputs.size()).mapToObj(call -> Path.of(folders.get(call))
+			.resolve(outputs.get(call)).normalize().getParent()).distinct().toList();
 
-		assertEquals(1, folders.size(), folders.toString());
-		assertTrue(folders.getFirst().toString().matches("build/\\.job-\\w+"), folders.toString());
+		assertEquals(1, jobs.size(), jobs.toString());
+		assertTrue(jobs.getFirst().toString().matches(".*/build/\\.job-\\w+"), jobs.toString());
 		assertEquals(List.of(), jobFolders(project));
+	}
+
+	/* vasm takes an include from its working folder before any other, so the boot loader is assembled in the boot
+	   folder, where the only ShrinklerDecompress.S is the one the build just copied there. */
+	@Example
+	public void shouldAssembleTheBootLoaderInTheBootFolderAwayFromFilesPlantedInTheProject() throws Exception {
+		final ProjectDirectory project = demo();
+		final Path vasm = StubTools.vasm(scratch().resolve("bin"), 2048, 300);
+
+		Files.writeString(project.dir().resolve("ShrinklerDecompress.S"), "\tfail \"planted\"\n");
+
+		assertTrue(build(project, vasm, StubTools.shrinkler(scratch().resolve("bin"), 700)).ok());
+		assertEquals(List.of(project.dir().toRealPath().toString(),
+			project.dir().resolve("build/boot").toRealPath().toString()), StubTools.folders(vasm));
+		assertTrue(StubTools.calls(vasm).getLast().startsWith("-quiet -nocompdir "));
+		assertTrue(StubTools.calls(vasm).getLast().endsWith(" bootblock.s"));
 	}
 
 	@Example
