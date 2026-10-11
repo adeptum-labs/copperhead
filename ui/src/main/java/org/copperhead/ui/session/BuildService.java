@@ -73,6 +73,7 @@ public class BuildService {
 	private static final Path OS_RELEASE = Path.of("/etc/os-release");
 	private static final String TOOLS = "tools";
 	private static final List<PinnedSource> SOURCES = List.of(PinnedSource.VASM, PinnedSource.SHRINKLER);
+	static final String STOPPED = "The build stopped without a report";
 
 	private final ProjectSession session;
 	private final Preferences preferences;
@@ -184,11 +185,30 @@ public class BuildService {
 			final Job job = jobs.create(request, trust, event -> take(event, run, andRun));
 
 			run.stop = job::cancel;
-			executor.execute(job);
+			executor.execute(() -> runToTheEnd(job, run));
 		} catch (RuntimeException e) {
 			abandon(run, "The build could not be started");
 			throw e;
 		}
+	}
+
+	/* A job is meant to end with its report, but one that stops without it must not leave the studio running a
+	   build that nothing does: Cancel could never end it, and no other build could start until a restart. */
+	private void runToTheEnd(final Job job, final Run run) {
+		try {
+			job.run();
+		} catch (RuntimeException | Error e) {
+			LOG.error("The build stopped without its report", e);
+		} finally {
+			if (holds(run)) {
+				LOG.error("The build ended without a report; the studio returns to idle");
+				abandon(run, STOPPED);
+			}
+		}
+	}
+
+	private synchronized boolean holds(final Run run) {
+		return active.filter(current -> current == run).isPresent();
 	}
 
 	public synchronized void fetch() {

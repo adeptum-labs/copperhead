@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
+import java.util.function.Function;
 import net.jqwik.api.Example;
 import org.copperhead.core.build.Bootblock;
 import org.copperhead.core.build.BuildLine;
@@ -52,6 +53,8 @@ public class BuildJobTest extends ScratchTest {
 	private static final List<BuildWarning> CANCELLED_ONLY = List.of(new BuildWarning("", 0, "build cancelled"));
 	private static final String SHORT_ERROR = "error 2 in line 4 of \"src/main.s\": unknown mnemonic <foo>";
 	private static final String ERROR = "error 2 in line 4 of \"src/main.s\": unknown mnemonic <foo>\n>\tfoo";
+	/* Past what one array can hold, so a build that reads it whole fails however much memory it has. */
+	private static final long HUGE = 3L << 30;
 
 	private final List<BuildEvent> events = new CopyOnWriteArrayList<>();
 
@@ -141,6 +144,29 @@ public class BuildJobTest extends ScratchTest {
 		assertEquals(List.of(new BuildWarning("", 0, "program needs 531456 bytes of chip RAM, A500 has 524288")),
 			report.errors());
 		assertFalse(Files.exists(project.adf()));
+	}
+
+	@Example
+	public void shouldRefuseAProgramLargerThanChipRamBeforeReadingIt() throws Exception {
+		final Path shrinkler = StubTools.shrinkler(scratch().resolve("bin"), 700);
+		final BuildReport report = build(demo(), StubTools.sparseVasm(scratch().resolve("bin"), HUGE), shrinkler);
+
+		assertEquals(List.of(new BuildWarning("", 0, "build/main.bin is " + HUGE
+			+ " bytes, more than the 524288 bytes of chip RAM the A500 has")), report.errors());
+		assertEquals(List.of(), StubTools.calls(shrinkler));
+	}
+
+	@Example
+	public void shouldFinishWithAReportWhenTheBuildRunsOutOfMemory() throws Exception {
+		final Toolchain starved = toolchain(new Fetcher(HttpClient.newHttpClient(), PATIENT), program -> {
+			throw new OutOfMemoryError("Java heap space");
+		});
+
+		new BuildJob(starved, new BuildRequest(demo(), Optional.empty(), Optional.empty(), Optional.empty()),
+			PATIENT, REFUSE, events::add).run();
+
+		assertEquals(List.of(new BuildWarning("", 0, "build failed: OutOfMemoryError: Java heap space")),
+			finished().errors());
 	}
 
 	@Example
@@ -523,11 +549,15 @@ public class BuildJobTest extends ScratchTest {
 	}
 
 	private Toolchain toolchain(final Fetcher fetcher) {
+		return toolchain(fetcher, program -> Optional.empty());
+	}
+
+	private Toolchain toolchain(final Fetcher fetcher, final Function<String, Optional<Path>> onPath) {
 		final Prerequisites present = new Prerequisites(program -> Optional.of(Path.of("/usr/bin", program)),
 			scratch().resolve("os-release"));
 
 		return new Toolchain(new ToolStore(scratch().resolve("tools")), fetcher, new Compiler(PATIENT), present,
-			program -> Optional.empty(), scratch().resolve("work"));
+			onPath, scratch().resolve("work"));
 	}
 
 	private static byte[] vasmRelease() throws IOException {

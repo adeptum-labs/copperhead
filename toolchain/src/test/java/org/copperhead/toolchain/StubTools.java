@@ -47,6 +47,11 @@ public final class StubTools {
 		return script(dir, "vasm", vasmBody(program, boot, stderr));
 	}
 
+	/** An assembler that writes a program of {@code bytes} bytes that takes no room on the disk. */
+	public static Path sparseVasm(final Path dir, final long bytes) throws IOException {
+		return script(dir, "vasm", NOTE_CALL + ARGUMENTS + "truncate -s " + bytes + " \"$out\"\n");
+	}
+
 	public static Path failingVasm(final Path dir, final String stderr) throws IOException {
 		return script(dir, "vasm", NOTE_CALL + "printf '%s\\n' '" + stderr + "' >&2\nexit 1\n");
 	}

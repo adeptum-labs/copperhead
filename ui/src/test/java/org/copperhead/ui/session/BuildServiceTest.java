@@ -192,6 +192,33 @@ public class BuildServiceTest {
 	}
 
 	@Example
+	public void shouldReturnToIdleWhenTheBuildStopsWithAnErrorBeforeItsReport() {
+		final AtomicBoolean broken = new AtomicBoolean(true);
+		final BuildService service = serving((request, trust, sink) -> new BuildService.Job() {
+			@Override
+			public void run() {
+				if (broken.getAndSet(false)) {
+					throw new OutOfMemoryError("Java heap space");
+				}
+				sink.accept(new BuildEvent.Finished(failed()));
+			}
+
+			@Override
+			public void cancel() {
+			}
+		}, Runnable::run);
+
+		service.start(false);
+
+		assertFalse(session.state().run().running());
+		assertEquals(BuildService.STOPPED, session.state().note());
+		service.cancel();
+		service.start(false);
+		assertFalse(session.state().run().running());
+		assertEquals("Build failed · 1 error", session.state().note());
+	}
+
+	@Example
 	public void shouldBuildTheProjectOpenWhenTheRunBegins() {
 		final AtomicReference<BuildRequest> asked = new AtomicReference<>();
 		final BuildService service = serving((request, trust, sink) -> {

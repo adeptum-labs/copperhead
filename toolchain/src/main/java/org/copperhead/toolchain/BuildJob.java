@@ -106,13 +106,20 @@ public final class BuildJob implements Runnable {
 			cancelled();
 		} catch (final IOException | ToolchainException | IllegalArgumentException e) {
 			fail(Objects.requireNonNullElse(e.getMessage(), e.toString()));
-		} catch (final RuntimeException e) {
-			LOG.warn("Build of {} failed", request.project().dir(), e);
-			fail("build failed: " + e);
+		} catch (final RuntimeException | Error e) {
+			LOG.error("Build of {} failed", request.project().dir(), e);
+			fail("build failed: " + readable(e));
 		} finally {
 			ended();
+			emit(new BuildEvent.Finished(report(adf, bytes, Duration.ofNanos(System.nanoTime() - start))));
 		}
-		emit(new BuildEvent.Finished(report(adf, bytes, Duration.ofNanos(System.nanoTime() - start))));
+	}
+
+	/* An error such as running out of memory names no file or line, so its kind is what the person is told. */
+	private static String readable(final Throwable failure) {
+		final String message = failure.getMessage();
+
+		return failure.getClass().getSimpleName() + (message == null ? "" : ": " + message);
 	}
 
 	/* The interrupt reaches whatever the build waits on: a download, make, the assembler or the trust prompt; a
@@ -148,12 +155,13 @@ public final class BuildJob implements Runnable {
 		final ProjectFile file = project.file();
 
 		assemble(vasm, project, job);
-		final int size = Math.toIntExact(Files.size(project.dir().resolve(PROGRAM)));
-		final byte[] payload = shrinkler.isPresent() ? crunch(shrinkler.get(), project)
-			: Files.readAllBytes(project.dir().resolve(PROGRAM));
+		final int size = withinChipRam(file.target(), project.dir().resolve(PROGRAM));
+		final Path packed = shrinkler.isPresent() ? crunch(shrinkler.get(), project)
+			: project.dir().resolve(PROGRAM);
 		final int stage = (file.loadAddress() + size + LONG - 1) / LONG * LONG;
 
-		fits(file, stage, size, payload.length);
+		fits(file, stage, size, withinChipRam(file.target(), packed));
+		final byte[] payload = Files.readAllBytes(packed);
 		final byte[] image = TrackDisk.image(loader(vasm, project, job, stage, payload.length), payload);
 
 		stopIfCancelled();
@@ -203,7 +211,19 @@ public final class BuildJob implements Runnable {
 		written(project, PROGRAM);
 	}
 
-	private byte[] crunch(final Path shrinkler, final ProjectDirectory project)
+	/* Asked before the file is read: a program of gigabytes would otherwise fill the studio's memory first. */
+	private static int withinChipRam(final Target target, final Path output) throws IOException, ToolchainException {
+		final long size = Files.size(output);
+
+		if (size > target.chipEnd()) {
+			throw new ToolchainException(ProjectLayout.BUILD + "/" + output.getFileName() + " is " + size
+				+ " bytes, more than the " + target.chipEnd() + " bytes of chip RAM the " + target.machine()
+				+ " has");
+		}
+		return (int) size;
+	}
+
+	private Path crunch(final Path shrinkler, final ProjectDirectory project)
 		throws IOException, InterruptedException, ToolchainException {
 
 		final List<String> output = new ArrayList<>();
@@ -218,7 +238,7 @@ public final class BuildJob implements Runnable {
 		}
 		output.stream().map(FINAL_SIZE::matcher).filter(Matcher::matches)
 			.forEach(found -> plain("crunched " + found.group(1) + " bytes"));
-		return Files.readAllBytes(written(project, CRUNCHED));
+		return written(project, CRUNCHED);
 	}
 
 	/* Uncrunched, the program is read straight to its load address. Crunched, it is read to the stage above itself
