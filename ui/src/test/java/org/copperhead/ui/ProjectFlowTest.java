@@ -363,6 +363,19 @@ public class ProjectFlowTest {
 	}
 
 	@Example
+	public void shouldSayAProjectWithoutASourceFolderWillNotOpenBecauseOfThat() throws Exception {
+		final Path bare = made("arcade");
+
+		TempDirectory.delete(bare.resolveSibling("src"));
+
+		final Screen screen = browsed(Screen.open(rig), "arcade")
+			.trigger(ENTRY + "--project", Map.of("path", bare.toString()));
+
+		assertEquals("Open project", screen.find("#modal .modal__title").text());
+		assertEquals("the project has no src folder", screen.find("#modal .modal__line").text());
+	}
+
+	@Example
 	public void shouldSkipAProjectWhoseSourceFolderIsALinkWhenTheStudioStarts() throws Exception {
 		welcome();
 

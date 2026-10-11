@@ -89,6 +89,52 @@ public class ProjectDirectoryTest extends ScratchTest {
 	}
 
 	@Example
+	public void shouldRefuseAProjectFileLargerThanAMebibyte() throws IOException {
+		final ProjectDirectory created = demo();
+
+		Files.writeString(created.chp(), created.file().toJson() + " ".repeat(1 << 20));
+
+		assertEquals("nightrun.chp is larger than 1048576 bytes",
+			assertThrows(IOException.class, () -> ProjectDirectory.open(created.chp())).getMessage());
+	}
+
+	@Example
+	public void shouldRefuseAProjectFileThatIsALink() throws IOException {
+		final ProjectDirectory created = demo();
+		final Path elsewhere = Files.move(created.chp(), scratch().resolve("elsewhere.chp"));
+
+		Files.createSymbolicLink(created.chp(), elsewhere);
+
+		assertEquals("nightrun.chp is not a plain file",
+			assertThrows(IOException.class, () -> ProjectDirectory.open(created.chp())).getMessage());
+		assertThrows(IOException.class, () -> ProjectDirectory.open(created.dir()));
+	}
+
+	@Example
+	public void shouldRefuseToCreateAProjectThroughALinkToAnEmptyFolder() throws IOException {
+		final Path outside = Files.createDirectories(scratch().resolve("outside"));
+		final Path parent = Files.createDirectories(scratch().resolve("projects"));
+
+		Files.createSymbolicLink(parent.resolve("nightrun"), outside);
+
+		assertTrue(assertThrows(IOException.class,
+			() -> ProjectDirectory.create(parent, "nightrun", ProjectKind.DEMO, Target.A500_OCS)).getMessage()
+			.endsWith("nightrun is a link"));
+		assertEquals(List.of(), listed(outside));
+	}
+
+	@Example
+	public void shouldSayWhenTheProjectHasNoSourceFolder() throws IOException {
+		final ProjectDirectory project = demo();
+
+		Files.delete(project.dir().resolve("src/main.s"));
+		Files.delete(project.dir().resolve("src"));
+
+		assertEquals("the project has no src folder",
+			assertThrows(IOException.class, project::sources).getMessage());
+	}
+
+	@Example
 	public void shouldWriteASourceWholeAndKeepItsLineEndings() throws IOException {
 		final ProjectDirectory project = demo();
 

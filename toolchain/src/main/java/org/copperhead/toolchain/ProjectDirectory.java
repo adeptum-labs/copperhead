@@ -16,11 +16,16 @@
 package org.copperhead.toolchain;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileSystemException;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
+import java.nio.file.NoSuchFileException;
+import java.nio.file.NotDirectoryException;
 import java.nio.file.Path;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.util.Comparator;
@@ -38,6 +43,7 @@ import org.copperhead.core.project.Target;
 public record ProjectDirectory(Path dir, ProjectFile file) {
 	private static final String PROJECT_FILE = ProjectLayout.chp("");
 	private static final String STAGED = ".tmp";
+	private static final int LARGEST_PROJECT_FILE = 1 << 20;
 
 	public static ProjectDirectory create(final Path parent, final String name, final ProjectKind kind,
 		final Target target) throws IOException {
@@ -46,6 +52,10 @@ public record ProjectDirectory(Path dir, ProjectFile file) {
 
 		if (!ProjectLayout.validName(name)) {
 			throw new IOException("not a project name: " + name);
+		}
+		/* An empty folder is taken as it is, and a link to one would have the template written wherever it leads. */
+		if (Files.isSymbolicLink(dir)) {
+			throw new IOException(dir + " is a link");
 		}
 		if (Files.exists(dir) && (!Files.isDirectory(dir) || !listed(dir).isEmpty())) {
 			throw new IOException(dir + " already exists and is not empty");
@@ -64,7 +74,25 @@ public record ProjectDirectory(Path dir, ProjectFile file) {
 	public static ProjectDirectory open(final Path chpOrDirectory) throws IOException {
 		final Path chp = Files.isDirectory(chpOrDirectory) ? projectFile(chpOrDirectory) : chpOrDirectory;
 
-		return new ProjectDirectory(chp.toAbsolutePath().getParent(), ProjectFile.parse(Files.readString(chp)));
+		return new ProjectDirectory(chp.toAbsolutePath().getParent(), ProjectFile.parse(projectText(chp)));
+	}
+
+	/* A project file is a few hundred bytes. A cloned project may hold a link, a pipe or gigabytes under its name, so
+	   anything but a plain file of a sane size is refused, and never followed or read whole. */
+	private static String projectText(final Path chp) throws IOException {
+		if (!Files.readAttributes(chp, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS).isRegularFile()) {
+			throw new IOException(chp.getFileName() + " is not a plain file");
+		}
+
+		try (InputStream in = Files.newInputStream(chp, LinkOption.NOFOLLOW_LINKS)) {
+			final byte[] bytes = in.readNBytes(LARGEST_PROJECT_FILE + 1);
+
+			if (bytes.length > LARGEST_PROJECT_FILE) {
+				throw new IOException(chp.getFileName() + " is larger than " + LARGEST_PROJECT_FILE
+					+ " bytes");
+			}
+			return StandardCharsets.UTF_8.newDecoder().decode(ByteBuffer.wrap(bytes)).toString();
+		}
 	}
 
 	public Path chp() {
@@ -79,9 +107,20 @@ public record ProjectDirectory(Path dir, ProjectFile file) {
 		final String entry = Path.of(file.entry()).getFileName().toString();
 		final Comparator<String> entryFirst = Comparator.comparing(name -> !name.equals(entry));
 
-		return listed(sourceFolder()).stream().filter(path -> Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS))
+		return sourceFiles().stream().filter(path -> Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS))
 			.map(path -> path.getFileName().toString()).filter(ProjectLayout::validSource)
 			.sorted(entryFirst.thenComparing(Comparator.naturalOrder())).toList();
+	}
+
+	/* The bare path of a missing folder tells the person nothing about what is wrong with the project. */
+	private List<Path> sourceFiles() throws IOException {
+		try {
+			return listed(sourceFolder());
+		} catch (final NoSuchFileException e) {
+			throw new IOException("the project has no " + ProjectLayout.SRC + " folder", e);
+		} catch (final NotDirectoryException e) {
+			throw new IOException(ProjectLayout.SRC + " of the project is not a folder", e);
+		}
 	}
 
 	public String read(final String source) throws IOException {
