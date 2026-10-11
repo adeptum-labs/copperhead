@@ -181,14 +181,14 @@ public class ToolchainFlowTest {
 		}
 
 		screen.click("#modal .modal__buttons .button:containsOwn(Cancel)");
-		assertEquals("build failed · 1 error", finished(screen).find("#status .status__error").text());
+		assertEquals("Build failed · 1 error", finished(screen).find("#status .status__error").text());
 	}
 
 	@Example
 	public void shouldBuildNothingWithARefusedVasm() throws Exception {
 		final Screen screen = finished(asked().click("#modal .modal__buttons .button:containsOwn(Cancel)"));
 
-		assertEquals("build failed · 1 error", screen.find("#status .status__error").text());
+		assertEquals("Build failed · 1 error", screen.find("#status .status__error").text());
 		assertEquals(Optional.empty(), rig.preferences().trustedVasm());
 	}
 
@@ -197,7 +197,7 @@ public class ToolchainFlowTest {
 		final Screen screen = finished(asked().press("escape"));
 
 		assertTrue(screen.find("#modal").hasAttr("hidden"));
-		assertEquals("build failed · 1 error", screen.find("#status .status__error").text());
+		assertEquals("Build failed · 1 error", screen.find("#status .status__error").text());
 		assertEquals(Optional.empty(), rig.preferences().trustedVasm());
 	}
 }

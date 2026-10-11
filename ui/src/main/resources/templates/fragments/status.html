@@ -4,7 +4,7 @@
 		<footer th:fragment="status" id="status" class="status" hx-swap-oob="true" th:attr="data-theme=${view.theme()},data-project=${view.project()},data-saved=${view.savedList()}">
 			<span th:text="${view.tool()}">vasm 2.0f</span>
 			<button class="status__error" type="button" th:if="${view.failed()}" hx-post="/action/goto-warning"
-				th:text="${view.errors()}">build failed · 1 error</button>
+				th:text="${view.errors()}">Build failed · 1 error</button>
 			<span class="status__ok" th:unless="${view.failed()}" th:text="${view.errors()}">0 errors</span>
 			<button class="status__warning" type="button" th:if="${view.warns()}" hx-post="/action/goto-warning"
 				th:text="${view.warnings()}">1 warning · main.s:24</button>

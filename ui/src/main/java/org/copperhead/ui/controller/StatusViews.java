@@ -20,6 +20,7 @@ import org.copperhead.core.build.BuildReport;
 import org.copperhead.core.build.BuildWarning;
 import org.copperhead.core.project.Part;
 import org.copperhead.toolchain.PinnedSource;
+import org.copperhead.ui.session.BuildService;
 import org.copperhead.ui.session.StudioState;
 import org.copperhead.ui.view.StatusView;
 import org.copperhead.ui.view.Vals;
@@ -36,7 +37,7 @@ final class StatusViews {
 		final Part part = state.project().parts().get(at);
 
 		return new StatusView("vasm " + PinnedSource.VASM.version(),
-			failed ? "build failed · " + counted(errors, "error") : "0 errors", failed,
+			failed ? BuildService.failed(errors) : "0 errors", failed,
 			warnings.isEmpty() ? "0 warnings" : counted(warnings.size(), "warning") + " · "
 				+ StudioState.sourceName(warnings.getFirst().file()) + ":" + warnings.getFirst().line(),
 			!warnings.isEmpty(), "last build " + BuildViews.outcome(state), state.note(),

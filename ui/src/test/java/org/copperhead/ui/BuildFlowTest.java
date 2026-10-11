@@ -125,7 +125,7 @@ public class BuildFlowTest {
 		final Screen screen = finished(running().click(rail(Tool.BUILD))
 			.click("#tool [hx-post=\"/action/build-cancel\"]"));
 
-		assertEquals("build failed · 1 error", screen.find("#status .status__error").text());
+		assertEquals("Build failed · 1 error", screen.find("#status .status__error").text());
 		assertTrue(screen.document().select("#tool .build__line--err").eachText().contains("build cancelled"));
 		assertTrue(Files.notExists(adf()));
 	}
@@ -240,7 +240,7 @@ public class BuildFlowTest {
 		final byte[] good = Files.readAllBytes(adf());
 		final Screen screen = build(saved(Screen.open(rig), FAILED));
 
-		assertEquals("build failed · 1 error", screen.find("#status .status__error").text());
+		assertEquals("Build failed · 1 error", screen.find("#status .status__error").text());
 		assertEquals("Build failed · 1 error", screen.find("#status .status__note").text());
 		assertEquals(Json.createArrayBuilder().add(Json.createObjectBuilder().add("file", "main.s").add("line", 3)
 			.add("severity", "error").add("message", "unknown mnemonic <BOGUS>")).build(),

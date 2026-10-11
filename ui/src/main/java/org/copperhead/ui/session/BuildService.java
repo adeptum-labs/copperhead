@@ -462,8 +462,11 @@ public class BuildService {
 				report.bytes());
 		}
 
-		final int errors = report.errors().size();
+		return failed(report.errors().size());
+	}
 
+	/** How a build that failed is told, in the note it ends with and on the status bar alike. */
+	public static String failed(final int errors) {
 		return "Build failed · " + errors + (errors == 1 ? " error" : " errors");
 	}
 }
