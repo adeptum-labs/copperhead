@@ -23,6 +23,9 @@ import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.PosixFilePermissions;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
 import org.copperhead.core.project.ProjectLayout;
@@ -37,6 +40,7 @@ import org.slf4j.LoggerFactory;
 final class JobFolder implements AutoCloseable {
 	private static final Logger LOG = LoggerFactory.getLogger(JobFolder.class);
 	private static final String PREFIX = ".job-";
+	private static final Duration STALE = Duration.ofDays(1);
 
 	private final Path dir;
 	private final String name;
@@ -48,10 +52,39 @@ final class JobFolder implements AutoCloseable {
 
 	static JobFolder create(final ProjectDirectory project) throws IOException {
 		final Path build = Files.createDirectories(project.dir().resolve(ProjectLayout.BUILD));
+
+		sweep(build);
+
 		final Path dir = Files.createTempDirectory(build, PREFIX,
 			PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwx------")));
 
 		return new JobFolder(dir, ProjectLayout.BUILD + "/" + dir.getFileName());
+	}
+
+	/* A build cut short with the studio leaves its folder behind; one untouched for a day belongs to no build that
+	   still runs. Only folders themselves are taken away, never what a link of that name leads to. */
+	private static void sweep(final Path build) {
+		final Instant stale = Instant.now().minus(STALE);
+		final List<Path> found;
+
+		try (Stream<Path> listed = Files.list(build)) {
+			found = listed.filter(path -> path.getFileName().toString().startsWith(PREFIX)).toList();
+		} catch (final IOException e) {
+			LOG.warn("Could not look for old build folders in {}", build, e);
+			return;
+		}
+		for (final Path folder : found) {
+			try {
+				final BasicFileAttributes seen = Files.readAttributes(folder, BasicFileAttributes.class,
+					LinkOption.NOFOLLOW_LINKS);
+
+				if (seen.isDirectory() && seen.lastModifiedTime().toInstant().isBefore(stale)) {
+					delete(folder);
+				}
+			} catch (final IOException e) {
+				LOG.warn("Could not remove the old build folder {}", folder, e);
+			}
+		}
 	}
 
 	/** The path of a file in the folder, relative to the project, as the tools are given it. */
@@ -90,25 +123,30 @@ final class JobFolder implements AutoCloseable {
 	@Override
 	public void close() {
 		try {
-			Files.walkFileTree(dir, new SimpleFileVisitor<>() {
-				@Override
-				public FileVisitResult visitFile(final Path file, final BasicFileAttributes attributes)
-					throws IOException {
-
-					Files.delete(file);
-					return FileVisitResult.CONTINUE;
-				}
-
-				@Override
-				public FileVisitResult postVisitDirectory(final Path folder, final IOException failure)
-					throws IOException {
-
-					Files.delete(folder);
-					return FileVisitResult.CONTINUE;
-				}
-			});
+			delete(dir);
 		} catch (final IOException e) {
 			LOG.warn("Could not remove {}", dir, e);
 		}
+	}
+
+	/* The walk does not follow links: a link inside is removed, not what it leads to. */
+	private static void delete(final Path folder) throws IOException {
+		Files.walkFileTree(folder, new SimpleFileVisitor<>() {
+			@Override
+			public FileVisitResult visitFile(final Path file, final BasicFileAttributes attributes)
+				throws IOException {
+
+				Files.delete(file);
+				return FileVisitResult.CONTINUE;
+			}
+
+			@Override
+			public FileVisitResult postVisitDirectory(final Path visited, final IOException failure)
+				throws IOException {
+
+				Files.delete(visited);
+				return FileVisitResult.CONTINUE;
+			}
+		});
 	}
 }

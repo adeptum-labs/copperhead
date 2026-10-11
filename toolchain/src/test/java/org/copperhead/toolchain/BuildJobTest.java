@@ -21,6 +21,7 @@ import java.net.http.HttpClient;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
@@ -352,6 +353,34 @@ public class BuildJobTest extends ScratchTest {
 			report.errors().toString());
 		assertEquals(List.of(), jobFolders(project));
 		assertFalse(Files.exists(project.adf()));
+	}
+
+	/* A build cut short with the studio leaves its folder; the next build takes away those a day old, and nothing
+	   else: neither a newer one, which a build may still use, nor a folder a link of that name leads to. */
+	@Example
+	public void shouldTakeAwayTheFoldersOfBuildsCutShortADayAgo() throws Exception {
+		final ProjectDirectory project = demo();
+		final Path build = project.dir().resolve("build");
+		final FileTime twoDaysAgo = FileTime.from(Instant.now().minus(Duration.ofDays(2)));
+		final Path old = Files.createDirectories(build.resolve(".job-old"));
+		final Path recent = Files.createDirectories(build.resolve(".job-recent"));
+		final Path elsewhere = Files.createDirectories(scratch().resolve("elsewhere"));
+		final Path other = Files.createDirectories(build.resolve("kept"));
+
+		Files.writeString(old.resolve("main.bin"), "left behind");
+		Files.writeString(elsewhere.resolve("precious"), "kept");
+		Files.createSymbolicLink(build.resolve(".job-link"), elsewhere);
+		for (final Path aged : List.of(old, elsewhere, other)) {
+			Files.setLastModifiedTime(aged, twoDaysAgo);
+		}
+
+		assertTrue(build(project, StubTools.vasm(scratch().resolve("bin"), 2048, 300),
+			StubTools.shrinkler(scratch().resolve("bin"), 700)).ok());
+		assertFalse(Files.exists(old));
+		assertTrue(Files.isDirectory(recent));
+		assertTrue(Files.isDirectory(other));
+		assertTrue(Files.isSymbolicLink(build.resolve(".job-link")));
+		assertEquals("kept", Files.readString(elsewhere.resolve("precious")));
 	}
 
 	private List<Path> jobFolders(final ProjectDirectory project) throws IOException {
