@@ -44,6 +44,11 @@ public record ModalView(Modal kind, String title, List<PairView> rows, List<Stri
 		return kind != Modal.NONE;
 	}
 
+	/** Whether one of its buttons takes the keys when it opens; otherwise its close button does. */
+	public boolean focusesAButton() {
+		return buttons.stream().anyMatch(ButtonView::focused);
+	}
+
 	public String modifier() {
 		return "modal__rows--" + kind.name().toLowerCase(Locale.ROOT);
 	}

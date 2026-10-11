@@ -15,6 +15,12 @@
 
 package org.copperhead.ui.view;
 
-/** A button that answers a dialog; the accented one is what the dialog is for. */
-public record ButtonView(String label, String post, String vals, boolean accent) {
+/**
+ * A button that answers a dialog; the accented one is what the dialog is for. A focused one has the keys when the
+ * dialog opens, so Enter pressed without reading answers with it.
+ */
+public record ButtonView(String label, String post, String vals, boolean accent, boolean focused) {
+	public ButtonView(final String label, final String post, final String vals, final boolean accent) {
+		this(label, post, vals, accent, false);
+	}
 }

@@ -9,7 +9,7 @@
 					<header class="modal__header">
 						<h2 class="modal__title" th:text="${view.title()}">Keyboard shortcuts</h2>
 						<button class="modal__close" type="button" hx-post="/action/modal-close"
-							data-key="escape" autofocus>Esc</button>
+							data-key="escape" th:autofocus="${!view.focusesAButton()}">Esc</button>
 					</header>
 					<dl class="modal__rows" th:classappend="${view.modifier()}" th:unless="${view.rows().isEmpty()}">
 						<th:block th:each="row : ${view.rows()}">
@@ -39,7 +39,7 @@
 					</div>
 					<div class="modal__buttons" th:unless="${view.buttons().isEmpty()}">
 						<button class="button" type="button" th:each="button : ${view.buttons()}"
-							th:classappend="${button.accent()} ? 'button--accent button--strong'"
+							th:classappend="${button.accent()} ? 'button--accent button--strong'" th:autofocus="${button.focused()}"
 							th:attr="hx-post=${button.post()}, hx-vals=${button.vals()}" th:text="${button.label()}">Save</button>
 					</div>
 				</section>

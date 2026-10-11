@@ -31,6 +31,7 @@ import org.copperhead.toolchain.PinnedSource;
 import org.copperhead.ui.session.BuildService.Job;
 import org.copperhead.ui.session.BuildService.Jobs;
 import org.copperhead.ui.view.Tool;
+import org.jsoup.nodes.Element;
 import static org.copperhead.ui.Flows.finished;
 import static org.copperhead.ui.Flows.polledUntil;
 import static org.copperhead.ui.Flows.rail;
@@ -139,10 +140,32 @@ public class ToolchainFlowTest {
 		assertEquals(List.of("2.0g", SHA256), screen.document().select("#modal dd").eachText());
 		assertTrue(screen.document().select("#modal .modal__buttons .button").stream()
 			.allMatch(button -> button.attr("hx-vals").contains(SHA256)));
-		screen.click("#modal .modal__buttons .button:containsOwn(Accept)");
+		screen.click("#modal .modal__buttons .button:containsOwn(Trust this download)");
 		assertTrue(screen.find("#modal").hasAttr("hidden"));
 		assertEquals(Optional.of(SHA256), rig.preferences().trustedVasm());
 		assertEquals("Built demo.adf · 7 bytes", finished(screen).find("#status .status__note").text());
+	}
+
+	/* Enter on a dialog that just opened must not trust a download nobody read about. */
+	@Example
+	public void shouldMakeCancelTheAnswerAVasmQuestionOpensOn() throws Exception {
+		final Screen screen = asked();
+		final Element cancel = screen.find("#modal .modal__buttons .button:containsOwn(Cancel)");
+		final Element trust = screen.find("#modal .modal__buttons .button:containsOwn(Trust this download)");
+
+		assertEquals(List.of(cancel), screen.document().select("#modal [autofocus]"));
+		assertTrue(cancel.hasClass("button--accent"));
+		assertFalse(trust.hasClass("button--accent"));
+		assertEquals("/action/trust-refuse", cancel.attr("hx-post"));
+		assertEquals("/action/trust-accept", trust.attr("hx-post"));
+	}
+
+	@Example
+	public void shouldSayTheVasmSourceCameOverUnencryptedHttpAndDiffersFromTheKnownOne() throws Exception {
+		final String text = asked().find("#modal .modal__lines").text();
+
+		assertTrue(text.contains("fetched over unencrypted HTTP"), text);
+		assertTrue(text.contains("differs from the one Copperhead knows"), text);
 	}
 
 	@Example

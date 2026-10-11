@@ -17,6 +17,7 @@ package org.copperhead.ui.controller;
 
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 import org.copperhead.toolchain.PinnedSource;
 import org.copperhead.ui.session.BuildRun.TrustRequest;
 import org.copperhead.ui.session.Layout;
@@ -91,16 +92,29 @@ final class ModalViews {
 			SHRINKLER, preferences.tool(SHRINKLER).map(Object::toString).orElse(""));
 	}
 
+	/* Trusting is the choice that can hurt, so it is never the one Enter makes: Cancel has the keys and the accent. */
 	private static ModalView trust(final TrustRequest request) {
 		final String asked = Vals.of("sha256", request.sha256());
 
 		return new ModalView(Modal.TRUST, "Unexpected " + request.tool() + " source", List.of(
 				new PairView("Version", request.version()), new PairView("SHA-256", request.sha256())),
-			List.of("The " + request.tool() + " download is not the one Copperhead pins. Build with it only "
-				+ "if you trust where it came from; accepting remembers this checksum."),
+			List.of(fetched(request.tool())
+					+ " and its SHA-256 checksum differs from the one Copperhead knows.",
+				"Trust it only if you know where this version comes from. Trusting builds with it and "
+					+ "remembers this checksum; Cancel stops the build."),
 			List.of(), List.of(), List.of(
-				new ButtonView("Accept", "/action/trust-accept", asked, true),
-				new ButtonView("Cancel", "/action/trust-refuse", asked, false)));
+				new ButtonView("Cancel", "/action/trust-refuse", asked, true, true),
+				new ButtonView("Trust this download", "/action/trust-accept", asked, false)));
+	}
+
+	/* What came over plain HTTP may have been changed on the way, which weighs on whether to trust it. */
+	private static String fetched(final String tool) {
+		final boolean plain = Stream.of(PinnedSource.VASM, PinnedSource.SHRINKLER)
+			.filter(source -> source.tool().equals(tool))
+			.anyMatch(source -> "http".equals(source.uri().getScheme()));
+
+		return "The " + tool + " source was fetched over " + (plain
+			? "unencrypted HTTP, so anyone on the network path could have changed it," : "HTTPS,");
 	}
 
 	private static String tool(final PinnedSource source) {
