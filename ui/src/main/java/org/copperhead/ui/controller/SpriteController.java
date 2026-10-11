@@ -35,14 +35,14 @@ public class SpriteController {
 
 	@Action("sprite-paint")
 	public Regions onClickCell(final Form form) {
-		final int cell = Integer.parseInt(form.get("cell"));
+		final int cell = Integer.parseInt(form.require("cell"));
 
 		return Screens.regions(session.change(state -> state.paintSprite(cell)), Region.TOOL);
 	}
 
 	@Action("sprite-colour")
 	public Regions onClickColour(final Form form) {
-		final int colour = Integer.parseInt(form.get("colour"));
+		final int colour = Integer.parseInt(form.require("colour"));
 
 		return Screens.regions(session.change(state -> state.pickSpriteColour(colour)), Region.TOOL);
 	}

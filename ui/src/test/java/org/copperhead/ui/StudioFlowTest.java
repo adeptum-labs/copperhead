@@ -16,7 +16,9 @@
 package org.copperhead.ui;
 
 import jakarta.json.JsonObject;
+import java.net.URLEncoder;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
@@ -200,12 +202,6 @@ public class StudioFlowTest {
 			assertEquals(500, screen.trigger(bad.getKey(), bad.getValue()).status(), bad.getKey());
 			assertEquals(before, rig.session().state(), bad.getKey());
 		}));
-		assertAll(Stream.of("tool", "target", "modal").map(action -> () -> {
-			final StudioState before = rig.session().state();
-
-			assertEquals(500, screen.client().submit("/action/" + action, "").statusCode(), action);
-			assertEquals(before, rig.session().state(), action);
-		}));
 	}
 
 	/* A request that leaves out a value is the caller's mistake, which the studio answers as one. */
@@ -214,12 +210,28 @@ public class StudioFlowTest {
 		final Screen screen = Screen.open(rig);
 
 		assertAll(Stream.of("project-recent", "project-create", "project-settings", "file-open", "file-save",
-			"breakpoint", "cursor", "source-check").map(action -> () -> {
+			"breakpoint", "cursor", "source-check", "tool", "target", "modal", "theme", "preferences-save",
+			"build-option", "build-progress", "trust-accept", "trust-refuse", "seek", "part", "exit",
+			"sprite-paint", "sprite-colour", "palette-pick", "browse").map(action -> () -> {
 				final StudioState before = rig.session().state();
 
 				assertEquals(400, screen.client().submit("/action/" + action, "").statusCode(), action);
 				assertEquals(before, rig.session().state(), action);
 			}));
+	}
+
+	/* The new project dialog sends what was typed so far with every folder it browses to. */
+	@Example
+	public void shouldRefuseABrowseOfTheNewProjectDialogThatLeavesOutTheDraftAsABadRequest() throws Exception {
+		final Screen screen = Screen.open(rig).click("#menus [hx-post=\"/action/project-new\"]");
+		final String folder = "path=" + URLEncoder.encode(rig.home().toString(), StandardCharsets.UTF_8);
+
+		for (final String left : List.of("&kind=DEMO&target=OCS", "&name=x&target=OCS", "&name=x&kind=DEMO")) {
+			assertEquals(400, screen.client().submit("/action/browse", folder + left).statusCode(), left);
+		}
+
+		assertEquals(200, screen.client().submit("/action/browse", folder + "&name=x&kind=DEMO&target=OCS")
+			.statusCode());
 	}
 
 	@Example

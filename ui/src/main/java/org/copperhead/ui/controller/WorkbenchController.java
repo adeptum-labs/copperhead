@@ -65,7 +65,7 @@ public class WorkbenchController {
 	/* The toolchain card says where each tool is found, which only the disk knows, so it is looked at anew. */
 	@Action("tool")
 	public Regions onClickTool(final Form form) {
-		final Tool tool = Tool.valueOf(form.get("tool"));
+		final Tool tool = Tool.valueOf(form.require("tool"));
 		final List<ToolStatus> found = tool == Tool.BUILD ? builds.tools() : session.state().environment().tools();
 
 		return Screens.regions(session.change(state -> state.withTool(tool)
@@ -74,14 +74,14 @@ public class WorkbenchController {
 
 	@Action("target")
 	public Regions onClickTarget(final Form form) {
-		final Target target = Target.chipset(form.get("target"));
+		final Target target = Target.chipset(form.require("target"));
 
 		return Screens.all(session.change(state -> Workspaces.saved(state.withTarget(target))));
 	}
 
 	@Action("modal")
 	public Regions onClickModal(final Form form) {
-		final Modal modal = Modal.valueOf(form.get("kind"));
+		final Modal modal = Modal.valueOf(form.require("kind"));
 
 		if (modal != Modal.PREFERENCES && !TOLD.contains(modal)) {
 			throw new IllegalArgumentException("The dialog " + modal + " opens from its own action");
@@ -131,7 +131,7 @@ public class WorkbenchController {
 	/* The status bar carries the theme, and the page takes it from there. */
 	@Action("theme")
 	public Regions onClickTheme(final Form form) {
-		final Layout layout = preferences.layout().withTheme(form.get(THEME));
+		final Layout layout = preferences.layout().withTheme(form.require(THEME));
 
 		preferences.layout(layout);
 		return Screens.regions(session.change(state -> state.withLayout(layout)));
@@ -151,9 +151,9 @@ public class WorkbenchController {
 
 	@Action("preferences-save")
 	public Regions onClickSavePreferences(final Form form) {
-		final Map<String, String> values = Map.of(ModalViews.THEME, form.get(ModalViews.THEME),
-			ModalViews.VASM, form.get(ModalViews.VASM).strip(), ModalViews.SHRINKLER,
-			form.get(ModalViews.SHRINKLER).strip());
+		final Map<String, String> values = Map.of(ModalViews.THEME, form.require(ModalViews.THEME),
+			ModalViews.VASM, form.require(ModalViews.VASM).strip(), ModalViews.SHRINKLER,
+			form.require(ModalViews.SHRINKLER).strip());
 		final Optional<String> refused = refused(values);
 
 		if (refused.isPresent()) {

@@ -34,7 +34,7 @@ public class PaletteController {
 
 	@Action("palette-pick")
 	public Regions onClickColour(final Form form) {
-		final int index = Integer.parseInt(form.get("index"));
+		final int index = Integer.parseInt(form.require("index"));
 
 		return Screens.regions(session.change(state -> state.pickColour(index)), Region.TOOL);
 	}

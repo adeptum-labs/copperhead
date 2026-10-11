@@ -42,6 +42,7 @@ public class BuildController {
 	/* A build that ends may start the machine, so what shows it running is drawn again as well. */
 	private static final Region[] ENDED = {Region.MENUS, Region.MACHINE, Region.TOOL, Region.EMULATOR,
 		Region.TIMELINE};
+	private static final String SHA256 = "sha256";
 
 	private final ProjectSession session;
 	private final BuildService builds;
@@ -54,7 +55,7 @@ public class BuildController {
 
 	@Action("build-option")
 	public Regions onClickOption(final Form form) {
-		final BuildOption option = BuildOption.valueOf(form.get("option"));
+		final BuildOption option = BuildOption.valueOf(form.require("option"));
 
 		return Screens.regions(session.change(state -> Workspaces.saved(state.toggleOption(option))), Region.MENUS,
 			Region.TOOL);
@@ -104,7 +105,7 @@ public class BuildController {
 	@Action("build-progress")
 	public Regions onPoll(final Form form) {
 		final StudioState state = session.state();
-		final Phase seen = Phase.valueOf(form.get("phase"));
+		final Phase seen = Phase.valueOf(form.require("phase"));
 		final Phase now = state.run().phase();
 
 		if (seen != now) {
@@ -122,13 +123,13 @@ public class BuildController {
 
 	@Action("trust-accept")
 	public Regions onClickAccept(final Form form) {
-		builds.answer(true, form.get("sha256"));
+		builds.answer(true, form.require(SHA256));
 		return Screens.regions(session.state(), Region.MODAL, Region.TOOL);
 	}
 
 	@Action("trust-refuse")
 	public Regions onClickRefuse(final Form form) {
-		builds.answer(false, form.get("sha256"));
+		builds.answer(false, form.require(SHA256));
 		return Screens.regions(session.state(), Region.MODAL, Region.TOOL);
 	}
 

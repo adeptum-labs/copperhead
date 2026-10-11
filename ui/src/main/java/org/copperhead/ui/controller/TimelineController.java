@@ -37,21 +37,23 @@ public class TimelineController {
 
 	@Action("seek")
 	public Regions onClickRuler(final Form form) {
-		final Duration at = Duration.ofMillis(Long.parseLong(form.get("at")));
+		final Duration at = Duration.ofMillis(Long.parseLong(form.require("at")));
 
 		return Screens.regions(session.change(state -> state.seek(at)), MOVED);
 	}
 
 	@Action("part")
 	public Regions onClickPart(final Form form) {
-		final int index = Integer.parseInt(form.get("index"));
+		final int index = Integer.parseInt(form.require("index"));
 
 		return Screens.regions(session.change(state -> state.playPart(index)), MOVED);
 	}
 
 	@Action("exit")
 	public Regions onClickExit(final Form form) {
-		return Screens.regions(session.change(state -> state.takeExit(form.get("to"))), MOVED);
+		final String to = form.require("to");
+
+		return Screens.regions(session.change(state -> state.takeExit(to)), MOVED);
 	}
 
 	/* The page has played into the next part. Only the time has moved, and the session already keeps it, so nothing

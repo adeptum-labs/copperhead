@@ -140,8 +140,9 @@ public class ProjectController {
 
 		return switch (state.modal()) {
 			case NEW_PROJECT -> Screens.dialog(state, ProjectDialogs.create(home,
-				new Draft(form.get(ProjectDialogs.NAME), ProjectKind.valueOf(form.get(ProjectDialogs.KIND)),
-					Target.chipset(form.get(ProjectDialogs.TARGET)), folder), "", editing));
+				new Draft(form.require(ProjectDialogs.NAME),
+					ProjectKind.valueOf(form.require(ProjectDialogs.KIND)),
+					Target.chipset(form.require(ProjectDialogs.TARGET)), folder), "", editing));
 			case OPEN_PROJECT -> Screens.dialog(state, ProjectDialogs.open(home, folder, "", editing));
 			default -> throw new IllegalStateException("No dialog is browsing folders");
 		};
