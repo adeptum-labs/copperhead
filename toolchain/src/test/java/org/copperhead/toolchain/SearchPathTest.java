@@ -23,6 +23,8 @@ import java.nio.file.attribute.PosixFilePermissions;
 import java.util.Optional;
 import net.jqwik.api.Example;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class SearchPathTest extends ScratchTest {
 	@Example
@@ -42,6 +44,26 @@ public class SearchPathTest extends ScratchTest {
 
 		assertEquals(Optional.of(runnable), SearchPath.of(path).apply("cc"));
 		assertEquals(Optional.empty(), SearchPath.of(path).apply("c++"));
+	}
+
+	@Example
+	public void shouldPassOverAFolderNamedLikeTheProgram() throws IOException {
+		final Path folder = Files.createDirectories(scratch().resolve("first/make"));
+		final Path runnable = program("second", "make", "rwxr-xr-x");
+		final String path = folder.getParent() + File.pathSeparator + runnable.getParent();
+
+		assertTrue(Files.isExecutable(folder));
+		assertFalse(SearchPath.usable(folder));
+		assertEquals(Optional.of(runnable), SearchPath.of(path).apply("make"));
+		assertEquals(Optional.empty(), SearchPath.of(folder.getParent().toString()).apply("make"));
+	}
+
+	@Example
+	public void shouldPassOverAnEntryThatIsNoPath() throws IOException {
+		final Path runnable = program("second", "cc", "rwxr-xr-x");
+
+		assertEquals(Optional.of(runnable), SearchPath.of("bad\0entry" + File.pathSeparator + runnable.getParent())
+			.apply("cc"));
 	}
 
 	private Path program(final String folder, final String name, final String permissions) throws IOException {

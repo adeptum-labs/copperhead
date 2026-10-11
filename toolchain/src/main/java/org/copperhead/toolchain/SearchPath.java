@@ -17,27 +17,42 @@ package org.copperhead.toolchain;
 
 import java.io.File;
 import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
+import java.util.stream.Stream;
 
 /** Finds a program by name the way a shell does: the first executable file of that name in the PATH folders. */
 public final class SearchPath {
 	private SearchPath() {
 	}
 
+	/** Whether a path is a program that can run: a folder may carry the execute bit, but it runs nothing. */
+	public static boolean usable(final Path path) {
+		return Files.isRegularFile(path) && Files.isExecutable(path);
+	}
+
+	/* An entry no path can be made of names no folder, as a shell would pass over it. */
 	public static Function<String, Optional<Path>> of(final String path) {
 		final List<Path> folders = Arrays.stream(path.split(File.pathSeparator)).filter(folder -> !folder.isBlank())
-			.map(Path::of).toList();
+			.flatMap(SearchPath::folder).toList();
 
-		return name -> folders.stream().map(folder -> folder.resolve(name))
-			.filter(file -> Files.isRegularFile(file) && Files.isExecutable(file)).findFirst();
+		return name -> folders.stream().map(folder -> folder.resolve(name)).filter(SearchPath::usable).findFirst();
 	}
 
 	public static Function<String, Optional<Path>> system() {
 		return of(Objects.requireNonNullElse(System.getenv("PATH"), ""));
+	}
+
+	private static Stream<Path> folder(final String folder) {
+		try {
+			return Stream.of(Path.of(folder));
+		} catch (final InvalidPathException e) {
+			return Stream.empty();
+		}
 	}
 }

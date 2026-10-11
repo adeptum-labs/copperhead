@@ -18,14 +18,10 @@ package org.copperhead.ui.session;
 import jakarta.annotation.PreDestroy;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import java.io.File;
 import java.io.IOException;
 import java.net.http.HttpClient;
-import java.nio.file.Files;
-import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.time.Duration;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
@@ -34,7 +30,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.function.Consumer;
 import java.util.function.Function;
-import java.util.stream.Stream;
 import org.copperhead.core.build.BuildLine;
 import org.copperhead.core.build.BuildReport;
 import org.copperhead.core.build.Tone;
@@ -47,6 +42,7 @@ import org.copperhead.toolchain.HashMismatch;
 import org.copperhead.toolchain.PinnedSource;
 import org.copperhead.toolchain.Prerequisites;
 import org.copperhead.toolchain.ProjectDirectory;
+import org.copperhead.toolchain.SearchPath;
 import org.copperhead.toolchain.ToolStore;
 import org.copperhead.toolchain.Toolchain;
 import org.copperhead.toolchain.ToolchainException;
@@ -86,7 +82,7 @@ public class BuildService {
 
 	@Inject
 	public BuildService(final ProjectSession session, final Preferences preferences) {
-		this(session, preferences, toolchain(XdgDirs.system(), BuildService::onPath, OS_RELEASE), STEP,
+		this(session, preferences, toolchain(XdgDirs.system(), SearchPath.system(), OS_RELEASE), STEP,
 			command -> Thread.ofVirtual().name("build").start(command));
 	}
 
@@ -151,21 +147,6 @@ public class BuildService {
 		return new Toolchain(new ToolStore(dirs.data().resolve(TOOLS)),
 			new Fetcher(HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NORMAL).build(), FETCH),
 			new Compiler(COMPILE), new Prerequisites(onPath, osRelease), onPath, dirs.cache());
-	}
-
-	/** Where the system's search path holds an executable of the name, if it does. */
-	public static Optional<Path> onPath(final String name) {
-		return Arrays.stream(System.getenv().getOrDefault("PATH", "").split(File.pathSeparator))
-			.filter(directory -> !directory.isEmpty()).flatMap(directory -> located(directory, name))
-			.filter(Files::isExecutable).findFirst();
-	}
-
-	private static Stream<Path> located(final String directory, final String name) {
-		try {
-			return Stream.of(Path.of(directory, name));
-		} catch (InvalidPathException e) {
-			return Stream.empty();
-		}
 	}
 
 	/** Where each tool of the build would come from if a build started now. */

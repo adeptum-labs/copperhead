@@ -59,7 +59,7 @@ public final class Toolchain {
 	public Optional<Path> locate(final PinnedSource source, final Optional<Path> configured,
 		final Optional<String> trusted) {
 
-		return configured.filter(path -> Files.isRegularFile(path) && Files.isExecutable(path))
+		return configured.filter(SearchPath::usable)
 			.or(() -> store.find(source, source.sha256()))
 			.or(() -> trustedFor(source, trusted).flatMap(sha256 -> store.find(source, sha256)))
 			.or(() -> onPath.apply(source.executable()));

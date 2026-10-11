@@ -46,8 +46,7 @@ public final class ToolStore {
 		}
 		final Path executable = folder(source, sha256).resolve(source.executable());
 
-		return Files.isRegularFile(executable) && Files.isExecutable(executable) ? Optional.of(executable)
-			: Optional.empty();
+		return Optional.of(executable).filter(SearchPath::usable);
 	}
 
 	/* Copied next to its final name and moved there in one step, so a build running at the same time never finds

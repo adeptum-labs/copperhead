@@ -16,7 +16,6 @@
 package org.copperhead.toolchain;
 
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
@@ -45,7 +44,7 @@ public final class Compiler {
 		if (exit != 0) {
 			throw new IOException("make failed with exit code " + exit);
 		}
-		if (!Files.isRegularFile(built) || !Files.isExecutable(built)) {
+		if (!SearchPath.usable(built)) {
 			throw new IOException("make did not produce " + binary);
 		}
 		return built;

@@ -17,7 +17,6 @@ package org.copperhead.ui.controller;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.util.List;
@@ -25,6 +24,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Stream;
 import org.copperhead.core.project.Target;
+import org.copperhead.toolchain.SearchPath;
 import org.copperhead.ui.session.BuildService;
 import org.copperhead.ui.session.Layout;
 import org.copperhead.ui.session.Preferences;
@@ -178,7 +178,7 @@ public class WorkbenchController {
 	private static boolean unrunnable(final String typed) {
 		try {
 			return tool(typed).filter(path -> !path.isAbsolute() || !path.equals(path.normalize())
-				|| !Files.isRegularFile(path) || !Files.isExecutable(path)).isPresent();
+				|| !SearchPath.usable(path)).isPresent();
 		} catch (InvalidPathException e) {
 			return true;
 		}
