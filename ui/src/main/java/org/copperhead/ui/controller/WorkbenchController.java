@@ -25,6 +25,7 @@ import java.util.Optional;
 import java.util.stream.Stream;
 import org.copperhead.core.project.Target;
 import org.copperhead.toolchain.SearchPath;
+import org.copperhead.ui.session.BuildRun.Phase;
 import org.copperhead.ui.session.BuildService;
 import org.copperhead.ui.session.Layout;
 import org.copperhead.ui.session.Preferences;
@@ -48,6 +49,7 @@ public class WorkbenchController {
 	private static final String THEME = "theme";
 	private static final String SPLIT = "split";
 	private static final String BOTTOM = "bottom";
+	static final String ANSWER_FIRST = "Answer the build's question first";
 
 	private final ProjectSession session;
 	private final Preferences preferences;
@@ -81,20 +83,28 @@ public class WorkbenchController {
 	public Regions onClickModal(final Form form) {
 		final Modal modal = Modal.valueOf(form.get("kind"));
 
-		if (modal == Modal.PREFERENCES) {
-			return Screens.dialog(session.change(state -> state.withModal(modal)),
-				ModalViews.preferences(ModalViews.preferencesOf(preferences), ""));
-		}
-
-		if (!TOLD.contains(modal)) {
+		if (modal != Modal.PREFERENCES && !TOLD.contains(modal)) {
 			throw new IllegalArgumentException("The dialog " + modal + " opens from its own action");
 		}
 
-		return Screens.regions(session.change(state -> told(state, modal)), Region.MODAL);
+		final StudioState state = session.change(changed -> told(changed, modal));
+
+		if (state.modal() != modal) {
+			return Screens.regions(state);
+		}
+
+		return modal == Modal.PREFERENCES
+			? Screens.dialog(state, ModalViews.preferences(ModalViews.preferencesOf(preferences), ""))
+			: Screens.regions(state, Region.MODAL);
 	}
 
-	/* The settings are the project's, so with none open there is nothing to draw them from. */
+	/* The settings are the project's, so with none open there is nothing to draw them from. A dialog drawn over the
+	   question a build waits on would take its place, and the build would wait until cancelled. */
 	private static StudioState told(final StudioState state, final Modal modal) {
+		if (state.run().phase() == Phase.WAITING) {
+			return state.withNote(ANSWER_FIRST);
+		}
+
 		if (modal == Modal.SETTINGS && state.workspace().isEmpty()) {
 			throw new IllegalStateException("No project is open");
 		}

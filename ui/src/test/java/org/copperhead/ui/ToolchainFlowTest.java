@@ -169,6 +169,22 @@ public class ToolchainFlowTest {
 	}
 
 	@Example
+	public void shouldKeepTheVasmQuestionUpWhenAnotherDialogIsAskedFor() throws Exception {
+		final Screen screen = asked();
+
+		for (final String kind : List.of("PREFERENCES", "SHORTCUTS", "ABOUT", "SETTINGS")) {
+			screen.trigger("#menus [hx-post=\"/action/modal\"][hx-vals*=" + kind + "]", Map.of());
+
+			assertEquals(200, screen.status(), kind);
+			assertEquals("Answer the build's question first", screen.find("#status .status__note").text(), kind);
+			assertEquals("Unexpected vasm source", screen.find("#modal .modal__title").text(), kind);
+		}
+
+		screen.click("#modal .modal__buttons .button:containsOwn(Cancel)");
+		assertEquals("build failed · 1 error", finished(screen).find("#status .status__error").text());
+	}
+
+	@Example
 	public void shouldBuildNothingWithARefusedVasm() throws Exception {
 		final Screen screen = finished(asked().click("#modal .modal__buttons .button:containsOwn(Cancel)"));
 
