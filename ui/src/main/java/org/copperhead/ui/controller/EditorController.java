@@ -58,7 +58,13 @@ public class EditorController {
 
 		Buffers.owned(directory, form);
 
-		final List<String> saved = Buffers.save(directory, List.of(name), buffer -> text);
+		final List<String> saved;
+
+		try {
+			saved = Buffers.save(directory, List.of(name), buffer -> text);
+		} catch (Buffers.Failed e) {
+			return e.answer(session);
+		}
 
 		return Screens.confirming(Screens.regions(session.change(state -> state.withNote("Saved " + name)),
 			Region.TOOL), saved);
@@ -66,7 +72,13 @@ public class EditorController {
 
 	@Action("file-save-all")
 	public Regions onSaveAll(final Form form) {
-		final List<String> saved = Buffers.save(Workspaces.open(session.state()), form);
+		final List<String> saved;
+
+		try {
+			saved = Buffers.save(Workspaces.open(session.state()), form);
+		} catch (Buffers.Failed e) {
+			return e.answer(session);
+		}
 
 		return Screens.confirming(Screens.regions(session.change(state -> state.withNote(saved.isEmpty()
 			? "Nothing to save" : "Saved " + String.join(", ", saved))), Region.TOOL), saved);

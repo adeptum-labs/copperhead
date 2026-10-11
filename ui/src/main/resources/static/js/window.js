@@ -27,6 +27,10 @@ const choice = (label, kind, chosen) => {
 	return button;
 };
 
+/* The status bar of the answer names the files the server wrote and, when the disk refused one, says why. */
+const statusOf = async (answer) => answer.ok
+	? new DOMParser().parseFromString(await answer.text(), "text/html").getElementById("status") : null;
+
 /* Closing with text that is not saved asks first, as switching projects does. The text goes to the server the way
    Save all sends it, and the window closes only once every file is written. */
 const askBeforeClosing = (unsaved) => {
@@ -37,20 +41,22 @@ const askBeforeClosing = (unsaved) => {
 	const buttons = document.createElement("div");
 	const saveAndClose = async (event) => {
 		const button = event.currentTarget;
-		const refused = () => {
-			line.textContent = "The files could not be saved, so the window stays open.";
+		const refused = (reason) => {
+			line.textContent = `${reason || "The files could not be saved."} The window stays open.`;
 			button.disabled = false;
 		};
 
 		button.disabled = true;
 
 		try {
-			const saved = await fetch("/action/file-save-all", { method: "POST", body: new URLSearchParams(unsaved) });
+			const status = await statusOf(await fetch("/action/file-save-all",
+				{ method: "POST", body: new URLSearchParams(unsaved) }));
+			const saved = (status?.dataset.saved ?? "").split(",");
 
-			if (saved.ok) {
+			if (unsaved.files.split(",").every((name) => saved.includes(name))) {
 				command("close");
 			} else {
-				refused();
+				refused(status?.querySelector(".status__note")?.textContent.trim());
 			}
 		} catch {
 			refused();

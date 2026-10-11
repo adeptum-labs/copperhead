@@ -16,8 +16,6 @@
 package org.copperhead.ui;
 
 import jakarta.json.JsonObject;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
@@ -34,8 +32,6 @@ import org.copperhead.core.debug.Breakpoint;
 import org.copperhead.core.project.ProjectFile;
 import org.copperhead.core.project.Target;
 import org.copperhead.ui.session.StudioState;
-import org.copperhead.web.action.ActionFailed;
-import org.copperhead.web.action.Form;
 import static org.copperhead.ui.Flows.GUTTER;
 import static org.copperhead.ui.Flows.finished;
 import static org.copperhead.ui.Flows.lines;
@@ -46,7 +42,6 @@ import static org.copperhead.ui.Flows.source;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeFalse;
 
@@ -80,25 +75,28 @@ public class EditorFlowTest {
 		return ProjectFile.parse(Files.readString(rig.project().chp())).breakpoints();
 	}
 
-	/* What the studio answers when the disk refuses the write: the failure itself, with the studio as it was. */
-	private Throwable refused(final String action, final String body) throws Exception {
+	/* What the page is shown when the disk refuses every write: an answer it draws, since it drops any other. */
+	private Screen refused(final String control, final Map<String, String> sent) throws Exception {
 		final Path src = rig.project().dir().resolve("src");
-		final StudioState before = rig.session().state();
+		final Screen screen = Screen.open(rig);
 
 		Files.setPosixFilePermissions(src, PosixFilePermissions.fromString("r-xr-xr-x"));
 
 		try {
 			assumeFalse(Files.isWritable(src), "a folder that cannot be written is writable to this user");
-
-			final ActionFailed failed = assertThrows(ActionFailed.class,
-				() -> rig.actions().invoke(action, Form.parse(body + "&project="
-					+ URLEncoder.encode(rig.project().dir().toString(), StandardCharsets.UTF_8))));
-
-			assertEquals(before, rig.session().state());
-			return failed.getCause();
+			assertEquals(200, screen.trigger(control, owned(rig, sent)).status());
+			return screen;
 		} finally {
 			Files.setPosixFilePermissions(src, PosixFilePermissions.fromString("rwxr-xr-x"));
 		}
+	}
+
+	private static String note(final Screen screen) {
+		return screen.find("#status .status__note").text();
+	}
+
+	private static String marked(final Screen screen) {
+		return screen.find("#status").attr("data-saved");
 	}
 
 	private Path secret() throws Exception {
@@ -259,21 +257,50 @@ public class EditorFlowTest {
 	}
 
 	@Example
-	public void shouldNameTheSourceThatCouldNotBeSavedWithoutTheStagingFile() throws Exception {
-		final String message = refused("file-save", "name=main.s&text=x").getMessage();
+	public void shouldSayWhichSourceCouldNotBeSavedWithoutTheStagingFile() throws Exception {
+		final Screen screen = refused(SAVE, Map.of("name", "main.s", "text", "x"));
 
-		assertTrue(message.startsWith("main.s could not be saved: "), message);
-		assertFalse(message.contains(".tmp"), message);
+		assertTrue(note(screen).startsWith("main.s could not be saved: "), note(screen));
+		assertFalse(note(screen).contains(".tmp"), note(screen));
+		assertEquals("", marked(screen));
 	}
 
 	@Example
-	public void shouldNameTheFirstSourceThatCouldNotBeSavedWhenSavingAll() throws Exception {
+	public void shouldSayWhichSourceCouldNotBeSavedFirstWhenSavingAll() throws Exception {
 		Files.writeString(file("tables.i"), "sine:\n");
 
-		final String message = refused("file-save-all", "files=main.s,tables.i&main.s=a&tables.i=b").getMessage();
+		final Screen screen = refused(SAVE_ALL, Map.of("files", "main.s,tables.i", "main.s", "a", "tables.i", "b"));
 
-		assertTrue(message.startsWith("main.s could not be saved: "), message);
-		assertFalse(message.contains(".tmp") || message.contains("already saved"), message);
+		assertTrue(note(screen).startsWith("main.s could not be saved: "), note(screen));
+		assertFalse(note(screen).contains(".tmp") || note(screen).contains("already saved"), note(screen));
+		assertEquals("", marked(screen));
+	}
+
+	@Example
+	public void shouldMarkOnlyTheSourcesWrittenBeforeOneWasRefused() throws Exception {
+		Files.writeString(Files.createDirectories(file("tables.i")).resolve("in-the-way"), "");
+
+		final Screen screen = Screen.open(rig).trigger(SAVE_ALL, owned(rig,
+			Map.of("files", "main.s,tables.i", "main.s", "; written\n", "tables.i", "; refused\n")));
+
+		assertEquals(200, screen.status());
+		assertTrue(note(screen).startsWith("tables.i could not be saved: "), note(screen));
+		assertTrue(note(screen).endsWith("; main.s already saved"), note(screen));
+		assertEquals("main.s", marked(screen));
+		assertEquals("; written\n", Files.readString(file("main.s")));
+	}
+
+	@Example
+	public void shouldNotBuildWhenASourceCouldNotBeSavedFirst() throws Exception {
+		for (final String control : List.of("[data-key=\"ctrl+b\"]", "[data-key=\"ctrl+shift+b\"]")) {
+			final Screen screen = refused(control, Map.of("files", "main.s", "main.s", "; unsaved\n"));
+
+			assertTrue(note(screen).startsWith("main.s could not be saved: "), note(screen));
+			assertEquals("", marked(screen));
+			assertTrue(screen.document().select(Flows.POLL).isEmpty(), control);
+			assertFalse(rig.session().state().run().running(), control);
+			assertTrue(rig.session().state().build().isEmpty(), control);
+		}
 	}
 
 	@Example
@@ -328,7 +355,8 @@ public class EditorFlowTest {
 		assertFalse(screen.document().html().contains("private key"));
 		assertEquals(500, screen.trigger("#tool [hx-post=\"/action/file-open\"]", Map.of("name", "tables.i"))
 			.status());
-		assertEquals(500, screen.trigger(SAVE, owned(rig, Map.of("name", "tables.i", "text", "x"))).status());
+		screen.trigger(SAVE, owned(rig, Map.of("name", "tables.i", "text", "x")));
+		assertEquals("tables.i could not be saved: tables.i is a link", note(screen));
 		assertEquals("private key", Files.readString(secret()));
 	}
 

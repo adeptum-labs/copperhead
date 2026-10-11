@@ -18,6 +18,7 @@ package org.copperhead.ui.controller;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import java.util.List;
+import java.util.function.Function;
 import org.copperhead.core.build.BuildOption;
 import org.copperhead.ui.session.BuildRun.Phase;
 import org.copperhead.ui.session.BuildService;
@@ -61,18 +62,26 @@ public class BuildController {
 	/* What the editor has not saved yet goes to disk first, since the assembler reads the files. */
 	@Action("build")
 	public Regions onClickBuild(final Form form) {
-		final List<String> saved = saveBeforeBuilding(form);
-
-		builds.start(false);
-		return Screens.confirming(Screens.regions(session.state(), HELD_BACK), saved);
+		return build(form, false, state -> Screens.regions(state, HELD_BACK));
 	}
 
 	@Action("build-run")
 	public Regions onClickBuildAndRun(final Form form) {
-		final List<String> saved = saveBeforeBuilding(form);
+		return build(form, true, Screens::all);
+	}
 
-		builds.start(true);
-		return Screens.confirming(Screens.all(session.state()), saved);
+	/* A source the disk refused would be assembled as it was before, so the build does not start. */
+	private Regions build(final Form form, final boolean andRun, final Function<StudioState, Regions> drawn) {
+		final List<String> saved;
+
+		try {
+			saved = saveBeforeBuilding(form);
+		} catch (Buffers.Failed e) {
+			return e.answer(session);
+		}
+
+		builds.start(andRun);
+		return Screens.confirming(drawn.apply(session.state()), saved);
 	}
 
 	/* A build that is refused writes nothing: the one running is reading these very files. */

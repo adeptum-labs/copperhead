@@ -350,8 +350,6 @@ public class BufferIT extends EditorTest {
 
 	@Example
 	public void shouldKeepTheWindowOpenWhenTheFilesCannotBeSavedOnTheWayOut() throws Exception {
-		forgive("file-save-all 500");
-		forgive("500 (Server Error)");
 		typeAtTheTop("; mine\n");
 		permit(src(), READ_ONLY);
 
@@ -362,7 +360,7 @@ public class BufferIT extends EditorTest {
 			final Locator save = page().locator(CLOSING + " button:text-is('Save all and close')");
 
 			save.click();
-			assertThat(page().locator(CLOSING + " .modal__line")).containsText("could not be saved");
+			assertThat(page().locator(CLOSING + " .modal__line")).containsText("main.s could not be saved");
 			assertThat(save).isEnabled();
 			assertFalse(rig().window().commands().contains(CLOSE));
 		} finally {

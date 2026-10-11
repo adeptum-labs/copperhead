@@ -22,6 +22,9 @@ import java.util.Optional;
 import java.util.function.UnaryOperator;
 import org.copperhead.core.project.ProjectLayout;
 import org.copperhead.toolchain.ProjectDirectory;
+import org.copperhead.ui.session.ProjectSession;
+import org.copperhead.ui.view.Region;
+import org.copperhead.ui.view.Regions;
 import org.copperhead.web.action.Form;
 
 /**
@@ -67,6 +70,13 @@ final class Buffers {
 		/** The buffers written before the refused one, which the disk holds. */
 		List<String> saved() {
 			return saved;
+		}
+
+		/* The page drops an answer that is not a success, so a refusal is answered as one: the status bar says
+		   why, and only what was written is marked saved. */
+		Regions answer(final ProjectSession session) {
+			return Screens.confirming(Screens.regions(session.change(state -> state.withNote(getMessage())),
+				Region.TOOL), saved);
 		}
 	}
 
