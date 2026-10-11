@@ -6,7 +6,8 @@ A1200 (AGA).
 
 A project is a folder on disk: its sources are edited in the Code tool and Build ADF turns them into a bootable
 trackloader disk with vasm and Shrinkler. The sprite, palette, debugger, emulator and timeline tools still show
-sample data.
+sample data. Build & run builds the disk and then only sets the emulator pane to running; the disk is not yet
+loaded into an emulator.
 
 ## Building
 
@@ -16,7 +17,7 @@ Copperhead needs JDK 25.
 mvn install                 # build and test
 mvn -pl shell exec:java     # run from the build tree
 mvn -Pbrowser install       # also drive the interface in a real browser
-mvn -Pinstaller install     # also build the DEB and RPM packages (needs fakeroot and rpm)
+mvn -Pinstaller install     # also build the DEB and RPM packages (needs the platform's packaging tools, e.g. fakeroot and rpm on Debian)
 mvn -Ptoolchain verify -pl toolchain -am   # fetch and compile the real vasm and Shrinkler, build both templates
 ```
 
@@ -80,7 +81,7 @@ moved aside to `preferences.json.bak`, and the studio starts from the defaults a
 
 Every folder follows the XDG base directories: `XDG_CONFIG_HOME`, `XDG_DATA_HOME` and `XDG_CACHE_HOME` take the
 place of `~/.config`, `~/.local/share` and `~/.cache` when they name absolute paths. The browser engine keeps its
-profile in `~/.cache/copperhead/cef`; a run from the build tree keeps the engine itself in `~/.copperhead/jcef`.
+profile in `<cache>/copperhead/cef`, where `<cache>` is `$XDG_CACHE_HOME` or `~/.cache`; a run from the build tree keeps the engine itself in `~/.copperhead/jcef`.
 
 ## Continuous integration
 
@@ -103,7 +104,8 @@ GitHub Actions runs two workflows on Temurin 25:
     Fedora 42 it runs once more on a Wayland desktop (Weston with Xwayland), where the page has to be drawn
     inside Copperhead's own window.
 
-None of this runs in the Maven build, which never needs Docker or the network beyond Maven's own downloads.
+The default `mvn install` needs neither Docker nor the network beyond Maven's own downloads. The profiles above and
+the workflows do fetch things (vasm and Shrinkler, the Playwright browser), but the Maven build never uses Docker.
 
 ## Licence
 

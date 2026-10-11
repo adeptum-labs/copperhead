@@ -17,6 +17,11 @@
 			<version>${project.version}</version>
 		</dependency>
 		<dependency>
+			<groupId>org.copperhead</groupId>
+			<artifactId>toolchain</artifactId>
+			<version>${project.version}</version>
+		</dependency>
+		<dependency>
 			<groupId>me.friwi</groupId>
 			<artifactId>jcefmaven</artifactId>
 		</dependency>
