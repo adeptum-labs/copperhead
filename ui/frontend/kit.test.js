@@ -16,6 +16,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { forEachDiagnostic } from "@codemirror/lint";
+import * as bundled from "./editor.entry.js";
 import {
 	breakpointLines, caretLine, createState, dirty, keepMine, loaded, reconcile, setDisk, takeDisk, textOf
 } from "./kit.js";
@@ -213,4 +214,11 @@ test("a disk that moved from LF to CRLF and back is shown without stray carriage
 	assert.equal(textOf(taken.state), "p\nq\n");
 	assert.equal(taken.state.doc.lines, 3);
 	assert.equal(dirty(taken.state), false);
+});
+
+test("the page can read where the breakpoints moved to, to send them to the server", () => {
+	const state = createState(source({ breakpoints: [1, 3] }));
+
+	assert.equal(bundled.breakpointLines, breakpointLines);
+	assert.deepEqual(bundled.breakpointLines(type(state, 0, "; one\n; two\n")), [3, 5]);
 });

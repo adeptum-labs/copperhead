@@ -22,6 +22,8 @@ import java.nio.file.attribute.FileTime;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
@@ -231,6 +233,72 @@ public class EditorFlowTest {
 		assertEquals(List.of(new Breakpoint("main.s", 3, 0)), kept());
 		screen.trigger(GUTTER, Map.of("line", "3"));
 		assertEquals(List.of(), kept());
+	}
+
+	/* Two lines typed above moved the page's breakpoints from 4 and 8 to 6 and 10; the click lands on the one shown. */
+	@Example
+	public void shouldTakeTheBreakpointsThePageMovedBeforeToggling() throws Exception {
+		final Screen screen = Screen.open(rig).trigger(GUTTER, Map.of("line", "4"))
+			.trigger(GUTTER, Map.of("line", "8"));
+
+		screen.trigger(GUTTER, moved("6", "6,10"));
+
+		assertEquals(List.of(10), lines(source(screen)));
+		assertEquals(List.of(new Breakpoint("main.s", 10, 0)), kept());
+	}
+
+	@Example
+	public void shouldKeepTheBreakpointsThePageMovedWhenSaving() throws Exception {
+		final String text = "; one\n; two\n" + Files.readString(file("main.s"));
+		final Map<String, String> sent = new HashMap<>(marks("main.s", "6", null));
+		final Screen screen = Screen.open(rig).trigger(GUTTER, Map.of("line", "4"));
+
+		sent.remove("line");
+		sent.putAll(Map.of("name", "main.s", "text", text));
+		screen.trigger(SAVE, sent);
+
+		assertEquals(List.of(new Breakpoint("main.s", 6, 0)), kept());
+		assertEquals(List.of(6), lines(source(screen)));
+	}
+
+	@Example
+	public void shouldRefuseBreakpointsOffTheLinesOfTheSourceOrOfNoSource() throws Exception {
+		final Screen screen = Screen.open(rig).trigger(GUTTER, Map.of("line", "4"));
+		final String text = Files.readString(file("main.s"));
+		final int last = text.split("\n", -1).length;
+		final String many = String.join(",", Collections.nCopies(4097, "1"));
+
+		for (final Map<String, String> sent : List.of(marks("main.s", "0", text),
+			marks("main.s", String.valueOf(last + 1), text), marks("main.s", "x", text),
+			marks("main.s", many, text), marks("../demo.chp", "1", text), marks("gone.s", "1", null))) {
+
+			assertEquals(500, screen.trigger(GUTTER, sent).status(), sent.toString());
+		}
+
+		assertEquals(200, screen.trigger(GUTTER, marks("main.s", String.valueOf(last), text)).status());
+		assertEquals(List.of(new Breakpoint("main.s", last, 0), new Breakpoint("main.s", 1, 0)), kept());
+	}
+
+	private Map<String, String> moved(final String line, final String breakpoints) throws Exception {
+		return marks("main.s", breakpoints, "; one\n; two\n" + Files.readString(file("main.s")), line);
+	}
+
+	private Map<String, String> marks(final String name, final String breakpoints, final String text) {
+		return marks(name, breakpoints, text, "1");
+	}
+
+	/* What the page sends with a click in the gutter: the line, the source's breakpoints and its text as held. */
+	private Map<String, String> marks(final String name, final String breakpoints, final String text,
+		final String line) {
+
+		final Map<String, String> sent = new HashMap<>(owned(rig, Map.of("line", line, "marked", name,
+			"breakpoints:" + name, breakpoints)));
+
+		if (text != null) {
+			sent.put(name, text);
+		}
+
+		return sent;
 	}
 
 	@Example

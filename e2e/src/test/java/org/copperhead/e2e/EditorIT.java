@@ -16,6 +16,7 @@
 package org.copperhead.e2e;
 
 import com.microsoft.playwright.Locator;
+import java.util.List;
 import net.jqwik.api.Example;
 import org.copperhead.ui.StubTools;
 import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
@@ -81,6 +82,27 @@ public class EditorIT extends EditorTest {
 
 		assertThat(page().locator(BREAKPOINTS)).hasCount(1);
 		await("the breakpoint kept in the project", () -> breakpointKept(THIRD_LINE + 1));
+	}
+
+	/* Breakpoints on lines 4 and 8 move to 6 and 10 as two lines are typed above them; a click on 6 takes that one
+	   away and leaves the one on 10, on screen and in the project. */
+	@Example
+	public void shouldToggleTheBreakpointWhereItIsShownAfterLinesWereTypedAboveIt() {
+		final Locator gutter = page().locator("#tool .cm-breakpoint-gutter .cm-gutterElement");
+
+		gutter.nth(3).click();
+		assertThat(page().locator(BREAKPOINTS)).hasCount(1);
+		gutter.nth(7).click();
+		assertThat(page().locator(BREAKPOINTS)).hasCount(2);
+		await("both breakpoints kept", () -> keptLines().equals(List.of(4, 8)));
+
+		typeAtTheTop("; one\n; two\n");
+		gutter.nth(5).click();
+
+		await("only the breakpoint left on screen kept", () -> keptLines().equals(List.of(10)));
+		assertThat(page().locator(BREAKPOINTS)).hasCount(1);
+		assertEquals(9, page().evaluate("[...document.querySelectorAll('#tool .cm-breakpoint-gutter "
+			+ ".cm-gutterElement')].findIndex((line) => line.querySelector('.code__dot--on'))"));
 	}
 
 	/* F9 is the menu's key: the editor leaves it to the studio, which takes the caret's line. */

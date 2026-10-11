@@ -16,4 +16,6 @@
 /* The editor of the Code tool. Bundled into ui/src/main/resources/static/js/editor.bundle.js, where it defines the
    global CopperheadEditor that static/js/editor.js puts on the page. */
 
-export { caretLine, commands, createState, dirty, loaded, mount, reconcile, reveal, setDisk, textOf } from "./kit.js";
+export {
+	breakpointLines, caretLine, commands, createState, dirty, loaded, mount, reconcile, reveal, setDisk, textOf
+} from "./kit.js";

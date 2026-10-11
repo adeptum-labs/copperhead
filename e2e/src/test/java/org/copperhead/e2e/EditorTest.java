@@ -20,7 +20,9 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
+import java.util.List;
 import java.util.regex.Pattern;
+import org.copperhead.core.debug.Breakpoint;
 import org.copperhead.toolchain.ProjectDirectory;
 
 /** What the editor tests share: the demo's entry source on disk, the editor's text and what is typed into it. */
@@ -50,9 +52,13 @@ public abstract class EditorTest extends BrowserTest {
 
 	/* The project file as it is on disk, not as the session holds it. */
 	protected boolean breakpointKept(final int line) {
+		return keptLines().contains(line);
+	}
+
+	protected List<Integer> keptLines() {
 		try {
 			return ProjectDirectory.open(rig().project().dir()).file().breakpoints().stream()
-				.anyMatch(breakpoint -> breakpoint.line() == line);
+				.map(Breakpoint::line).sorted().toList();
 		} catch (final IOException e) {
 			throw new UncheckedIOException(e);
 		}

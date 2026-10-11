@@ -209,14 +209,19 @@ public class ProjectController {
 		}
 
 		if (form.has(ProjectDialogs.SAVE)) {
+			final ProjectDirectory leaving = Workspaces.open(session.state());
+			final Marks marks = Marks.of(leaving, form, form::get);
+
 			try {
-				saved = Buffers.save(Workspaces.open(session.state()), form);
+				saved = Buffers.save(leaving, form);
 			} catch (Buffers.Failed e) {
 				final StudioState asking = session.change(state -> state.withModal(Modal.DISCARD));
 
 				return Screens.confirming(Screens.dialog(asking,
 					ProjectDialogs.discard(action, pending, unsaved, e.getMessage())), e.saved());
 			}
+
+			session.update(state -> Workspaces.saved(marks.placed(state)));
 		}
 
 		final ProjectDirectory opened;

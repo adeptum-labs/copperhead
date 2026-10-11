@@ -46,7 +46,7 @@ final class Menus {
 	private static final String MODAL = "modal";
 	private static final String BUILD_OPTION = "build-option";
 	private static final String BREAKPOINT = "breakpoint-cursor";
-	private static final String AT_CURSOR = Vals.spread("copperhead.editor.cursor()");
+	private static final String AT_CURSOR = Vals.spread("copperhead.editor.caret()");
 	private static final String KIND = "kind";
 
 	private Menus() {

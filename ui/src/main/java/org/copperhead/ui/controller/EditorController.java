@@ -58,6 +58,7 @@ public class EditorController {
 
 		Buffers.owned(directory, form);
 
+		final Marks marks = Marks.of(directory, form, source -> source.equals(name) ? text : form.get(source));
 		final List<String> saved;
 
 		try {
@@ -66,22 +67,25 @@ public class EditorController {
 			return e.answer(session);
 		}
 
-		return Screens.confirming(Screens.regions(session.change(state -> state.withNote("Saved " + name)),
-			Region.TOOL), saved);
+		return Screens.confirming(Screens.regions(session.change(state -> Workspaces.saved(marks.placed(state))
+			.withNote("Saved " + name)), Region.TOOL), saved);
 	}
 
 	@Action("file-save-all")
 	public Regions onSaveAll(final Form form) {
+		final ProjectDirectory directory = Workspaces.open(session.state());
+		final Marks marks = Marks.of(directory, form, form::get);
 		final List<String> saved;
 
 		try {
-			saved = Buffers.save(Workspaces.open(session.state()), form);
+			saved = Buffers.save(directory, form);
 		} catch (Buffers.Failed e) {
 			return e.answer(session);
 		}
 
-		return Screens.confirming(Screens.regions(session.change(state -> state.withNote(saved.isEmpty()
-			? "Nothing to save" : "Saved " + String.join(", ", saved))), Region.TOOL), saved);
+		return Screens.confirming(Screens.regions(session.change(state -> Workspaces.saved(marks.placed(state))
+			.withNote(saved.isEmpty() ? "Nothing to save" : "Saved " + String.join(", ", saved))), Region.TOOL),
+			saved);
 	}
 
 	/* The editor moves its own cursor; the studio only remembers where, for F9 and for the next time it is drawn. */
@@ -92,19 +96,23 @@ public class EditorController {
 		session.update(state -> state.moveCursor(line));
 	}
 
+	/* The page's breakpoints of the source come first: they followed the text, and the line clicked is one of its. */
 	@Action("breakpoint")
 	public Regions onClickGutter(final Form form) {
 		final int line = Integer.parseInt(form.require(LINE));
+		final Marks marks = Marks.of(Workspaces.open(session.state()), form, form::get);
 
-		return Screens.regions(session.change(state -> Workspaces.saved(state.toggleBreakpoint(line))), Region.TOOL);
+		return Screens.regions(session.change(state -> Workspaces.saved(marks.placed(state).toggleBreakpoint(line))),
+			Region.TOOL);
 	}
 
 	@Action("breakpoint-cursor")
 	public Regions onToggleBreakpoint(final Form form) {
 		final StudioState state = session.state();
 		final int line = form.has(LINE) ? Integer.parseInt(form.get(LINE)) : state.cursor();
+		final Marks marks = Marks.of(Workspaces.open(state), form, form::get);
 
-		return Screens.regions(session.change(changed -> Workspaces.saved(changed.moveCursor(line)
+		return Screens.regions(session.change(changed -> Workspaces.saved(marks.placed(changed).moveCursor(line)
 			.toggleBreakpoint(line))), Region.TOOL);
 	}
 

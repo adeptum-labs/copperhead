@@ -20,6 +20,7 @@ import jakarta.inject.Inject;
 import java.util.List;
 import java.util.function.Function;
 import org.copperhead.core.build.BuildOption;
+import org.copperhead.toolchain.ProjectDirectory;
 import org.copperhead.ui.session.BuildRun.Phase;
 import org.copperhead.ui.session.BuildService;
 import org.copperhead.ui.session.ProjectSession;
@@ -70,29 +71,29 @@ public class BuildController {
 		return build(form, true, Screens::all);
 	}
 
-	/* A source the disk refused would be assembled as it was before, so the build does not start. */
+	/* A build that is refused writes nothing: the one running is reading these very files. A source the disk refused
+	   would be assembled as it was before, so the build does not start. The breakpoints the page holds are kept with
+	   the text saved for the build. */
 	private Regions build(final Form form, final boolean andRun, final Function<StudioState, Regions> drawn) {
-		final List<String> saved;
-
-		try {
-			saved = saveBeforeBuilding(form);
-		} catch (Buffers.Failed e) {
-			return e.answer(session);
-		}
-
-		builds.start(andRun);
-		return Screens.confirming(drawn.apply(session.state()), saved);
-	}
-
-	/* A build that is refused writes nothing: the one running is reading these very files. */
-	private List<String> saveBeforeBuilding(final Form form) {
 		final StudioState state = session.state();
 
 		if (state.run().running()) {
 			throw new IllegalStateException("A build is already running");
 		}
 
-		return Buffers.save(Workspaces.open(state), form);
+		final ProjectDirectory directory = Workspaces.open(state);
+		final Marks marks = Marks.of(directory, form, form::get);
+		final List<String> saved;
+
+		try {
+			saved = Buffers.save(directory, form);
+		} catch (Buffers.Failed e) {
+			return e.answer(session);
+		}
+
+		session.update(changed -> Workspaces.saved(marks.placed(changed)));
+		builds.start(andRun);
+		return Screens.confirming(drawn.apply(session.state()), saved);
 	}
 
 	/*

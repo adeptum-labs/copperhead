@@ -222,23 +222,40 @@
 
 	const held = () => buffers.get(active);
 
+	/* The breakpoints moved with the lines typed above them, which only the page saw, so they go along wherever the
+	   server may keep them or toggle one: the server takes these lists in place of its own. */
+	const marked = (list) => list.length === 0 ? {} : {
+		project,
+		marked: list.map((buffer) => buffer.name).join(","),
+		...Object.fromEntries(list.map((buffer) => [`breakpoints:${buffer.name}`,
+			kit.breakpointLines(buffer.state).join(",")]))
+	};
+
+	/* The text comes along so the server can tell the lines of the breakpoints are lines of the source. */
+	const toggled = (line) => held()
+		? { line, ...marked([held()]), [active]: kit.textOf(held().state) } : {};
+
 	/* What the controls send, worked out as each request leaves, so text typed meanwhile goes with it. The getters
 	   answer while the editor is off the page too: a request that waited for the Code tool to be drawn anew is
 	   worked out in between. */
 	Object.assign(window.copperhead, {
 		editor: {
-			buffer: () => held() ? { name: active, text: kit.textOf(held().state), project } : {},
+			buffer: () => held() ? { ...marked([held()]), name: active, text: kit.textOf(held().state) } : {},
 			buffers: (extra = {}) => {
 				const list = unsaved();
+				const kept = held() && !list.includes(held()) ? [...list, held()] : list;
 
-				return list.length === 0 ? { ...extra } : {
+				return {
 					...extra,
-					project,
-					files: list.map((buffer) => buffer.name).join(","),
-					...Object.fromEntries(list.map((buffer) => [buffer.name, kit.textOf(buffer.state)]))
+					...marked(kept),
+					...(list.length === 0 ? {} : {
+						files: list.map((buffer) => buffer.name).join(","),
+						...Object.fromEntries(list.map((buffer) => [buffer.name, kit.textOf(buffer.state)]))
+					})
 				};
 			},
-			line: () => held() ? { line: asked.shift() ?? caretAt } : {},
+			line: () => toggled(asked.shift() ?? caretAt),
+			caret: () => toggled(caretAt),
 			cursor: () => held() ? { line: caretAt } : {},
 			check: () => held() ? { name: active, modified: kit.loaded(held().state).modified } : {}
 		}
