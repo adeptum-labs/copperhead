@@ -16,12 +16,15 @@
 package org.copperhead.toolchain;
 
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BooleanSupplier;
 import net.jqwik.api.Example;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -100,14 +103,17 @@ public class ProcessesTest extends ScratchTest {
 	@Example
 	public void shouldStopHandingOnOutputOnceTheProgramHasExited() throws Exception {
 		final List<String> lines = new CopyOnWriteArrayList<>();
+		final Path written = scratch().resolve("late-written");
 		final Instant start = Instant.now();
 
-		final int exit = Processes.run("sh", List.of("sh", "-c", "(sleep 1; echo late) & echo early"), scratch(),
-			PATIENT, SHORT_DRAIN, lines::add);
-		Thread.sleep(1500);
+		/* The late child goes on past a closed pipe, so the file says when its line has been written. */
+		final int exit = Processes.run("sh", List.of("sh", "-c", "(trap '' PIPE; sleep 1; echo late; touch '"
+			+ written + "') & echo early"), scratch(), PATIENT, SHORT_DRAIN, lines::add);
+
+		assertTrue(Duration.between(start, Instant.now()).compareTo(Duration.ofSeconds(3)) < 0);
+		await(() -> Files.exists(written));
 
 		assertEquals(0, exit);
-		assertTrue(Duration.between(start, Instant.now()).compareTo(Duration.ofSeconds(3)) < 0);
 		assertEquals(List.of("early"), lines);
 	}
 
@@ -139,6 +145,15 @@ public class ProcessesTest extends ScratchTest {
 			Thread.sleep(20);
 		}
 		assertFalse(alive(marker).isEmpty());
+	}
+
+	private static void await(final BooleanSupplier condition) throws InterruptedException {
+		final Instant until = Instant.now().plus(PATIENT);
+
+		while (!condition.getAsBoolean()) {
+			assertTrue(Instant.now().isBefore(until), "the condition never came");
+			Thread.sleep(20);
+		}
 	}
 
 	private static List<String> survivors(final String marker) throws InterruptedException {

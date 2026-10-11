@@ -129,6 +129,8 @@ public class LiveToolchainIT {
 		assertEquals(List.of(new BuildWarning("src/main.s", 1, "unknown mnemonic <foo>")), report.errors());
 	}
 
+	/* The output name resolves from the job folder, where the folder it names does not exist, so vasm cannot write
+	   it at all, let alone outside the project. */
 	@Example
 	public void shouldKeepAnOutputDirectiveInsideTheProject() throws IOException {
 		final ProjectDirectory project = project("hostile", ProjectKind.DEMO, Target.A500_OCS, false);
@@ -141,7 +143,11 @@ public class LiveToolchainIT {
 			assertEquals(List.of(), made.filter(path -> "escaped.bin".equals(path.getFileName().toString()))
 				.toList());
 		}
-		assertTrue(report.ok() || !report.errors().isEmpty(), report.log().toString());
+		assertFalse(report.ok());
+		assertEquals(1, report.errors().size(), report.errors().toString());
+		assertTrue(report.errors().getFirst().message().matches(
+			"could not open <build/\\.job-\\w+/main\\.x/\\.\\./\\.\\./\\.\\./escaped\\.bin> for output"),
+			report.errors().toString());
 	}
 
 	/* vasm takes an include from its working folder first; the boot loader's must be the one Copperhead ships. */
