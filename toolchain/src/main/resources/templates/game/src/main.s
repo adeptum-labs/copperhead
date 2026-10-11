@@ -19,16 +19,21 @@ BPL1PTH		=	$0e0
 BPLCON0		=	$100
 BPLCON1		=	$102
 BPLCON2		=	$104
+BPLCON3		=	$106
 BPL1MOD		=	$108
+BPLCON4		=	$10c
 SPR0PTH		=	$120
 COLOR00		=	$180
 COLOR17		=	$1a2
+DIWHIGH		=	$1e4
 FMODE		=	$1fc
 
 ALL		=	$7fff			; every bit but set/clear, which stays clear
 VERTB		=	5			; the vertical blank bit of the interrupt registers
 DMA_PLAY	=	$83a0			; set the master, bitplane, copper and sprite bits
 ONE_PLANE	=	$1200			; colour output on, one bitplane
+PALETTE_BANKS	=	$0c00			; colour bank 0, playfield 2 colours from 8: the older chips' way
+SPRITE_BANKS	=	$0011			; sprites take colours 16 to 31, as on the older chips
 
 FIRST_LINE	=	$2c
 FIRST_COLUMN	=	$81
@@ -37,6 +42,8 @@ HEIGHT		=	200			; keeps the sprite's last line within the 8 bits of its control 
 ROW		=	WIDTH/8			; bytes in a line of the bitplane
 SIZE		=	16			; the ship is 16 by 16 pixels
 STEP		=	2			; pixels the ship moves in a frame
+; Bit 8 of the window's last column and bits 10 to 8 of its last line, then the same of its first.
+WINDOW_HIGH	=	((((FIRST_COLUMN+WIDTH)>>8)&1)<<13)|((((FIRST_LINE+HEIGHT)>>8)&7)<<8)|(((FIRST_COLUMN>>8)&1)<<5)|((FIRST_LINE>>8)&7)
 
 ; Clamps the word in register \1 to the range \2 to \3.
 clamp	macro
@@ -56,7 +63,12 @@ clamp	macro
 	move.w	#ALL,INTENA(a5)		; nothing of Kickstart's may interrupt from here on
 	move.w	#ALL,INTREQ(a5)
 	move.w	#ALL,DMACON(a5)
-	move.w	#0,FMODE(a5)		; an AGA machine may have left wide fetches on; older chips ignore it
+	; An AGA machine may have left wide fetches, another colour bank or other window bits on. These set
+	; what the older chips do by themselves, and older chips ignore the writes.
+	move.w	#0,FMODE(a5)
+	move.w	#PALETTE_BANKS,BPLCON3(a5)
+	move.w	#SPRITE_BANKS,BPLCON4(a5)
+	move.w	#WINDOW_HIGH,DIWHIGH(a5)
 	move.l	#copper,COP1LC(a5)	; the copper starts it at the next vertical blank
 	move.w	#(WIDTH-SIZE)/2,d2	; x, from the left of the playfield
 	move.w	#(HEIGHT-SIZE)/2,d3	; y, from its top
